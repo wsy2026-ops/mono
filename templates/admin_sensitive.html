@@ -1,0 +1,168 @@
+{% extends "_admin_base.html" %}
+{% block title %}敏感词管理 · 管理后台{% endblock %}
+{% block admin_icon %}🔤{% endblock %}
+{% block admin_heading %}全局敏感词过滤{% endblock %}
+{% block admin_desc %}三种拦截模式可全局切换 · 支持增删、批量导入、自动拦截外链引流 · 仅超级管理员可见{% endblock %}
+
+{% block admin_content %}
+
+<style>
+  .sw-cat{
+    border:1px solid var(--line);border-radius:10px;margin-bottom:8px;
+    background:var(--card);overflow:hidden;
+  }
+  .sw-cat > summary{
+    cursor:pointer;padding:11px 16px;font-weight:600;font-size:13.5px;
+    background:var(--soft);list-style:none;display:flex;align-items:center;gap:8px;
+    user-select:none;transition:background .14s ease;
+  }
+  .sw-cat > summary:hover{background:#f0f0f2;}
+  .sw-cat > summary::-webkit-details-marker{display:none;}
+  .sw-cat > summary::before{
+    content:"▸";color:var(--muted);transition:transform .15s ease;
+    display:inline-block;width:10px;font-size:12px;
+  }
+  .sw-cat[open] > summary::before{transform:rotate(90deg);}
+  .sw-cat .sw-count{color:var(--muted);font-weight:400;font-size:12.5px;}
+  .sw-cat .adm-table-wrap{max-height:330px;overflow:auto;}
+  .sw-toolbar{
+    display:flex;justify-content:space-between;align-items:center;
+    gap:10px;flex-wrap:wrap;margin-bottom:14px;
+  }
+  .sw-mode-row{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;}
+  .sw-mode-row label{
+    display:inline-flex;align-items:center;gap:6px;font-size:13.5px;
+    font-weight:500;color:var(--fg);cursor:pointer;
+  }
+  .sw-checks{display:flex;gap:18px;flex-wrap:wrap;}
+  .sw-checks label{
+    display:inline-flex;align-items:center;gap:6px;font-size:13px;
+    color:#4b4b53;cursor:pointer;
+  }
+</style>
+
+<form method="post" class="adm-card">
+  <input type="hidden" name="action" value="set_mode">
+  <div class="adm-sec-title">拦截模式</div>
+  <div class="sw-mode-row">
+    <label><input type="radio" name="filter_mode" value="replace" {% if filter_mode=='replace' %}checked{% endif %}> 内容替换（****）</label>
+    <label><input type="radio" name="filter_mode" value="block" {% if filter_mode=='block' %}checked{% endif %}> 直接拦截</label>
+    <label><input type="radio" name="filter_mode" value="warn" {% if filter_mode=='warn' %}checked{% endif %}> 放行预警</label>
+  </div>
+  <div class="sw-checks">
+    <label><input type="checkbox" name="case_sensitive" {% if case_sensitive=='1' %}checked{% endif %}> 区分大小写</label>
+    <label><input type="checkbox" name="fuzzy_match" {% if fuzzy_match=='1' %}checked{% endif %}> 模糊匹配</label>
+    <label><input type="checkbox" name="spam_autoblock" {% if spam_autoblock=='1' %}checked{% endif %}> 自动拦截外链 / 引流</label>
+  </div>
+  <div class="adm-form-row" style="margin-top:16px;">
+    <button class="btn" type="submit">保存模式</button>
+  </div>
+</form>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:14px;">
+  <form method="post" class="adm-card" style="margin-bottom:0;">
+    <input type="hidden" name="action" value="add">
+    <div class="adm-sec-title">新增敏感词</div>
+    <div class="adm-form-row">
+      <input type="text" name="word" placeholder="敏感词" style="flex:1;min-width:110px;" required>
+      <input type="text" name="category" placeholder="分类" value="默认" style="width:92px;">
+      <button class="btn sm" type="submit">添加</button>
+    </div>
+  </form>
+
+  <form method="post" class="adm-card" style="margin-bottom:0;">
+    <input type="hidden" name="action" value="import">
+    <div class="adm-sec-title">批量导入（每行一个）</div>
+    <textarea name="bulk" rows="3" placeholder="一行一个敏感词&#10;也可以写「词,分类」指定分类"
+              style="width:100%;"></textarea>
+    <div class="adm-form-row" style="margin-top:10px;">
+      <button class="btn sm" type="submit">导入</button>
+    </div>
+  </form>
+</div>
+
+<div class="adm-card">
+  <div class="sw-toolbar">
+    <div>
+      <b style="font-size:14px;">敏感词库</b>
+      <span class="muted" style="font-size:12.5px;margin-left:6px;">
+        共 <span id="swTotal">{{ total }}</span> 个 · 按分类折叠
+      </span>
+    </div>
+    <div class="adm-form-row">
+      <input type="text" id="swSearch" placeholder="搜索敏感词…" style="width:170px;">
+      <button class="btn sm ghost" id="swExpand" type="button">全部展开</button>
+      <button class="btn sm ghost" id="swCollapse" type="button">全部折叠</button>
+    </div>
+  </div>
+
+  {% for cat, items in grouped.items() %}
+  <details class="sw-cat">
+    <summary>
+      <span>{{ cat }}</span>
+      <span class="sw-count">（{{ items|length }}）</span>
+    </summary>
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th style="width:70px;">ID</th>
+            <th>敏感词</th>
+            <th style="width:100px;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for w in items %}
+          <tr class="sw-row" data-word="{{ w.word }}">
+            <td class="adm-id">{{ w.id }}</td>
+            <td>{{ w.word }}</td>
+            <td>
+              <form method="post" action="{{ url_for('admin_sensitive') }}">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="word_id" value="{{ w.id }}">
+                <button class="btn sm ghost" type="submit"
+                        style="color:#b42318;border-color:#f2cfcb;">删除</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% else %}
+  <div class="adm-empty">
+    <div class="adm-empty-ico">🔤</div>
+    <div class="adm-empty-text">词库为空 —— 添加第一个敏感词后这里会按分类折叠展示</div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  (function(){
+    var search = document.getElementById('swSearch');
+    var cats = document.querySelectorAll('.sw-cat');
+    if (search) {
+      search.addEventListener('input', function(){
+        var q = this.value.trim().toLowerCase();
+        cats.forEach(function(d){
+          var rows = d.querySelectorAll('.sw-row');
+          var any = false;
+          rows.forEach(function(r){
+            var hit = r.getAttribute('data-word').toLowerCase().indexOf(q) !== -1;
+            r.style.display = hit ? '' : 'none';
+            if (hit) any = true;
+          });
+          d.style.display = any ? '' : 'none';
+          if (q && any) d.open = true;   // 搜索时自动展开命中分类
+        });
+        if (!q) cats.forEach(function(d){ d.style.display = ''; });
+      });
+    }
+    var ex = document.getElementById('swExpand');
+    var co = document.getElementById('swCollapse');
+    if (ex) ex.addEventListener('click', function(){ cats.forEach(function(d){ d.open = true; }); });
+    if (co) co.addEventListener('click', function(){ cats.forEach(function(d){ d.open = false; }); });
+  })();
+</script>
+{% endblock %}

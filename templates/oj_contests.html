@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}公开赛 · MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .ojc-wrap{max-width:1000px;margin:0 auto;padding:22px 16px 60px;font-size:14px;color:#1a1a1a;}
+  .ojc-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
+  .ojc-title{margin:0;font-size:22px;font-weight:700;letter-spacing:-.3px;}
+  .ojc-nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;}
+  .ojc-nav a{padding:6px 13px;border-radius:7px;text-decoration:none;color:#555;font-size:13px;
+             transition:background .12s,color .12s;}
+  .ojc-nav a:hover{background:#f2f4f7;color:#111;}
+  .ojc-nav a.on{background:#111;color:#fff;}
+  .ojc-nav a.primary{background:#2563eb;color:#fff;}
+  .ojc-nav a.primary:hover{background:#1d4ed8;}
+  .ojc-nav a.warn{background:#fff4e5;color:#b45309;}
+
+  .ojc-list{display:flex;flex-direction:column;gap:9px;}
+  .ojc-item{display:flex;align-items:center;justify-content:space-between;gap:14px;
+            padding:15px 18px;border:1px solid #e6e8eb;border-radius:10px;
+            text-decoration:none;color:inherit;background:#fff;transition:background .12s,border-color .12s;}
+  .ojc-item:hover{background:#f8fafc;border-color:#d5d9de;}
+  .ojc-main{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;}
+  .ojc-name{font-weight:600;font-size:15px;}
+  .ojc-meta{font-size:12.5px;color:#9aa0a6;display:flex;gap:10px;flex-wrap:wrap;}
+  .ojc-state{font-size:12px;padding:4px 11px;border-radius:5px;white-space:nowrap;font-weight:500;}
+  .ojc-state.running{background:#e8f7ee;color:#177245;}
+  .ojc-state.wait{background:#eef2ff;color:#4338ca;}
+  .ojc-state.ended{background:#f3f4f6;color:#8b9096;}
+
+  .ojc-empty{padding:50px 20px;text-align:center;color:#9aa0a6;border:1px dashed #e0e3e7;
+             border-radius:10px;background:#fcfcfd;}
+  .ojc-empty .ico{font-size:32px;margin-bottom:10px;}
+  .ojc-empty p{margin:0 0 5px;font-size:14px;color:#6b7280;}
+  .ojc-empty span{font-size:12.5px;}
+
+  .ojc-bar{display:flex;gap:9px;margin-top:16px;}
+  .ojc-btn{padding:8px 20px;border:none;border-radius:7px;font-size:13.5px;font-weight:500;
+           cursor:pointer;background:#2563eb;color:#fff;text-decoration:none;display:inline-block;
+           transition:background .12s;}
+  .ojc-btn:hover{background:#1d4ed8;}
+
+  @media (max-width:720px){
+    .ojc-title{font-size:19px;}
+    .ojc-nav{width:100%;margin-left:0;}
+  }
+</style>
+
+<div class="ojc-wrap">
+  <div class="ojc-head">
+    <h1 class="ojc-title">MONO OJ</h1>
+    <div class="ojc-nav">
+      <a href="{{ url_for('oj_home') }}">题库</a>
+      <a class="on" href="{{ url_for('oj_contest_list') }}">公开赛</a>
+      <a href="{{ url_for('oj_records') }}">我的记录</a>
+      <a class="primary" href="{{ url_for('oj_problem_new') }}">＋ 我要出题</a>
+      {% if me and me.is_admin %}
+      <a class="warn" href="{{ url_for('oj_admin_review') }}">审核{% if pending_count %} · {{ pending_count }}{% endif %}</a>
+      <a href="{{ url_for('oj_admin') }}">管理</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="ojc-head" style="margin-bottom:14px;">
+    <h2 style="margin:0;font-size:16px;font-weight:600;">公开赛</h2>
+    <span style="font-size:12px;color:#9aa0a6;">{{ contests|length }} 场</span>
+    {% if me and me.is_admin %}
+    <a href="{{ url_for('oj_admin') }}"
+       style="margin-left:auto;font-size:12.5px;color:#2563eb;text-decoration:none;">创建比赛 →</a>
+    {% endif %}
+  </div>
+
+  {% if contests %}
+  <div class="ojc-list">
+    {% for c in contests %}
+    <a class="ojc-item" href="{{ url_for('oj_contest', cid=c.id) }}">
+      <div class="ojc-main">
+        <span class="ojc-name">{{ c.title }}</span>
+        <span class="ojc-meta">
+          <span>{{ c.start_label }}</span>
+          <span>{{ c.duration_label }}</span>
+          {% if c.problem_count %}<span>{{ c.problem_count }} 道题</span>{% endif %}
+        </span>
+      </div>
+      <span class="ojc-state {{ c.state_class }}">{{ c.state_text }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="ojc-empty">
+    <div class="ico">🏁</div>
+    <p>还没有比赛</p>
+    <span>{% if me and me.is_admin %}在「管理」里创建第一场吧{% else %}等管理员开赛吧{% endif %}</span>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

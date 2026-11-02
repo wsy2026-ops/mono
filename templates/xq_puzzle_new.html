@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% block title %}创作残局 - 中国象棋{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .pz-new{max-width:1040px;margin:0 auto;}
+  .pz-new h2{font-size:22px;font-weight:800;margin:0 0 4px;}
+  .pz-new .sub{color:var(--muted,#888);font-size:13px;margin:0 0 16px;}
+  .pz-edit{display:grid;grid-template-columns:minmax(420px,1fr) 320px;gap:20px;align-items:start;}
+  .pz-card{border:1px solid var(--line,#e6e6e6);border-radius:16px;background:#fff;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+  .pz-card h4{margin:0 0 10px;font-size:14px;font-weight:800;}
+  .pz-board{position:relative;width:100%;max-width:480px;aspect-ratio:9/10;margin:0 auto;background:#fff;border:3px solid #111;border-radius:6px;user-select:none;-webkit-user-select:none;}
+  .pz-board svg{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;}
+  .pz-pt{position:absolute;width:calc(100% / 8 * 0.8);height:calc(100% / 9 * 0.8);transform:translate(-50%,-50%);cursor:pointer;z-index:2;border-radius:6px;}
+  .pz-pt:hover{background:rgba(0,0,0,.07);}
+  .pz-piece{position:absolute;width:calc(100% / 8 * 0.88);height:calc(100% / 8 * 0.88);transform:translate(-50%,-50%);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;z-index:3;pointer-events:none;background:#fff;border:2px solid #111;font-size:calc(100% / 8 * 0.5);box-shadow:0 1px 3px rgba(0,0,0,.22);box-sizing:border-box;}
+  .pz-piece.red{color:#c22b22;}
+  .pz-piece.black{color:#111;}
+  .pz-piece.bad{outline:3px solid #dc2626;outline-offset:1px;animation:pz-blink 1.1s ease-in-out infinite;}
+  @keyframes pz-blink{0%,100%{box-shadow:0 0 0 3px rgba(220,38,38,.45);}50%{box-shadow:0 0 0 8px rgba(220,38,38,.12);}}
+  .pz-hintbar{margin-top:10px;text-align:center;font-size:12.5px;color:#888;min-height:18px;}
+  .pz-toolrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  .pz-tool{border:1px solid #ddd;background:#fff;border-radius:9px;width:46px;height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;cursor:pointer;position:relative;transition:all .12s;}
+  .pz-tool.red{color:#c22b22;}
+  .pz-tool.black{color:#111;}
+  .pz-tool:hover{border-color:#999;}
+  .pz-tool.on{border-color:#111;background:#111;color:#fff;box-shadow:0 0 0 2px #111;}
+  .pz-tool.on.red{background:#c22b22;border-color:#c22b22;color:#fff;}
+  .pz-tool.erase{font-size:20px;color:#666;}
+  .pz-field{margin:12px 0;}
+  .pz-field label{display:block;font-size:12.5px;font-weight:700;margin-bottom:5px;}
+  .pz-field input[type=text],.pz-field textarea,.pz-field select{width:100%;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:9px;font-size:13px;font-family:inherit;box-sizing:border-box;background:#fff;}
+  .pz-field textarea{min-height:52px;resize:vertical;}
+  .pz-fen{font-family:Consolas,Menlo,monospace;font-size:11.5px;word-break:break-all;background:#fafafa;border:1px dashed #ccc;border-radius:8px;padding:8px 10px;color:#333;cursor:pointer;}
+  .pz-fen.err{border-color:#dc2626;color:#dc2626;}
+  .pz-act{display:flex;gap:8px;}
+  .pz-btn{flex:1;padding:10px;border:none;border-radius:10px;background:#111;color:#fff;font-size:13.5px;font-weight:800;cursor:pointer;}
+  .pz-btn:hover{opacity:.88;}
+  .pz-btn.ghost{background:#fff;color:#333;border:1px solid #ddd;}
+  .pz-btn.ghost:hover{border-color:#999;}
+  .pz-err{color:#dc2626;font-size:12.5px;margin-top:8px;display:none;}
+  .pz-ok{color:#189a5d;font-size:12.5px;margin-top:8px;display:none;}
+  .pz-count{font-size:11.5px;color:#999;margin-top:4px;line-height:1.6;}
+  .pz-note{font-size:12px;color:#888;margin-top:8px;line-height:1.8;}
+  @media (max-width:900px){ .pz-edit{grid-template-columns:minmax(0, 1fr);} }
+</style>
+
+<div class="pz-new">
+  <h2>＋ 创作象棋残局</h2>
+  <p class="sub">在棋盘上摆出你想让大家挑战的局面（红方先行），发布即公开到「玩家共享残局」。</p>
+
+  <div class="pz-edit">
+    <div class="pz-card">
+      <h4>🀄 摆子棋盘 <span style="font-weight:500;font-size:12px;color:#999;">选子后点击棋盘放置；用橡皮点击可移除</span></h4>
+      <div class="pz-board" id="pzBoard"></div>
+      <div class="pz-hintbar" id="pzHint">👆 先在右侧选择要摆的棋子（红/黑），再点棋盘落子</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="pz-card">
+        <h4>🎲 选择棋子</h4>
+        <div style="font-size:11.5px;color:#999;margin-bottom:4px;">红方（帅仕相马车炮兵）</div>
+        <div class="pz-toolrow" id="redTools"></div>
+        <div style="font-size:11.5px;color:#999;margin-bottom:4px;margin-top:6px;">黑方（将士象马车炮卒）</div>
+        <div class="pz-toolrow" id="blackTools"></div>
+        <div style="font-size:11.5px;color:#999;margin-bottom:4px;margin-top:6px;">其他</div>
+        <div class="pz-toolrow">
+          <button type="button" class="pz-tool erase" onclick="pickTool('erase')" title="移除棋子">✨</button>
+          <button type="button" class="pz-tool" onclick="clearBoard()" title="清空棋盘">🗑</button>
+          <button type="button" class="pz-tool" onclick="loadExample()" title="载入示例残局">✨</button>
+        </div>
+        <div class="pz-count" id="pzCount"></div>
+        <div class="pz-note">💡 点击目标格放下选中棋子（已有棋子会被替换）。残局要求<b style="color:#111;">红先</b>、双方各一枚将帅。摆位须符合棋规：<b style="color:#111;">帅/将限九宫</b>、<b style="color:#111;">仕/士限九宫斜点</b>、<b style="color:#111;">相/象不过河</b>——违规子会红圈高亮，发布会被拦截。</div>
+      </div>
+
+      <div class="pz-card">
+        <h4>📚 从内置残局开始改</h4>
+        <select id="loadSel" onchange="loadBuiltin(this.value)">
+          <option value="">— 选择一局内置残局作为底稿 —</option>
+          {% for p in builtin %}
+          <option value="{{ p.id }}">{{ p.title }}（难度{{ p.diff }}）</option>
+          {% endfor %}
+        </select>
+        <div class="pz-note">选好后载入该局局面，可在此基础上增删棋子改造成自己的作品。</div>
+      </div>
+
+      <div class="pz-card">
+        <h4>📋 填写信息并发布</h4>
+        <div class="pz-field">
+          <label>残局名称</label>
+          <input type="text" id="title" maxlength="40" placeholder="例：马后炮 · 三子归边">
+        </div>
+        <div class="pz-field">
+          <label>局面 FEN（随摆子实时生成 · 点击可粘贴替换）</label>
+          <div class="pz-fen" id="fenBox" onclick="focusFen()"></div>
+          <textarea id="fenInput" style="display:none;margin-top:6px;" placeholder="粘贴 FEN 后回车/失焦即导入棋盘"></textarea>
+        </div>
+        <div class="pz-field">
+          <label>说明 / 题解（可选）</label>
+          <textarea id="intro" maxlength="300" placeholder="杀法思路、经典出处等……"></textarea>
+        </div>
+        <div class="pz-act">
+          <button class="pz-btn" onclick="submitPz()">🚀 发布并公开</button>
+          <button class="pz-btn ghost" onclick="location.href='{{ url_for('xq_puzzles_list') }}'">返回</button>
+        </div>
+        <div class="pz-err" id="err"></div>
+        <div class="pz-ok" id="okbox">✅ 发布成功，正在跳转……</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const RED = ['K','A','B','N','R','C','P'];
+const BLACK = ['k','a','b','n','r','c','p'];
+const CN = {K:'帅',A:'仕',B:'相',N:'马',R:'车',C:'炮',P:'兵',k:'将',a:'士',b:'象',n:'马',r:'车',c:'炮',p:'卒'};
+const W = 9, H = 10;
+let board = '.'.repeat(90);   // 内部盘面 y 0..9（顶=黑方）
+let tool = null;              // {type:'piece',code} | {type:'erase'}
+
+function pctX(x){ return (x / (W - 1) * 100) + '%'; }
+function pctY(y){ return (y / (H - 1) * 100) + '%'; }
+function at(x, y){ return board[y * W + x]; }
+
+function boardSvg(){
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 8 9');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const mk = (x1,y1,x2,y2,w) => {
+    const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+    l.setAttribute('stroke','#111'); l.setAttribute('stroke-width',w); l.setAttribute('stroke-linecap','round'); l.setAttribute('vector-effect','non-scaling-stroke');
+    svg.appendChild(l);
+  };
+  for (let x = 0; x < 9; x++) mk(x, 0, x, 9, (x===0||x===8) ? 2.4 : 1.1);
+  for (let y = 0; y <= 4; y++) mk(0, y, 8, y, (y===0) ? 2.4 : 1.1);
+  for (let y = 5; y <= 9; y++) mk(0, y, 8, y, (y===9) ? 2.4 : 1.1);
+  mk(3, 0, 5, 2, 1.1); mk(5, 0, 3, 2, 1.1);
+  mk(3, 7, 5, 9, 1.1); mk(5, 7, 3, 9, 1.1);
+  mk(0, 4, 1.0, 4, 0.9); mk(7.0, 4, 8, 4, 0.9);
+  mk(0, 5, 1.0, 5, 0.9); mk(7.0, 5, 8, 5, 0.9);
+  const mt = (x,txt) => {
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x); t.setAttribute('y',4.95); t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','central');
+    t.setAttribute('fill','#555'); t.setAttribute('font-size','0.7'); t.setAttribute('font-weight','700');
+    t.setAttribute('font-family','KaiTi,STKaiti,"Microsoft YaHei",serif');
+    t.textContent = txt; svg.appendChild(t);
+  };
+  mt(2.0, '楚 河'); mt(6.0, '汉 界');
+  return svg;
+}
+function buildBoard(){
+  const el = document.getElementById('pzBoard');
+  el.appendChild(boardSvg());
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const pt = document.createElement('div');
+    pt.className = 'pz-pt';
+    pt.dataset.x = x; pt.dataset.y = y;
+    pt.style.left = pctX(x); pt.style.top = pctY(y);
+    pt.addEventListener('click', onBoardClick);
+    el.appendChild(pt);
+  }
+}
+function renderPieces(){
+  const el = document.getElementById('pzBoard');
+  el.querySelectorAll('.pz-piece').forEach(n => n.remove());
+  validateBoard();  // 填充 BAD：违规摆位的子即时红圈高亮
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const p = at(x, y);
+    if (p === '.') continue;
+    const d = document.createElement('div');
+    let cls = 'pz-piece ' + (p === p.toUpperCase() ? 'red' : 'black');
+    if (BAD.has(x + ',' + y)) cls += ' bad';
+    d.className = cls;
+    d.textContent = CN[p] || p;
+    d.style.left = pctX(x); d.style.top = pctY(y);
+    el.appendChild(d);
+  }
+  updateCount();
+  syncFen();
+}
+function buildTools(){
+  const mk = (arr, cls, box) => {
+    const host = document.getElementById(box);
+    arr.forEach(code => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pz-tool ' + cls;
+      b.textContent = CN[code];
+      b.dataset.code = code;
+      b.onclick = () => pickTool('piece', code);
+      host.appendChild(b);
+    });
+  };
+  mk(RED, 'red', 'redTools');
+  mk(BLACK, 'black', 'blackTools');
+}
+function pickTool(type, code){
+  tool = type === 'erase' ? {type:'erase'} : {type:'piece', code};
+  document.querySelectorAll('.pz-tool[data-code]').forEach(b => {
+    b.classList.toggle('on', !!(tool && tool.type === 'piece' && b.dataset.code === tool.code));
+  });
+  const eb = document.querySelector('.pz-tool.erase');
+  if (eb) eb.classList.toggle('on', !!(tool && tool.type === 'erase'));
+  const hint = document.getElementById('pzHint');
+  hint.textContent = tool && tool.type === 'erase'
+    ? '✨ 橡皮模式：点击棋盘上的棋子可移除'
+    : (tool ? ('已选择：' + CN[tool.code] + ' —— 点击棋盘落子（可覆盖）') : '请选择棋子或橡皮');
+}
+function onBoardClick(e){
+  const x = parseInt(e.currentTarget.dataset.x), y = parseInt(e.currentTarget.dataset.y);
+  if (!tool){ document.getElementById('pzHint').textContent = '⚠️ 请先在右侧选择棋子或橡皮'; return; }
+  const arr = board.split('');
+  if (tool.type === 'erase') arr[y * W + x] = '.';
+  else arr[y * W + x] = tool.code;
+  board = arr.join('');
+  renderPieces();
+  const vErr = validateBoard();
+  document.getElementById('pzHint').textContent = (tool.type === 'erase')
+    ? '✨ 已移除该棋子，继续点击其他棋子或改选棋子'
+    : (vErr ? '⚠️ ' + vErr + '（该子已标红圈）' : '✅ 已放置 ' + CN[tool.code] + '，继续摆子，摆完填名称即可发布');
+}
+function updateCount(){
+  const cnt = {};
+  for (const c of board) if (c !== '.') cnt[c] = (cnt[c] || 0) + 1;
+  const el = document.getElementById('pzCount');
+  const total = Object.keys(cnt).reduce((a, k) => a + cnt[k], 0);
+  el.innerHTML = '当前子力 <b style="color:#111;">' + total + '</b> 枚 · ' +
+    '红帅 <b style="color:#c22b22;">' + (cnt['K'] || 0) + '</b> · 黑将 <b>' + (cnt['k'] || 0) + '</b>';
+}
+
+function boardToFen(){
+  const rows = [];
+  for (let y = 0; y < H; y++){
+    let row = '', run = 0;
+    for (let x = 0; x < W; x++){
+      const c = at(x, y);
+      if (c === '.'){ run++; }
+      else { if (run){ row += run; run = 0; } row += c; }
+    }
+    if (run) row += run;
+    rows.push(row);
+  }
+  return rows.join('/') + ' w - - 0 1';
+}
+function fenToBoard(fen){
+  try {
+    const part = (fen || '').trim().split(/\s+/)[0];
+    const rows = part.split('/');
+    if (rows.length !== 10) return null;
+    const cells = [];
+    for (const row of rows){
+      let line = '';
+      for (const ch of row){
+        if (ch >= '1' && ch <= '9') line += '.'.repeat(+ch);
+        else if (/^[RNBAKCP]$/.test(ch) || /^[rnbakcp]$/.test(ch)) line += ch;
+        else return null;
+      }
+      if (line.length !== 9) return null;
+      cells.push(line);
+    }
+    return cells.join('');
+  } catch(e){ return null; }
+}
+function syncFen(){
+  const fen = boardToFen();
+  const box = document.getElementById('fenBox');
+  box.textContent = fen;
+  const err = validateBoard();
+  box.classList.toggle('err', !!err);
+  box.title = err || '点击可编辑 / 粘贴 FEN';
+}
+const BAD = new Set();  // 摆位违规的子坐标集合（"x,y"）
+const ADVISOR_RED  = [[3,7],[5,7],[4,8],[3,9],[5,9]];
+const ADVISOR_BLACK= [[3,0],[5,0],[4,1],[3,2],[5,2]];
+const hasPt = (x, y, list) => list.some(p => p[0] === x && p[1] === y);
+function validateBoard(){
+  BAD.clear();
+  let rk = 0, bk = 0, reds = 0, blacks = 0;
+  for (const c of board){
+    if (c === 'K') rk++;
+    else if (c === 'k') bk++;
+    else if (/^[A-Z]$/.test(c)) reds++;
+    else if (/^[a-z]$/.test(c)) blacks++;
+  }
+  if (rk !== 1) return '红方必须有且只有一枚帅（当前 ' + rk + ' 枚）';
+  if (bk !== 1) return '黑方必须有且只有一枚将（当前 ' + bk + ' 枚）';
+  if (reds < 1) return '红方至少再摆 1 枚进攻子力';
+  if (blacks < 1) return '黑方至少再摆 1 枚防守子力';
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const p = at(x, y);
+    if (p === '.') continue;
+    const row = y + 1, col = x + 1;  // 自上而下行 / 自左而右列
+    if (p === 'K' && !(x >= 3 && x <= 5 && y >= 7 && y <= 9)){
+      BAD.add(x + ',' + y);
+      return '红『帅』必须在下方九宫格内（虚线框），当前在第 ' + row + ' 行第 ' + col + ' 列';
+    }
+    if (p === 'k' && !(x >= 3 && x <= 5 && y >= 0 && y <= 2)){
+      BAD.add(x + ',' + y);
+      return '黑『将』必须在上方九宫格内（虚线框），当前在第 ' + row + ' 行第 ' + col + ' 列';
+    }
+    if (p === 'A' && !hasPt(x, y, ADVISOR_RED)){
+      BAD.add(x + ',' + y);
+      return '红『仕』只能摆在九宫斜线交叉点（四角与中心），当前在第 ' + row + ' 行第 ' + col + ' 列';
+    }
+    if (p === 'a' && !hasPt(x, y, ADVISOR_BLACK)){
+      BAD.add(x + ',' + y);
+      return '黑『士』只能摆在九宫斜线交叉点（四角与中心），当前在第 ' + row + ' 行第 ' + col + ' 列';
+    }
+    if (p === 'B' && y < 5){
+      BAD.add(x + ',' + y);
+      return '红『相』不能过河（须在红方半场），当前在第 ' + row + ' 行第 ' + col + ' 列';
+    }
+    if (p === 'b' && y > 4){
+      BAD.add(x + ',' + y);
+      return '黑『象』不能过河（须在黑方半场），当前在第 ' + row + ' 行第 ' + col + ' 列';
+    }
+  }
+  return null;
+}
+function focusFen(){
+  const box = document.getElementById('fenBox');
+  const input = document.getElementById('fenInput');
+  box.style.display = 'none';
+  input.style.display = 'block';
+  input.value = box.textContent;
+  input.focus();
+}
+function applyFenInput(){
+  const input = document.getElementById('fenInput');
+  const box = document.getElementById('fenBox');
+  const b = fenToBoard(input.value);
+  if (!b){ box.textContent = input.value; box.classList.add('err'); box.title = 'FEN 不合法，棋盘未改动'; }
+  else { board = b; renderPieces(); box.title = '已从 FEN 导入棋盘'; }
+  box.style.display = 'block';
+  input.style.display = 'none';
+}
+function setBoardFromFen(fen){
+  const b = fenToBoard(fen);
+  if (b){ board = b; renderPieces(); }
+}
+
+function clearBoard(){
+  if (!isBlank() && !confirm(__('清空当前棋盘？'))) return;
+  board = '.'.repeat(90);
+  renderPieces();
+}
+function isBlank(){ return board.indexOf('.') === 0 && board.indexOf('K') < 0; }
+function loadExample(){
+  if (!isBlank() && !confirm(__('载入示例将覆盖当前棋盘'))) return;
+  setBoardFromFen('4k4/4a4/9/4P4/9/9/9/9/4A4/4K4 w - - 0 1');
+  if (!document.getElementById('title').value) document.getElementById('title').value = '兵士巧胜单士';
+}
+const BUILTIN_FENS = {
+{% for p in builtin %}{{ p.id }}: {{ p.fen|tojson }},
+{% endfor %}};
+function loadBuiltin(id){
+  if (!id) return;
+  const fen = BUILTIN_FENS[id];
+  if (!fen) return;
+  if (!isBlank() && !confirm(__('载入内置残局将覆盖当前棋盘'))){ document.getElementById('loadSel').value=''; return; }
+  setBoardFromFen(fen);
+  document.getElementById('pzHint').textContent = '📚 已载入内置残局作为底稿，可增删棋子改造成你的作品';
+}
+
+async function submitPz(){
+  const err = document.getElementById('err');
+  const okb = document.getElementById('okbox');
+  err.style.display = 'none'; okb.style.display = 'none';
+  const title = document.getElementById('title').value.trim();
+  const intro = document.getElementById('intro').value.trim();
+  const fen = boardToFen();
+  const chk = validateBoard();
+  if (!title){ err.textContent = '请填写残局名称'; err.style.display = 'block'; return; }
+  if (chk){ err.textContent = chk; err.style.display = 'block'; return; }
+  const body = 'title=' + encodeURIComponent(title) + '&fen=' + encodeURIComponent(fen) + '&intro=' + encodeURIComponent(intro);
+  try{
+    const r = await fetch('/api/xq/puzzle/new', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: body
+    });
+    const j = await r.json();
+    if (j.ok){ okb.style.display = 'block'; setTimeout(() => { location.href = '/game/xq/puzzle/' + j.pid; }, 600); }
+    else { err.textContent = j.msg || '发布失败'; err.style.display = 'block'; }
+  }catch(e){
+    err.textContent = '网络错误，请重试'; err.style.display = 'block';
+  }
+}
+
+buildTools();
+buildBoard();
+renderPieces();
+document.getElementById('fenInput').addEventListener('blur', applyFenInput);
+document.getElementById('fenInput').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); applyFenInput(); } });
+</script>
+{% endblock %}

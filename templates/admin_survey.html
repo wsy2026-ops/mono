@@ -1,0 +1,186 @@
+{% extends "_admin_base.html" %}
+{% block title %}调查问卷 · 管理后台{% endblock %}
+{% block admin_icon %}📋{% endblock %}
+{% block admin_heading %}调查问卷{% endblock %}
+{% block admin_desc %}发布后用户登录会弹窗强制填写（更新公告关掉后弹出）。同时只能启用一份。{% endblock %}
+
+{% block admin_content %}
+<style>
+  .sv-wrap{padding:14px;}
+  .sv-card{border:1px solid var(--line);border-radius:10px;background:var(--card);
+    padding:14px 16px;margin-bottom:10px;}
+  .sv-row{display:flex;align-items:center;gap:12px;font-size:13px;}
+  .sv-title{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sv-pill{font-size:11.5px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted);}
+  .sv-pill.on{border-color:#16a34a;color:#16a34a;}
+  .sv-btn{padding:5px 12px;border-radius:7px;border:1px solid var(--line);background:var(--card);
+    color:var(--fg);font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-block;}
+  .sv-btn:hover{background:var(--soft);}
+  .sv-btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:700;}
+  .sv-btn.danger{border-color:#dc2626;color:#dc2626;}
+  .sv-form{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:16px;margin-top:16px;}
+  .sv-inp,.sv-ta{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;
+    padding:9px 11px;font-size:13px;background:var(--bg);color:var(--fg);outline:none;font-family:inherit;}
+  .sv-ta{min-height:70px;resize:vertical;}
+  .sv-lb{display:block;font-size:12px;color:var(--muted);margin:10px 0 5px;}
+  .sv-q{border:1px dashed var(--line);border-radius:9px;padding:12px;margin-bottom:10px;position:relative;}
+  .sv-q-head{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .sv-q-head select{flex:none;width:110px;padding:6px 8px;font-size:12.5px;border:1px solid var(--line);
+    border-radius:7px;background:var(--bg);color:var(--fg);}
+  .sv-q-del{position:absolute;top:8px;right:8px;width:24px;height:24px;border:none;background:transparent;
+    color:var(--muted);font-size:16px;cursor:pointer;border-radius:6px;}
+  .sv-q-del:hover{background:rgba(220,38,38,.12);color:#dc2626;}
+  .sv-opts{font-size:12px;color:var(--muted);margin-top:4px;}
+</style>
+
+<div class="sv-wrap">
+  {% for s in surveys %}
+  <div class="sv-card">
+    <div class="sv-row">
+      <span class="sv-title">{{ s.title }}</span>
+      <span class="sv-pill {{ 'on' if s.enabled else '' }}">{{ '启用中' if s.enabled else '已停用' }}</span>
+      <span class="sv-pill">{{ s.qcount }} 题</span>
+      <span class="sv-pill">{{ s.rcount }} 份答卷</span>
+      <a class="sv-btn" href="{{ url_for('admin_survey_results', sid=s.id) }}">看结果</a>
+      <form method="post" action="{{ url_for('admin_survey_toggle', sid=s.id) }}" style="display:inline;">
+        <button class="sv-btn {{ '' if s.enabled else 'primary' }}" type="submit">
+          {{ '停用' if s.enabled else '启用' }}</button>
+      </form>
+      <button class="sv-btn" type="button"
+              onclick="editSurvey({{ s.id }})">编辑</button>
+      <form method="post" action="{{ url_for('admin_survey_delete', sid=s.id) }}"
+            style="display:inline;" onsubmit="return confirm(__('删掉这份问卷和所有答卷？不可恢复'));">
+        <button class="sv-btn danger" type="submit">删除</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="sv-card" style="text-align:center;color:var(--muted);font-size:13px;padding:30px;">
+    还没有问卷，下面新建一份
+  </div>
+  {% endfor %}
+
+  <div class="sv-form">
+    <form method="post" id="svForm">
+      <input type="hidden" name="sid" id="fSid" value="0">
+      <label class="sv-lb">标题</label>
+      <input class="sv-inp" name="title" id="fTitle" placeholder="例如：MONO 社区使用体验调查">
+
+      <label class="sv-lb">说明（可空）</label>
+      <textarea class="sv-ta" name="intro" id="fIntro"
+                placeholder="例如：这份问卷大约需要 2 分钟，感谢你的反馈。"></textarea>
+
+      <label class="sv-lb" style="display:flex;gap:16px;align-items:center;margin-top:14px;">
+        <span><input type="checkbox" name="enabled" id="fEnabled"> 立即启用（会停用其他问卷）</span>
+        <span><input type="checkbox" name="once_only" id="fOnce" checked> 每人只答一次</span>
+      </label>
+
+      <label class="sv-lb">题目</label>
+      <div id="qList"></div>
+      <button class="sv-btn" type="button" onclick="addQ()">+ 添加题目</button>
+
+      <div style="margin-top:16px;display:flex;gap:10px;">
+        <button class="sv-btn primary" type="submit">保存问卷</button>
+        <button class="sv-btn" type="button" onclick="resetForm()">清空重填</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+var SURVEYS = {{ surveys | tojson }};
+var qSeq = 0;
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+function addQ(data){
+  data = data || {};
+  var id = 'q' + (qSeq++);
+  var type = data.qtype || 'single';
+  var wrap = document.createElement('div');
+  wrap.className = 'sv-q';
+  wrap.id = id;
+  wrap.innerHTML =
+    '<button class="sv-q-del" type="button" onclick="this.parentNode.remove()">×</button>' +
+    '<div class="sv-q-head">' +
+      '<select onchange="onTypeChange(this)">' +
+        '<option value="single">单选</option>' +
+        '<option value="multi">多选</option>' +
+        '<option value="text">填空</option>' +
+      '</select>' +
+      '<input class="sv-inp q-title" placeholder="题目内容" style="flex:1;">' +
+      '<label style="font-size:12px;color:var(--muted);white-space:nowrap;">' +
+        '<input type="checkbox" class="q-req" checked> 必答</label>' +
+    '</div>' +
+    '<textarea class="sv-ta q-opts" placeholder="选项，每行一个（单选/多选填，填空留空）" style="min-height:56px;"></textarea>' +
+    '<div class="sv-opts">单选/多选：每行一个选项；填空：留空</div>';
+  document.getElementById('qList').appendChild(wrap);
+
+  wrap.querySelector('select').value = type;
+  wrap.querySelector('.q-title').value = data.title || '';
+  wrap.querySelector('.q-req').checked = data.required !== false;
+  wrap.querySelector('.q-opts').value = (data.options || []).join('\n');
+  onTypeChange(wrap.querySelector('select'));
+}
+
+function onTypeChange(sel){
+  var q = sel.closest('.sv-q');
+  var ta = q.querySelector('.q-opts');
+  ta.style.display = (sel.value === 'text') ? 'none' : '';
+  if (sel.value === 'text') ta.value = '';
+}
+
+function resetForm(){
+  document.getElementById('fSid').value = '0';
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fIntro').value = '';
+  document.getElementById('fEnabled').checked = false;
+  document.getElementById('fOnce').checked = true;
+  document.getElementById('qList').innerHTML = '';
+  addQ();
+}
+
+function editSurvey(sid){
+  var s = null;
+  for (var i = 0; i < SURVEYS.length; i++) if (SURVEYS[i].id === sid) s = SURVEYS[i];
+  if (!s) return;
+  document.getElementById('fSid').value = s.id;
+  document.getElementById('fTitle').value = s.title || '';
+  document.getElementById('fIntro').value = s.intro || '';
+  document.getElementById('fEnabled').checked = !!s.enabled;
+  document.getElementById('fOnce').checked = !!s.once_only;
+  document.getElementById('qList').innerHTML = '';
+  (s.questions || []).forEach(function(q){ addQ(q); });
+  window.scrollTo({top: document.getElementById('svForm').offsetTop - 80, behavior: 'smooth'});
+}
+
+document.getElementById('svForm').addEventListener('submit', function(e){
+  var out = [];
+  var qs = document.querySelectorAll('#qList .sv-q');
+  for (var i = 0; i < qs.length; i++) {
+    var q = qs[i];
+    var title = q.querySelector('.q-title').value.trim();
+    if (!title) { alert('第 ' + (i+1) + ' 题没填题目'); e.preventDefault(); return; }
+    var type = q.querySelector('select').value;
+    var opts = [];
+    if (type !== 'text') {
+      opts = q.querySelector('.q-opts').value.split('\n')
+        .map(function(x){ return x.trim(); }).filter(function(x){ return x; });
+      if (!opts.length) { alert('第 ' + (i+1) + ' 题没有选项'); e.preventDefault(); return; }
+    }
+    out.push({qtype: type, title: title, options: opts,
+              required: q.querySelector('.q-req').checked});
+  }
+  if (!out.length) { alert(__('至少加一道题')); e.preventDefault(); return; }
+
+  var hid = document.createElement('input');
+  hid.type = 'hidden';
+  hid.name = 'questions';
+  hid.value = JSON.stringify(out);
+  this.appendChild(hid);
+});
+
+addQ();
+</script>
+{% endblock %}

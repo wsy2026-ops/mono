@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}{% if post %}编辑帖子{% else %}发布帖子{% endif %} - MONO 社区{% endblock %}
+{% set active = 'forum' %}
+{% block content %}
+<style>
+.editor-split{display:flex;gap:16px;align-items:stretch;min-height:520px;}
+.editor-pane{flex:1;min-width:0;display:flex;flex-direction:column;}
+.preview-pane{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:16px;background:var(--bg-elev);overflow-y:auto;color:var(--fg);}
+.preview-pane .empty{color:var(--muted);font-size:13px;text-align:center;margin-top:40px;}
+.editor-pane textarea{flex:1;min-height:400px;resize:vertical;}
+.editor-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.editor-toolbar button{padding:6px 12px;font-size:13px;background:var(--bg-elev);color:var(--fg);border:1px solid var(--line);border-radius:8px;cursor:pointer;}
+.editor-toolbar button:hover{background:var(--soft);border-color:var(--muted);}
+.editor-info{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);margin-top:6px;}
+@media (max-width:860px){
+  .editor-split{flex-direction:column;}
+  .preview-pane{min-height:200px;}
+}
+</style>
+
+<h2>{% if post %}编辑帖子{% else %}发布新帖子{% endif %}</h2>
+<p class="sub">左栏码字，右栏实时预览；支持 Markdown 和 LaTeX 公式，输入 @ 可提及他人</p>
+
+<div class="card">
+  <form method="post" id="postForm">
+    {% if not post %}
+    <label>发布板块</label>
+    <select name="section_id" style="margin-bottom:12px;">
+      {% for s in sections %}
+        {% if not s.is_announcement or (current_user and current_user.is_admin) %}
+        <option value="{{ s.id }}" {% if (preselect and s.id == preselect) or (loop.first and not post and not preselect) %}selected{% endif %}>{{ s.name }}{% if s.is_announcement %}（仅管理员）{% endif %}{% if s.is_closed %}（已关闭）{% endif %}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+
+    <label>标签（029 · 可选，点选，最多 5 个；留空则从标题自动提取）</label>
+    <div id="tagPick" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px;"></div>
+    <input type="hidden" name="tags" id="tagsInput" value="">
+    <div id="tagPickEmpty" class="muted" style="display:none;font-size:12px;margin-bottom:8px;">
+      站点还没有标签 —— 留空即可，发布时会从标题自动提取</div>
+    <script>
+    (function(){
+      var box = document.getElementById('tagPick');
+      var input = document.getElementById('tagsInput');
+      var empty = document.getElementById('tagPickEmpty');
+      var picked = [];
+      if (!box || !input) return;
+      fetch('/api/tags/hot?limit=20').then(function(r){ return r.json(); })
+        .then(function(j){
+          var tags = j.tags || [];
+          if (!tags.length) { empty.style.display = 'block'; return; }
+          box.innerHTML = tags.map(function(t){
+            return '<button type="button" data-t="' + t.name.replace(/"/g, '&quot;') + '"'
+                 + ' style="font-size:12.5px;padding:5px 13px;border-radius:99px;border:1px solid var(--line);'
+                 + ' background:var(--bg-elev);color:var(--fg-2);cursor:pointer;">#' + t.name + '</button>';
+          }).join('');
+        }).catch(function(){ empty.style.display = 'block'; });
+      box.addEventListener('click', function(e){
+        var b = e.target.closest('button[data-t]');
+        if (!b) return;
+        var name = b.getAttribute('data-t');
+        var i = picked.indexOf(name);
+        if (i >= 0) {
+          picked.splice(i, 1);
+          b.style.background = 'var(--bg-elev)';
+          b.style.color = 'var(--fg-2)';
+          b.style.borderColor = 'var(--line)';
+        } else {
+          if (picked.length >= 5) return;
+          picked.push(name);
+          b.style.background = 'rgba(201,162,39,.16)';
+          b.style.color = '#8a6d12';
+          b.style.borderColor = 'rgba(201,162,39,.5)';
+        }
+        input.value = picked.join(',');
+      });
+    })();
+    </script>
+    {% endif %}
+
+    <label>标题</label>
+    <input type="text" name="title" id="titleInput" value="{{ post.title if post else '' }}" placeholder="帖子标题" required maxlength="100" style="margin-bottom:12px;">
+
+    <label>摘要（可选，列表卡片展示用，留空将自动从正文截取 · 最多 200 字）</label>
+    <textarea name="summary" id="summaryInput" rows="2" maxlength="200" placeholder="用一句话概括本帖内容，便于列表快速浏览" style="margin-bottom:12px;min-height:60px;">{{ post.summary if post and post.summary else '' }}</textarea>
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:12px;flex-wrap:wrap;">
+      <label style="margin:0;">内容</label>
+      <div class="editor-toolbar" style="max-width:340px;">
+        <button type="button" onclick="insertFormat('**', '**')">粗体</button>
+        <button type="button" onclick="insertFormat('*', '*')">斜体</button>
+        <button type="button" onclick="insertFormat('# ', '')">标题</button>
+        <button type="button" onclick="insertFormat('> ', '')">引用</button>
+        <button type="button" onclick="insertFormat('`', '`')">行内代码</button>
+        <button type="button" onclick="insertFormat('$$', '$$')">公式</button>
+        <button type="button" onclick="insertFormat('- ', '')">列表</button>
+        <button type="button" onclick="insertFormat('[', '](url)')">链接</button>
+        <button type="button" onclick="window.imgUploader && window.imgUploader.pick(document.getElementById('editor'))">📷 图片</button>
+        <button type="button" onclick="mdInsertTable()">⊞ 表格</button>
+        <button type="button" onclick="mdInsertTask()">☑ 任务列表</button>
+        <button type="button" id="srcModeBtn" onclick="mdToggleSource()">源码模式</button>
+        <select id="codeLang" style="padding:6px 8px;font-size:13px;border:1px solid var(--line);border-radius:8px;">
+          <option value="python">Python</option>
+          <option value="cpp">C/C++</option>
+          <option value="javascript">JavaScript</option>
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="java">Java</option>
+          <option value="go">Go</option>
+          <option value="sql">SQL</option>
+          <option value="lua">Lua</option>
+          <option value="bash">Batch/Shell</option>
+        </select>
+        <button type="button" class="code-btn" onclick="insertCode(document.getElementById('codeLang').value,'editor')">💻 插入代码块</button>
+      </div>
+    </div>
+
+    <div class="editor-split">
+      <div class="editor-pane">
+        <textarea name="content" id="editor" data-uploader data-upload-api="/api/upload-image" placeholder="在这里写帖子内容...&#10;&#10;支持 Markdown 语法 · Ctrl+B 粗体 · Ctrl+K 链接&#10;支持 LaTeX 公式：$E=mc^2$ · 输入 @用户名 可提及他人&#10;图片可直接拖拽或 Ctrl+V 粘贴上传" required>{{ post.content if post else '' }}</textarea>
+        <div class="editor-info">
+          <span id="wordCount">0 字</span>
+          <span>Enter 换行，支持 @ 提及</span>
+        </div>
+      </div>
+      <div class="preview-pane" id="preview">
+        <div class="empty">右侧将实时显示预览</div>
+      </div>
+    </div>
+
+    <details style="margin-top:20px;border:1px solid var(--line);border-radius:12px;padding:14px;">
+      <summary style="cursor:pointer;font-weight:600;">📊 附加投票（可选 · 2–12 个选项）</summary>
+      <div style="margin-top:12px;">
+        <label>投票标题</label>
+        <input type="text" name="poll_title" placeholder="例如：你最常用哪门语言？" style="margin-bottom:10px;">
+        <label>选项（每行一个，至少 2 个）</label>
+        <textarea name="poll_options" rows="4" placeholder="Python&#10;C++&#10;JavaScript"></textarea>
+        <div class="row" style="margin-top:8px;">
+          <label style="margin:0;">模式</label>
+          <select name="poll_mode" style="width:auto;">
+            <option value="single">单选</option>
+            <option value="multi">多选</option>
+          </select>
+          <label style="margin:0;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="poll_anonymous" value="1"> 匿名投票</label>
+          <label style="margin:0;display:flex;align-items:center;gap:4px;">截止 <input type="datetime-local" name="poll_deadline" style="width:auto;"></label>
+        </div>
+      </div>
+    </details>
+
+    <div style="margin-top:24px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;">
+      <button type="submit" class="btn" style="min-width:180px;">{% if post %}保存修改{% else %}发布帖子{% endif %}</button>
+      <a href="{{ url_for('forum') }}" class="btn ghost" style="min-width:120px;">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/img_uploader.js') }}"></script>
+<script src="{{ url_for('static', filename='js/md_editor.js') }}"></script>
+<script>
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+const titleInput = document.getElementById('titleInput');
+const wordCount = document.getElementById('wordCount');
+
+function insertFormat(before, after) {
+  const start = editor.selectionStart;
+  const end = editor.selectionEnd;
+  const selected = editor.value.substring(start, end);
+  editor.value = editor.value.substring(0, start) + before + selected + after + editor.value.substring(end);
+  editor.focus();
+  editor.selectionStart = start + before.length;
+  editor.selectionEnd = end + before.length;
+  updatePreview();
+}
+
+function buildPreview(){
+  let html = '';
+  if (titleInput && titleInput.value.trim()) {
+    html += `<h1>${escapeHtml(titleInput.value.trim())}</h1>`;
+  }
+  if (editor.value.trim()) {
+    html += renderMarkdown(editor.value);
+  } else {
+    html += '<div class="empty">右侧将实时显示预览</div>';
+  }
+  return html;
+}
+
+function updatePreview(){
+  preview.innerHTML = buildPreview();
+  preview.classList.add('md-content');
+  enhanceMarkdown(preview);
+  wordCount.textContent = (editor.value.length) + ' 字';
+}
+
+function escapeHtml(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+editor.addEventListener('input', updatePreview);
+if (titleInput) titleInput.addEventListener('input', updatePreview);
+
+updatePreview();
+</script>
+{% endblock %}

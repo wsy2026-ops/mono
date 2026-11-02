@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ t.name }} - MONO 社区{% endblock %}
+{% set active = 'forum' %}
+
+{% block content %}
+<style>
+  .th-wrap{max-width:860px;margin:0 auto;}
+  .th-head{border:1px solid var(--line);border-radius:16px;padding:24px 28px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);margin-bottom:22px;}
+  .th-crumb{font-size:12.5px;color:var(--muted);margin-bottom:8px;}
+  .th-crumb a{color:var(--muted);}
+  .th-head h1{font-size:23px;margin:0 0 6px;font-weight:700;}
+  .th-head .meta{font-size:12.5px;color:var(--muted);margin-bottom:14px;}
+  .th-btn{border:1px solid var(--line);background:var(--bg-elev);color:var(--fg);
+    border-radius:99px;padding:8px 18px;font-size:13px;cursor:pointer;font-weight:600;}
+  .th-btn.on{background:#c9a227;border-color:#c9a227;color:#fff;}
+  .th-list{display:flex;flex-direction:column;gap:10px;}
+  .th-item{display:flex;gap:14px;align-items:baseline;border:1px solid var(--line);
+    border-radius:12px;padding:13px 16px;background:var(--card);text-decoration:none;color:inherit;}
+  .th-item:hover{border-color:var(--muted);}
+  .th-item .t{font-weight:600;font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .th-item .u{font-size:12px;color:var(--muted);flex:none;}
+  .th-item .n{margin-left:auto;font-size:12px;color:var(--muted);flex:none;font-variant-numeric:tabular-nums;}
+  .th-empty{padding:36px;text-align:center;color:var(--muted);font-size:13px;
+    border:1px dashed var(--line);border-radius:14px;}
+  .th-pager{display:flex;gap:8px;justify-content:center;margin-top:18px;font-size:13px;}
+  .th-pager a{padding:5px 12px;border:1px solid var(--line);border-radius:8px;color:var(--fg);text-decoration:none;}
+  .th-pager a.on{background:#111;color:#fff;border-color:#111;}
+</style>
+
+<div class="th-wrap">
+  <div class="th-head">
+    <div class="th-crumb"><a href="{{ url_for('forum', section=board.id) }}">{{ board.name }}</a> / 主题</div>
+    <h1>{{ t.name }}</h1>
+    <div class="meta">{{ total }} 篇帖子{% if t.description %} · {{ t.description }}{% endif %}</div>
+    {% if me %}
+    <button class="th-btn {{ 'on' if subbed else '' }}" id="subBtn">
+      {{ '已订阅' if subbed else '+ 订阅主题' }}
+    </button>
+    {% endif %}
+  </div>
+
+  {% if rows %}
+  <div class="th-list">
+    {% for p in rows %}
+    <a class="th-item" href="{{ url_for('view_post', post_id=p.id) }}">
+      <span class="t">{{ p.title }}</span>
+      <span class="u">{{ p.username }}</span>
+      <span class="n">{{ p.comment_count }} 评 · {{ p.likes }} 赞</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if pages > 1 %}
+  <div class="th-pager">
+    {% for i in range(1, pages + 1) %}
+    <a href="{{ url_for('thread_page', thread_id=t.id, page=i) }}"
+       class="{{ 'on' if i == page else '' }}">{{ i }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="th-empty">这个主题下还没有帖子，来发第一帖</div>
+  {% endif %}
+</div>
+
+{% if me %}
+<script>
+document.getElementById('subBtn').addEventListener('click', function(){
+  var b = this;
+  fetch('/api/thread/sub/{{ t.id }}', {method:'POST'}).then(function(r){return r.json()})
+    .then(function(j){
+      if (!j.ok) return;
+      var on = !!j.subbed;
+      b.classList.toggle('on', on);
+      b.textContent = on ? '已订阅' : '+ 订阅主题';
+    }).catch(function(){});
+});
+</script>
+{% endif %}
+{% endblock %}

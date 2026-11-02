@@ -1,0 +1,1074 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}对局中{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-bt" id="xqmBt">
+  <div class="xqm-bt-top">
+    <button class="xqm-btn xqm-btn-d xqm-btn-sm" id="xqmQuitBtn">退出</button>
+    <div class="xqm-side">
+      <div class="xqm-ringwrap off" id="xqmTopRing">
+        <div class="xqm-ava black" id="xqmTopAva">♟</div>
+        <div class="xqm-ring"></div>
+        <div class="xqm-ringnum"></div>
+      </div>
+      <div class="xqm-sideinfo">
+        <div class="xqm-nm" id="xqmTopName">对手</div>
+        <div class="xqm-rt" id="xqmTopRt">—</div>
+      </div>
+    </div>
+    <div class="xqm-trays" id="xqmTopTrays"></div>
+    <div class="xqm-round" id="xqmRound">第 1 回合</div>
+    <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmSfxBtn" title="音效开关">音效</button>
+  </div>
+
+  <div class="xqm-bt-mid">
+    <div class="xqm-boardwrap" id="xqmBoardWrap">
+      <div class="xqm-board" id="xqmBoard" tabindex="0" role="grid"
+           aria-label="棋盘，方向键移动光标，回车确认"><div class="xqm-fx" id="xqmFx"></div></div>
+    </div>
+    <div class="xqm-col" id="xqmCol">
+      <div class="xqm-tut" id="xqmTut" style="display:none">
+        <div class="st" id="xqmTutSt"><i class="on"></i><i></i><i></i></div>
+        <h5 id="xqmTutT"></h5>
+        <p id="xqmTutP"></p>
+        <div class="acts">
+          <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmTutSkip">跳过</button>
+          <button class="xqm-btn xqm-btn-g xqm-btn-sm" id="xqmTutNext">下一步</button>
+        </div>
+      </div>
+      <div class="xqm-panel" id="xqmTurnPanel">
+        <h4>当前回合</h4>
+        <div class="xqm-turn red" id="xqmTurn"><span class="dot"></span><span id="xqmTurnTxt">加载中…</span></div>
+        <div class="xqm-ap">
+          <div class="xqm-apdot on"></div><div class="xqm-apdot on"></div><div class="xqm-apdot on"></div>
+          <span class="xqm-aptxt" id="xqmApTxt">剩余 3 点</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="xqm-btn xqm-btn-g xqm-btn-sm" id="xqmPassBtn" style="flex:1">结束回合</button>
+          <button class="xqm-btn xqm-btn-o xqm-btn-sm xqm-only-sm" id="xqmLogBtn">战报</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px" id="xqmDrawBox"></div>
+      </div>
+      <div class="xqm-panel" id="xqmSelPanel">
+        <h4 id="xqmSelTitle">选中棋子</h4>
+        <div class="xqm-empty" id="xqmSelEmpty">点一枚棋子，查看血量、攻击与行动范围</div>
+        <div id="xqmSelBody" style="display:none"></div>
+      </div>
+      <div class="xqm-panel xqm-panel-log">
+        <h4>战报</h4>
+        <div class="xqm-log" id="xqmLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="xqm-bt-bot">
+    <div class="xqm-side">
+      <div class="xqm-ringwrap off" id="xqmBotRing">
+        <div class="xqm-ava red" id="xqmBotAva">♔</div>
+        <div class="xqm-ring"></div>
+        <div class="xqm-ringnum"></div>
+      </div>
+      <div class="xqm-sideinfo">
+        <div class="xqm-nm" id="xqmBotName">我</div>
+        <div class="xqm-rt" id="xqmBotRt">—</div>
+      </div>
+    </div>
+    <div class="xqm-tug">
+      <div class="xqm-tug-bar"><i class="red" id="xqmTugRed" style="width:50%"></i><i class="black" id="xqmTugBlack" style="width:50%"></i></div>
+      <div class="xqm-tug-txt"><span id="xqmTugRedTxt">—</span><span id="xqmTugBlkTxt">—</span></div>
+    </div>
+    <div class="xqm-trays" id="xqmBotTrays"></div>
+  </div>
+</div>
+
+<div class="xqm-hintbar">
+  玉绿实心 = 可移动　·　鎏金斜纹 = 可攻击　·　红色数字 = 预计伤害　·　方向键选格 / 回车确认
+</div>
+<div class="xqm-towarn" id="xqmTimeoutWarn" style="display:none" role="status" aria-live="assertive"></div>
+<div class="xqm-net" id="xqmNet" style="display:none">连接中断，正在重连…</div>
+<div class="xqm-sr" id="xqmLive" aria-live="polite" aria-atomic="true"></div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var GID = {{ gid }};
+  var P = null, mySide = null, sel = null, selR = -1, selC = -1, view = null;
+  var moves = {}, ranges = {}, heals = {}, over = false, busy = false;
+  var socket = null, pollTimer = null;
+  var flip = false;
+  var lastMove = null, captured = {red:[], black:[]};
+  var turnLeft = 0, turnTimer = null, turnKey = '';
+  var cursor = {r:9, c:4}, kbd = false;
+  var LOG_KEY = 'xqm_log_' + GID, META_KEY = 'xqm_meta_' + GID;
+
+  function $(id){ return document.getElementById(id); }
+  function VR(r){ return flip ? 9-r : r; }
+  function VC(c){ return flip ? 8-c : c; }
+  function glyph(p){ return (p && X.GLYPH[p.t]) ? X.GLYPH[p.t][0] : '？'; }
+  function coord(r,c){ return '(' + (r+1) + ',' + (c+1) + ')'; }
+  function sideName(s){ return s === 'red' ? '红方' : '黑方'; }
+  function fmtTime(s){
+    var m = Math.floor(s/60), q = s%60;
+    return m + ':' + (q < 10 ? '0'+q : q);
+  }
+
+  /* ── 撑满视口 ── */
+  function fitBattle(){
+    var bt = $('xqmBt'); if(!bt) return;
+    var land = document.documentElement.getAttribute('data-xqm-land') === '1';
+    if (!land){
+      var isMobile = window.matchMedia('(max-width:900px)').matches;
+      var reserve = isMobile ? 74 : 14;
+      var top = bt.getBoundingClientRect().top;
+      var h = window.innerHeight - top - reserve;
+      bt.style.height = Math.max(180, Math.round(h)) + 'px';
+    } else {
+      /* 横屏下高度由 CSS 的 .xqm-bt{height:100%} 管，
+         这里千万别再写 inline height —— .xqm 已经是 flex 列容器，
+         100% 会连 padding 一起算进来，直接撑出滚动条。 */
+      bt.style.height = '';
+    }
+    fitBoard();
+  }
+  function fitBoard(){
+    var wrap = $('xqmBoardWrap'), board = $('xqmBoard');
+    if(!wrap || !board) return;
+    var availW = wrap.clientWidth, availH = wrap.clientHeight;
+    if(availW < 40 || availH < 40) return;
+    var land = document.documentElement.getAttribute('data-xqm-land') === '1';
+    /* 横屏矮屏（300 多 px 高）里 padding 占比要压到最小，
+       否则 10 行全被 padding 吃掉，棋子只剩 22px。 */
+    var ratio = land ? 0.94 : 0.96;
+    var padXK = land ? 0.14 : 0.38;
+    var padYK = land ? 0.10 : 0.35;
+    var byW = availW / (9 + padXK*2);
+    var byH = availH / ((10 + padYK*2) * ratio);
+    var cw = Math.floor(Math.min(byW, byH));
+    cw = Math.max(20, Math.min(72, cw));
+    var ch = Math.round(cw * ratio);
+    board.style.setProperty('--cw', cw + 'px');
+    board.style.setProperty('--ch', ch + 'px');
+    board.style.setProperty('--bpx', Math.round(cw*padXK) + 'px');
+    board.style.setProperty('--bpy', Math.round(ch*padYK) + 'px');
+  }
+
+  /* ── 战报 ── */
+  var logLines = [];
+  function logLoad(){
+    try{ logLines = JSON.parse(sessionStorage.getItem(LOG_KEY)) || []; }catch(e){ logLines = []; }
+    try{
+      var m = JSON.parse(sessionStorage.getItem(META_KEY)) || {};
+      lastMove = m.lastMove || null;
+      captured = m.captured || {red:[], black:[]};
+    }catch(e){ lastMove = null; captured = {red:[], black:[]}; }
+  }
+  function logPersist(){
+    try{ sessionStorage.setItem(LOG_KEY, JSON.stringify(logLines.slice(0,40))); }catch(e){}
+    try{ sessionStorage.setItem(META_KEY, JSON.stringify({lastMove:lastMove, captured:captured})); }catch(e){}
+  }
+  function pushLine(cls, text){
+    var d = new Date();
+    var pad = function(n){ return n < 10 ? '0'+n : ''+n; };
+    logLines.unshift({t: pad(d.getHours())+':'+pad(d.getMinutes()), cls: cls, text: text});
+    if(logLines.length > 40) logLines.length = 40;
+  }
+  function renderLog(){
+    var box = $('xqmLog'); if(!box) return;
+    if(!logLines.length){ box.innerHTML = '<div class="xqm-empty" style="padding:12px 0">还没有行动</div>'; return; }
+    box.innerHTML = logLines.map(function(l){
+      return '<div class="xqm-logline ' + (l.cls||'') + '"><span class="t">' + l.t + '</span><span>' + l.text + '</span></div>';
+    }).join('');
+  }
+  var TAG_CN = {splash:'溅射', sweep:'横扫', pierce:'穿透', chain:'连珠',
+                reflect:'反伤', burn:'自燃', guard:'舍身', sacrifice:'舍身'};
+  function logFromEvents(evs, oldBoard){
+    if(!evs || !evs.length) return;
+    var at = function(r,c){
+      if(!oldBoard || !oldBoard[r]) return null;
+      return oldBoard[r][c];
+    };
+    evs.forEach(function(ev){
+      if(ev.k === 'move'){
+        var pc = at(ev.fr, ev.fc);
+        pushLine(pc && pc.s === 'red' ? 'r' : 'b',
+          glyph(pc) + ' ' + coord(ev.fr,ev.fc) + ' → ' + coord(ev.tr,ev.tc));
+        lastMove = {fr:ev.fr, fc:ev.fc, tr:ev.tr, tc:ev.tc};
+      } else if(ev.k === 'attack'){
+        var a = at(ev.fr, ev.fc), d = at(ev.tr, ev.tc);
+        pushLine(a && a.s === 'red' ? 'r' : 'b',
+          glyph(a) + ' 攻击 ' + glyph(d)
+          + (ev.notes && ev.notes.length ? '（' + ev.notes.join(' · ') + '）' : ''));
+        lastMove = {fr:ev.fr, fc:ev.fc, tr:ev.tr, tc:ev.tc};
+      } else if(ev.k === 'dmg'){
+        var q = at(ev.r, ev.c);
+        pushLine('d', glyph(q) + ' 受到 ' + ev.v + ' 点'
+          + (TAG_CN[ev.tag] ? '（' + TAG_CN[ev.tag] + '）' : ''));
+      } else if(ev.k === 'reflect'){
+        var rq = at(ev.tr, ev.tc);
+        pushLine('d', glyph(rq) + ' 反伤 ' + ev.v + ' 点给 ' + glyph(at(ev.fr, ev.fc)));
+      } else if(ev.k === 'heal'){
+        var hq = at(ev.r, ev.c);
+        pushLine('d', glyph(hq) + ' 回复 ' + ev.v + ' 点' + (ev.note ? '（' + ev.note + '）' : ''));
+      } else if(ev.k === 'shieldup'){
+        pushLine('d', glyph(at(ev.r, ev.c)) + ' 获得 ' + ev.v + ' 点护盾（妙手）');
+      } else if(ev.k === 'shield'){
+        pushLine('d', glyph(at(ev.r, ev.c)) + ' 的护盾挡下 ' + ev.v + ' 点');
+      } else if(ev.k === 'extra'){
+        pushLine('d', glyph(at(ev.r, ev.c)) + ' 猛扑，本回合可以再行动一次');
+      } else if(ev.k === 'dot'){
+        pushLine('d', glyph(at(ev.r, ev.c)) + ' 被藤缠住，损失 ' + ev.v + ' 点');
+      } else if(ev.k === 'swap'){
+        pushLine('d', glyph(at(ev.fr, ev.fc)) + ' 与 ' + glyph(at(ev.tr, ev.tc)) + ' 交换了位置');
+      } else if(ev.k === 'guard'){
+        pushLine('d', glyph(at(ev.tr, ev.tc)) + ' 替 ' + glyph(at(ev.fr, ev.fc))
+          + ' 挡下致命一击');
+      } else if(ev.k === 'revive'){
+        pushLine('k', glyph(at(ev.r, ev.c)) + ' 残兵不屈，以 ' + ev.v + ' 点生命站了起来');
+      } else if(ev.k === 'mark'){
+        pushLine('d', glyph(at(ev.r, ev.c)) + ' 被标记'
+          + (ev.turns > 1 ? '（持续 2 回合）' : ''));
+      } else if(ev.k === 'cut'){
+        pushLine('d', glyph(at(ev.r, ev.c))
+          + (ev.buff ? ' 被断援：不能回血，也拿不到增益' : ' 被断粮：下回合不能回血'));
+      } else if(ev.k === 'miss'){
+        var mq = at(ev.r, ev.c);
+        pushLine('d', glyph(mq) + (ev.why || '影袭') + '生效，这一击落空');
+      } else if(ev.k === 'kill'){
+        var k = at(ev.r, ev.c);
+        pushLine('k', glyph(k) + ' 阵亡');
+      } else if(ev.k === 'turn'){
+        pushLine('d', '第 ' + ev.round + ' 回合 · ' + sideName(ev.turn) + '行动');
+      } else if(ev.k === 'over'){
+        pushLine('k', '对局结束');
+      }
+    });
+  }
+
+  /* ── 计时 ── */
+  function paintTimer(){
+    var st = P ? P.state : null;
+    var top = $('xqmTopRing'), bot = $('xqmBotRing');
+    if(!st || over){ if(top) top.className = 'xqm-ringwrap off'; if(bot) bot.className = 'xqm-ringwrap off'; return; }
+    var mine = (st.turn === mySide);
+    var on = mine ? bot : top, off = mine ? top : bot;
+    if(off) off.className = 'xqm-ringwrap off';
+    if(!on) return;
+    var total = P.turn_timeout || 150;
+    var pct = Math.max(0, Math.min(100, turnLeft / total * 100));
+    on.className = 'xqm-ringwrap' + (turnLeft <= 30 ? ' urgent' : '');
+    on.style.setProperty('--p', pct.toFixed(1) + '%');
+    var n = on.querySelector('.xqm-ringnum');
+    if(n) n.textContent = fmtTime(turnLeft);
+    var warn = $('xqmTimeoutWarn');
+    if (warn){
+      if (mine && turnLeft <= 30){
+        warn.style.display = '';
+        warn.textContent = turnLeft <= 10
+          ? '再不行动就要判负了（' + turnLeft + ' 秒）'
+          : '剩 ' + turnLeft + ' 秒，超时判负';
+      } else {
+        warn.style.display = 'none';
+      }
+    }
+  }
+  function startTimer(sec){
+    turnLeft = Math.max(0, sec|0);
+    if(turnTimer) clearInterval(turnTimer);
+    paintTimer();
+    turnTimer = setInterval(function(){
+      if(over){ clearInterval(turnTimer); turnTimer = null; return; }
+      turnLeft = Math.max(0, turnLeft - 1);
+      paintTimer();
+      if(turnLeft <= 10 && turnLeft > 0) X.sfx.tick();
+      if(turnLeft === 0){ clearInterval(turnTimer); turnTimer = null; }
+    }, 1000);
+  }
+
+  /* ── 播报 ── */
+  function say(text){
+    var el = $('xqmLive'); if(!el) return;
+    el.textContent = '';
+    setTimeout(function(){ el.textContent = text; }, 30);
+  }
+
+  function collectMoveRects(evs){
+    if(!evs || !evs.length) return null;
+    var board = $('xqmBoard'); if(!board) return null;
+    var br = board.getBoundingClientRect(), out = null;
+    for(var i=0;i<evs.length;i++){
+      var ev = evs[i];
+      if(ev.k !== 'move' || ev.id === undefined) continue;
+      var pc = board.querySelector('.xqm-pc[data-id="'+ev.id+'"]');
+      if(!pc) continue;
+      var r = pc.getBoundingClientRect();
+      if(!out) out = {};
+      out[ev.id] = {dx: r.left - br.left, dy: r.top - br.top};
+    }
+    return out;
+  }
+  function playFlip(oldPos){
+    if(!oldPos) return;
+    var board = $('xqmBoard'); if(!board) return;
+    var br = board.getBoundingClientRect();
+    for(var id in oldPos){
+      var pc = board.querySelector('.xqm-pc[data-id="'+id+'"]');
+      if(!pc) continue;
+      var r = pc.getBoundingClientRect();
+      var dx = oldPos[id].dx - (r.left - br.left), dy = oldPos[id].dy - (r.top - br.top);
+      if(Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      (function(el, tx, ty){
+        el.style.transition = 'none';
+        el.style.transform = 'translate('+tx.toFixed(1)+'px,'+ty.toFixed(1)+'px)';
+        void el.offsetWidth;
+        el.style.transition = 'transform .2s ease-out';
+        el.style.transform = '';
+        setTimeout(function(){ el.style.transition = ''; },230);
+      })(pc, dx, dy);
+    }
+  }
+  function sameState(a,b){ return a && b && JSON.stringify(a) === JSON.stringify(b); }
+
+  function hasScout(st){
+    for(var r=0;r<10;r++) for(var c=0;c<9;c++){
+      var p = st.board[r][c];
+      if(p && p.s === mySide && p.t === 'chi' && p.hp > 0) return true;
+    }
+    return false;
+  }
+
+  function renderBoard(){
+    var st = P.state, board = $('xqmBoard');
+    var fx = board.querySelector('#xqmFx');
+    var html = '';
+    for(var dr=0;dr<10;dr++) for(var dc=0;dc<9;dc++){
+      var r = VR(dr), c = VC(dc);
+      var cur = (kbd && cursor.r === dr && cursor.c === dc) ? ' xqm-cursor' : '';
+      html += '<div class="xqm-cell'+cur+'" data-r="'+dr+'" data-c="'+dc+'">';
+      var p = st.board[r][c];
+      if(p) html += X.pcHTML(p, {sel: sel === p.id || (!!view && view.id === p.id), mine:(p.s === mySide && st.turn === mySide)});
+      if(lastMove){
+        if(lastMove.fr === r && lastMove.fc === c) html += '<div class="xqm-last"></div>';
+        if(lastMove.tr === r && lastMove.tc === c) html += '<div class="xqm-last to"></div>';
+      }
+      html += '</div>';
+    }
+    html += '<div class="xqm-palace p1"></div><div class="xqm-palace p2"></div>';
+    html += '<div class="xqm-river"><span>楚 河</span><span>汉 界</span></div>';
+    board.innerHTML = html;
+    if(fx) board.insertBefore(fx, board.firstChild);
+    board.classList.toggle('xqm-focus', !!sel);
+    board.classList.toggle('xqm-kbd', kbd);
+
+    /* 斥 · 侦察：己方有存活的斥，就把敌方所有攻击范围淡淡地铺出来 */
+    if(hasScout(st)){
+      var foeSide = mySide === 'red' ? 'black' : 'red';
+      for(var sr=0;sr<10;sr++) for(var sc2=0;sc2<9;sc2++){
+        var sp = st.board[sr][sc2];
+        if(!sp || sp.s !== foeSide) continue;
+        var stg = X.targetsOf(st.board, sr, sc2, st.ply);
+        for(var sk in stg.rng){
+          var ska = sk.split(','), skr = +ska[0], skc = +ska[1];
+          if(st.board[skr][skc] && st.board[skr][skc].s === foeSide) continue;
+          var scell = board.querySelector('.xqm-cell[data-r="'+VR(skr)+'"][data-c="'+VC(skc)+'"]');
+          if(!scell) continue;
+          var sd = document.createElement('div');
+          sd.className = 'xqm-hl rng';
+          sd.style.opacity = '0.30';
+          scell.appendChild(sd);
+        }
+      }
+    }
+
+    var all = {}; for(var k in moves) all[k] = 1; for(var k2 in ranges) all[k2] = 1;
+    for(var k3 in heals) all[k3] = 1;
+    for(var key in all){
+      var ab = key.split(','), a = +ab[0], b2 = +ab[1];
+      var cell = board.querySelector('.xqm-cell[data-r="'+VR(a)+'"][data-c="'+VC(b2)+'"]');
+      if(!cell) continue;
+      var inMv = !!moves[key], inRng = !!ranges[key], foe = st.board[a][b2];
+      var d = document.createElement('div');
+      d.className = 'xqm-hl ' + (heals[key] ? 'heal'
+        : (inMv && inRng ? 'both' : inMv ? 'mv' : 'rng'));
+      if(foe && inRng) d.innerHTML = '<span class="foemark"></span>';
+      cell.appendChild(d);
+    }
+    if(sel && selR >= 0){
+      var healer = st.board[selR][selC];
+      for(var hkey in heals){
+        var hab = hkey.split(','), hr = +hab[0], hc = +hab[1];
+        var ally = st.board[hr][hc];
+        if(!ally) continue;
+        var hcell = board.querySelector('.xqm-cell[data-r="'+VR(hr)+'"][data-c="'+VC(hc)+'"]');
+        if(!hcell) continue;
+        var hpv = X.healPreview(healer, ally);
+        var hd = document.createElement('div');
+        hd.className = 'xqm-prev';
+        hd.textContent = hpv.shield ? '预计 +' + hpv.heal + ' 盾 ' + hpv.shield
+                                    : '预计 +' + hpv.heal;
+        hcell.appendChild(hd);
+      }
+    }
+    if(sel && selR >= 0){
+      for(var key2 in ranges){
+        var ab2 = key2.split(','), ar = +ab2[0], ac = +ab2[1];
+        var foe2 = st.board[ar][ac];
+        if(!foe2 || foe2.s === mySide) continue;
+        var c2 = board.querySelector('.xqm-cell[data-r="'+VR(ar)+'"][data-c="'+VC(ac)+'"]');
+        if(!c2) continue;
+        var res = X.resolveAttack(st.board, selR, selC, ar, ac, st.ply);
+        if(!res) continue;
+        var bd = document.createElement('div');
+        bd.className = 'xqm-prev';
+        bd.textContent = res.miss ? '落空' : '预计 -' + res.hits[0].v;
+        c2.appendChild(bd);
+      }
+    }
+  }
+
+  function renderTrays(){
+    var top = $('xqmTopTrays'), bot = $('xqmBotTrays');
+    var foe = mySide === 'red' ? 'black' : 'red';
+    var lost = (P && P.lost) || captured || {};
+    function row(side){
+      var list = lost[side] || (captured ? captured[side] : []) || [];
+      return list.map(function(t){
+        return '<div class="xqm-tray ' + side + '">' + (X.GLYPH[t] ? X.GLYPH[t][0] : '？') + '</div>';
+      }).join('');
+    }
+    if(top) top.innerHTML = row(foe);
+    if(bot) bot.innerHTML = row(mySide);
+  }
+
+  function renderTug(){
+    var iAmRed = mySide === 'red';
+    var mine = iAmRed ? P.red : P.black, foe = iAmRed ? P.black : P.red;
+    var tot = (mine.max + foe.max) || 1;
+    var rp = Math.round(mine.max ? (mine.hp / tot * 100) : 50);
+    var bp = 100 - rp;
+    var red = iAmRed ? $('xqmTugRed') : $('xqmTugBlack');
+    var blk = iAmRed ? $('xqmTugBlack') : $('xqmTugRed');
+    if(red){ red.style.width = rp + '%'; }
+    if(blk){ blk.style.width = bp + '%'; }
+    var rt = $('xqmTugRedTxt'), bt = $('xqmTugBlkTxt');
+    var redObj = iAmRed ? mine : foe, blkObj = iAmRed ? foe : mine;
+    if(rt) rt.textContent = '红 ' + redObj.hp + '/' + redObj.max + '　剩 ' + redObj.alive + ' 子';
+    if(bt) bt.textContent = '剩 ' + blkObj.alive + ' 子　' + blkObj.hp + '/' + blkObj.max + ' 黑';
+  }
+
+  function renderPanel(){
+    var st = P.state;
+    $('xqmTurn').className = 'xqm-turn ' + (st.turn === 'red' ? 'red' : 'black');
+    $('xqmTurnTxt').textContent = sideName(st.turn) + '行动' + (st.turn === mySide ? '（你）' : '（对方）');
+    /* 行动点圆点按实际点数渲染（斥的先机首回合会到 4 点） */
+    var apBox = document.querySelector('.xqm-ap');
+    if(apBox){
+      var want = Math.max(3, st.ap), ah = '';
+      for(var ai = 0; ai < want; ai++) ah += '<div class="xqm-apdot' + (ai < st.ap ? ' on' : '') + '"></div>';
+      ah += '<span class="xqm-aptxt" id="xqmApTxt">剩余 ' + st.ap + ' 点</span>';
+      apBox.innerHTML = ah;
+    }
+    $('xqmRound').textContent = '第 ' + st.round + ' 回合';
+    $('xqmPassBtn').disabled = !(!over && st.turn === mySide && !busy);
+
+    var sp = null;
+    var fid = sel || (view ? view.id : null);
+    if(fid) for(var r=0;r<10;r++) for(var c=0;c<9;c++){
+      var p = st.board[r][c]; if(p && p.id === fid) sp = {p:p, r:r, c:c};
+    }
+    if(!sp){ $('xqmSelEmpty').style.display = ''; $('xqmSelBody').style.display = 'none'; }
+    else {
+      $('xqmSelEmpty').style.display = 'none'; $('xqmSelBody').style.display = '';
+      $('xqmSelTitle').textContent = sel ? '选中棋子' : '棋子信息';
+      var pp = sp.p, d = X.PD[pp.t], extra = '';
+      if(pp.t === 'pawn' && X.crossed(pp.s, sp.r)) extra += '<div class="on">· 已过河，死战生效中</div>';
+      if(pp.t === 'zu' && X.crossed(pp.s, sp.r)) extra += '<div class="on">· 已过河，老卒生效中</div>';
+      if(pp.t === 'horse' && pp.mv) extra += '<div class="on">· 本回合已移动，踏营生效中</div>';
+      if(pp.acts !== undefined && pp.acts !== null && pp.acts !== 1)
+        extra += '<div' + (pp.acts > 0 ? ' class="on"' : '') + '>· 本回合还能行动 ' + pp.acts + ' 次</div>';
+      if(pp.frz !== undefined && pp.frz !== null && st.ply <= pp.frz)
+        extra += '<div>· 被震击钉住，本回合不能移动</div>';
+      if(pp.gh !== undefined && pp.gh !== null && st.ply <= pp.gh && pp.ghn > 0)
+        extra += '<div class="on">· ' + (pp.t === 'bao' ? '残影' : '潜行') + '中，还能免疫一次攻击</div>';
+      if(pp.sh > 0) extra += '<div class="on">· 护盾 ' + pp.sh + ' 点，先替他挡伤害</div>';
+      if(pp.kb > 0) extra += '<div class="on">· 已连杀 ' + pp.kb + ' 次，攻击 +' + (pp.kb * 20) + '%</div>';
+      if(pp.dbf !== undefined && pp.dbf !== null && st.ply <= pp.dbf)
+        extra += '<div>· ' + (pp.dbfn || '死卫') + '降攻中，攻击 -'
+          + Math.round((pp.dbfv || 0.30) * 100) + '%</div>';
+      if(pp.t === 'jing' || pp.t === 'mao'){
+        var rr = X.reflectRatio(st.board, pp, sp.r, sp.c);
+        if(rr.ratio > 0) extra += '<div class="on">· 当前反伤 ' + Math.round(rr.ratio * 100) + '%</div>';
+      }
+      $('xqmSelBody').innerHTML =
+        '<div class="xqm-selhead">' + X.pcHTML(pp,{})
+        + '<div><div class="xqm-selname">' + glyph(pp) + '</div>'
+        + '<div class="xqm-selsub">' + sideName(pp.s) + ' · ' + d.name + '</div></div></div>'
+        + '<div class="xqm-s2">'
+        + '<div class="s hp"><div class="k">生命</div><div class="v">' + pp.hp + '/' + pp.mh + '</div></div>'
+        + '<div class="s atk"><div class="k">攻击</div><div class="v">' + pp.atk + '</div></div></div>'
+        + '<div class="xqm-trait"><div class="t">特性 · ' + d.trait + '</div>'
+        + '<div class="d">' + d.tdesc + '</div>' + extra + '</div>'
+        + (pp.g2 && d.nt
+            ? '<div class="xqm-trait nt"><div class="t">20 级特性 · ' + d.nt.name + '</div>'
+              + '<div class="d">' + d.nt.desc + '</div></div>'
+            : '');
+    }
+
+    var iAmRed = mySide === 'red';
+    var mine = iAmRed ? P.red : P.black, foe = iAmRed ? P.black : P.red;
+    $('xqmBotName').textContent = mine.name + '（你）';
+    $('xqmBotRt').textContent = mine.rating + ' 分';
+    $('xqmTopName').textContent = foe.name;
+    $('xqmTopRt').textContent = foe.rating + ' 分';
+    $('xqmTopAva').className = 'xqm-ava ' + (iAmRed ? 'black' : 'red');
+    $('xqmBotAva').className = 'xqm-ava ' + (iAmRed ? 'red' : 'black');
+    $('xqmTopAva').textContent = iAmRed ? '♟' : '♔';
+    $('xqmBotAva').textContent = iAmRed ? '♔' : '♟';
+
+    renderTug();
+    renderTrays();
+    renderLog();
+
+    var box = $('xqmDrawBox'), offer = st.draw_offer, myUid = iAmRed ? P.red.id : P.black.id;
+    if(over || st.over){ box.innerHTML = ''; }
+    else if(!offer){ box.innerHTML = '<button class="xqm-btn xqm-btn-o xqm-btn-sm" data-act="offer">求和</button>'; }
+    else if(offer === myUid){ box.innerHTML = '<button class="xqm-btn xqm-btn-o xqm-btn-sm" data-act="withdraw">撤回求和</button>'; }
+    else { box.innerHTML = '<button class="xqm-btn xqm-btn-g xqm-btn-sm" data-act="accept">接受和棋</button>'
+      + '<button class="xqm-btn xqm-btn-o xqm-btn-sm" data-act="decline">拒绝</button>'; }
+  }
+
+  var introing = false, introDone = false;
+
+  function playIntro(){
+    var board = $('xqmBoard');
+    if(!board) return;
+    if(document.documentElement.getAttribute('data-xqm-motion') === '0') return;
+    var pcs = board.querySelectorAll('.xqm-pc');
+    if(!pcs.length) return;
+    introing = true;
+    document.body.classList.add('xqm-intro');
+    var step = Math.min(105, Math.floor(2400 / pcs.length));
+    Array.prototype.forEach.call(pcs, function(el, i){
+      el.style.animationDelay = (i * step) + 'ms';
+      var lv = el.querySelector('.xqm-lv');
+      if(lv) lv.style.animationDelay = (i * step + 360) + 'ms';
+    });
+    setTimeout(function(){
+      document.body.classList.remove('xqm-intro');
+      Array.prototype.forEach.call(pcs, function(el){
+        el.style.animationDelay = '';
+        var lv = el.querySelector('.xqm-lv');
+        if(lv) lv.style.animationDelay = '';
+      });
+      introing = false;
+    }, 5000);
+  }
+
+  function renderAll(){
+    if(!P) return;
+    renderBoard(); renderPanel(); paintTimer();
+    if(!introDone){ introDone = true; setTimeout(playIntro, 80); }
+  }
+
+  function spawnFx(evs){
+    if(!evs || !evs.length) return;
+    if(document.documentElement.getAttribute('data-xqm-motion') === '0') return;
+    var board = $('xqmBoard'); if(!board) return;
+    function cellAt(r, c){
+      return board.querySelector('.xqm-cell[data-r="'+VR(r)+'"][data-c="'+VC(c)+'"]');
+    }
+    evs.forEach(function(ev){
+      if(ev.k === 'move'){
+        var c1 = cellAt(ev.fr, ev.fc);
+        if(!c1) return;
+        var t = document.createElement('div');
+        t.className = 'xqm-trail';
+        t.style.cssText = 'width:60px;height:60px;left:50%;top:50%;margin:-30px 0 0 -30px;'
+          + 'background:radial-gradient(circle,rgba(201,162,39,.6),rgba(201,162,39,.12) 55%,transparent 72%)';
+        c1.appendChild(t);
+        setTimeout(function(){ t.remove(); }, 780);
+      } else if(ev.k === 'kill'){
+        var c2 = cellAt(ev.r, ev.c);
+        if(!c2) return;
+        for(var i = 0; i < 8; i++){
+          (function(i){
+            var f = document.createElement('div');
+            var ang = (i / 8) * Math.PI * 2 + Math.random() * .5;
+            var dist = 24 + Math.random() * 20;
+            var sz = 4 + Math.random() * 4;
+            f.className = 'xqm-frag';
+            f.style.cssText = 'width:'+sz+'px;height:'+sz+'px;left:50%;top:50%;margin:'+(-sz/2)+'px 0 0 '+(-sz/2)+'px;'
+              + 'background:radial-gradient(circle,rgba(232,198,110,.95),rgba(201,162,39,.7));'
+              + 'transition:transform .6s cubic-bezier(.2,.7,.3,1),opacity .6s ease-out';
+            c2.appendChild(f);
+            requestAnimationFrame(function(){
+              f.style.transform = 'translate('+(Math.cos(ang)*dist)+'px,'+(Math.sin(ang)*dist)+'px) scale(.35)';
+              f.style.opacity = '0';
+            });
+            setTimeout(function(){ f.remove(); }, 660);
+          })(i);
+        }
+      }
+    });
+  }
+
+  function tagPops(evs){
+    if(!evs || !evs.length) return;
+    var board = $('xqmBoard'); if(!board) return;
+    function cellOf(r, c){
+      return board.querySelector('.xqm-cell[data-r="'+VR(r)+'"][data-c="'+VC(c)+'"]');
+    }
+    evs.forEach(function(ev){
+      if(ev.k === 'heal'){
+        var hc = cellOf(ev.r, ev.c);
+        if(hc){
+          var hel = document.createElement('div');
+          hel.className = 'xqm-tagpop heal';
+          hel.textContent = '+' + ev.v;
+          hc.appendChild(hel);
+          setTimeout(function(){ hel.remove(); }, 1300);
+        }
+        return;
+      }
+      /* 反伤：数字打在出手那一边身上 */
+      if(ev.k === 'reflect'){
+        var rc = cellOf(ev.tr, ev.tc);
+        if(rc){
+          var rp = document.createElement('div');
+          rp.className = 'xqm-tagpop';
+          rp.textContent = '-' + ev.v;
+          rc.appendChild(rp);
+          setTimeout(function(){ rp.remove(); }, 1300);
+        }
+        return;
+      }
+      /* 护盾 / 妙手 / 猛扑 */
+      if(ev.k === 'shieldup' || ev.k === 'shield'){
+        var sc = cellOf(ev.r, ev.c);
+        if(sc){
+          var sp = document.createElement('div');
+          sp.className = 'xqm-tagpop heal';
+          sp.textContent = (ev.k === 'shieldup' ? '盾 +' : '盾 -') + ev.v;
+          sc.appendChild(sp);
+          setTimeout(function(){ sp.remove(); }, 1300);
+        }
+        return;
+      }
+      if(ev.k === 'extra'){
+        var ec = cellOf(ev.r, ev.c);
+        if(ec){
+          var ep = document.createElement('div');
+          ep.className = 'xqm-tagpop';
+          ep.textContent = '再动';
+          ec.appendChild(ep);
+          setTimeout(function(){ ep.remove(); }, 1300);
+        }
+        return;
+      }
+      /* 缠绕：被藤缠住掉的那一下 */
+      if(ev.k === 'dot'){
+        var dc2 = cellOf(ev.r, ev.c);
+        if(dc2){
+          var dp = document.createElement('div');
+          dp.className = 'xqm-tagpop';
+          dp.textContent = '藤 -' + ev.v;
+          dc2.appendChild(dp);
+          setTimeout(function(){ dp.remove(); }, 1300);
+        }
+        return;
+      }
+      /* 标记 / 断粮 / 复活 / 替死 */
+      if(ev.k === 'mark' || ev.k === 'cut' || ev.k === 'revive' || ev.k === 'guard'){
+        var mc = cellOf(ev.r !== undefined ? ev.r : ev.tr,
+                        ev.c !== undefined ? ev.c : ev.tc);
+        if(mc){
+          var mp = document.createElement('div');
+          mp.className = 'xqm-tagpop' + (ev.k === 'revive' ? ' heal' : '');
+          mp.textContent = ev.k === 'mark' ? '标记' : ev.k === 'cut' ? '断粮'
+                         : ev.k === 'revive' ? '复活' : '替死';
+          mc.appendChild(mp);
+          setTimeout(function(){ mp.remove(); }, 1300);
+        }
+        return;
+      }
+      /* 影袭 / 残影：这一击落空 */
+      if(ev.k === 'miss'){
+        var mc = cellOf(ev.r, ev.c);
+        if(mc){
+          var mp = document.createElement('div');
+          mp.className = 'xqm-tagpop';
+          mp.textContent = '落空';
+          mc.appendChild(mp);
+          setTimeout(function(){ mp.remove(); }, 1300);
+        }
+        return;
+      }
+      if(ev.k !== 'attack' || !ev.notes || !ev.notes.length) return;
+      var cell = cellOf(ev.tr, ev.tc);
+      if(!cell) return;
+      var pc = cell.querySelector('.xqm-pc');
+      if(pc && !pc.classList.contains('xqm-hit')){
+        pc.classList.remove('xqm-hit');
+        void pc.offsetWidth;
+        pc.classList.add('xqm-hit');
+        setTimeout(function(){ pc.classList.remove('xqm-hit'); }, 380);
+      }
+      if(!board.classList.contains('xqm-shake')){
+        board.classList.remove('xqm-shake');
+        void board.offsetWidth;
+        board.classList.add('xqm-shake');
+        setTimeout(function(){ board.classList.remove('xqm-shake'); }, 340);
+      }
+    });
+  }
+
+  function enterResult(p){
+    over = true;
+    if(pollTimer) clearInterval(pollTimer);
+    if(turnTimer){ clearInterval(turnTimer); turnTimer = null; }
+    var el = $('xqmTurnTxt');
+    if (el) el.textContent = '对局结束';
+    var box = $('xqmSelPanel');
+    if (box){
+      var t = document.getElementById('xqmSelTitle');
+      var em = document.getElementById('xqmSelEmpty');
+      var bd = document.getElementById('xqmSelBody');
+      if (t) t.textContent = '正在进入结算';
+      if (em){ em.style.display = ''; em.textContent = '马上就好…'; }
+      if (bd) bd.style.display = 'none';
+    }
+    var bd2 = $('xqmPassBtn');
+    if (bd2) bd2.disabled = true;
+    setTimeout(function(){ location.href = '/game/xqmaster/result/' + GID; }, 900);
+  }
+
+  var prevOffer = null;
+
+  function apply(p, evs){
+    var oldPos = collectMoveRects(evs);
+    var oldBoard = P ? P.state.board : null;
+    P = p; mySide = p.my_side;
+    var wasOver = over;
+    if(p.status !== 'playing' || p.state.over) over = true;
+    if(evs && evs.length){
+      logFromEvents(evs, oldBoard);
+      (evs||[]).forEach(function(ev){
+        if(ev.k === 'kill'){
+          var q = oldBoard && oldBoard[ev.r] ? oldBoard[ev.r][ev.c] : null;
+          if(q) captured[q.s].push(q.t);
+        }
+        if(ev.k === 'move') X.sfx.move();
+        else if(ev.k === 'attack') X.sfx.swing();
+        else if(ev.k === 'dmg'){
+          if(ev.tag === 'splash') X.sfx.hurt();
+          else setTimeout(function(){ X.sfx.hit(); }, 120);
+        }
+        else if(ev.k === 'kill') setTimeout(function(){ X.sfx.die(); }, 190);
+        else if(ev.k === 'reflect') X.sfx.hurt();
+        else if(ev.k === 'miss') X.sfx.tick();
+        else if(ev.k === 'shieldup') X.sfx.tick();
+        else if(ev.k === 'extra') X.sfx.turn();
+        else if(ev.k === 'turn') X.sfx.turn();
+      });
+      logPersist();
+      X.fxFromEvents(evs, p.state.round);
+    }
+    sel = null; view = null; moves = {}; ranges = {}; heals = {};
+    renderAll();
+    playFlip(oldPos);
+    if(evs && evs.length){
+      X.fxHitAfter(evs, p.state.board);
+      tagPops(evs);
+      spawnFx(evs);
+      var newTurn = p.state.turn + '|' + p.state.round + '|' + p.state.ap;
+      if(newTurn !== turnKey){ turnKey = newTurn; startTimer(p.turn_left); }
+      var atk = (evs||[]).filter(function(e){ return e.k === 'attack'; })[0];
+      var kil = (evs||[]).filter(function(e){ return e.k === 'kill'; })[0];
+      if(kil) say('有棋子阵亡');
+      else if(atk) say('交手：' + (atk.notes && atk.notes.length ? atk.notes.join('，') : ''));
+    } else {
+      var tk = p.state.turn + '|' + p.state.round + '|' + p.state.ap;
+      if(tk !== turnKey){ turnKey = tk; startTimer(p.turn_left); }
+    }
+    if(!over && p.state.turn === mySide) say('轮到你行动，剩余 ' + p.state.ap + ' 点行动');
+    var offer = p.state.draw_offer, myUid = (mySide === 'red') ? p.red.id : p.black.id;
+    if(offer && offer !== myUid && prevOffer !== offer && !wasOver) X.toast(__('对方发起求和，请回应'));
+    prevOffer = offer || null;
+    if(over && !wasOver) enterResult(p);
+  }
+
+  function load(){
+    X.api('/api/xqm/game/' + GID).then(function(r){
+      if(!r.ok){ X.sfx.error(); X.toast(r.msg || __('对局加载失败')); setTimeout(function(){ location.href = '/game/xqmaster'; },900); return; }
+      logLoad();
+      P = r; mySide = r.my_side;
+      over = (r.status !== 'playing' || r.state.over);
+      flip = (mySide === 'black');
+      if(flip) X.setFlip({r:function(x){ return 9-x; }, c:function(x){ return 8-x; }});
+      turnKey = r.state.turn + '|' + r.state.round + '|' + r.state.ap;
+      cursor = {r: flip ? 2 : 7, c: 4};
+      if(!logLines.length) pushLine('d', '对局开始，' + sideName(r.state.turn) + '先行');
+      renderAll();
+      startTimer(r.turn_left);
+      fitBattle();
+      setTimeout(fitBattle, 320);
+      if(over){ enterResult(r); return; }
+      try{ if(!localStorage.getItem('xqm_tut')) setTimeout(tutShow, 700); }catch(e){}
+      bindSocket();
+      pollTimer = setInterval(function(){
+        if(over) return;
+        X.api('/api/xqm/game/' + GID).then(function(q){
+          netFails = 0;
+          if(!q.ok || over) return;
+          if(!sameState(q.state, P.state)) apply(q);
+        }).catch(function(){
+          netFails++;
+          if(netFails >= 2) setNet(false);
+        });
+      }, 5000);
+    });
+  }
+
+  var netFails = 0, netDown = false;
+  function setNet(ok){
+    if(ok === !netDown) return;
+    netDown = !ok;
+    var el = $('xqmNet');
+    if(el){
+      el.style.display = ok ? 'none' : '';
+      el.className = 'xqm-net' + (ok ? ' ok' : '');
+      el.textContent = ok ? '已重新连接' : '连接中断，正在重连…';
+    }
+    if(!ok){ X.sfx.error(); say('连接中断，正在重连'); }
+    else {
+      say('已重新连接');
+      setTimeout(function(){
+        var e2 = $('xqmNet');
+        if(e2 && !netDown) e2.style.display = 'none';
+      }, 1600);
+    }
+  }
+
+  function bindSocket(){
+    try{
+      window.__monoSioReady(function(s){
+        socket = s;
+        s.emit('join_xqm', {gid:GID});
+        if(s.on){
+          s.on('connect', function(){ netFails = 0; setNet(true); });
+          s.on('disconnect', function(){ setNet(false); });
+        }
+        s.on('xqm_update', function(p){
+          if(!p || p.gid !== GID) return;
+          netFails = 0; setNet(true);
+          if(sameState(p.state, P.state) && p.status === P.status) return;
+          apply(p, p.events || []);
+        });
+        s.on('xqm_ready', function(p){
+          if(!p || p.gid !== GID) return;
+          if(sameState(p.state, P.state)) return;
+          apply(p);
+        });
+      });
+    }catch(e){}
+  }
+
+  function sendMove(fr,fc,tr,tc){
+    if(busy || over) return;
+    busy = true;
+    renderPanel();
+    X.api('/api/xqm/game/' + GID + '/move', {method:'POST', body:{fr:fr, fc:fc, tr:tr, tc:tc}})
+      .then(function(r){
+        busy = false;
+        if(!r.ok){
+          X.sfx.error(); X.toast(r.msg || __('走不了'));
+          sel = null; view = null; moves = {}; ranges = {}; heals = {}; renderAll(); return;
+        }
+        if(sameState(r.state, P.state)) return;
+        var p = JSON.parse(JSON.stringify(P));
+        p.state = r.state;
+        p.turn_left = r.turn_left !== undefined ? r.turn_left : 150;
+        apply(p, r.events || []);
+      }).catch(function(){ busy = false; X.sfx.error(); X.toast(__('网络异常')); });
+  }
+
+  function pickCell(r, c){
+    if(introing) return;
+    if(!P || over) return;
+    var p = P.state.board[r][c], key = r + ',' + c;
+    /* 已经选中了医，点相邻友军 = 治疗 */
+    if(P.state.turn === mySide && selR >= 0 && heals[key] && p && p.s === mySide){
+      sendMove(selR, selC, r, c); return;
+    }
+    if(p && p.s === mySide && P.state.turn === mySide){
+      if(sel === p.id){ sel = null; moves = {}; ranges = {}; heals = {}; renderAll(); return; }
+      sel = p.id; view = null; selR = r; selC = c;
+      var tg = X.targetsOf(P.state.board, r, c, P.state.ply);
+      moves = tg.mv; ranges = tg.rng; heals = tg.heal || {};
+      renderAll();
+      var left = (p.acts === undefined || p.acts === null) ? 1 : p.acts;
+      say('已选中 ' + glyph(p) + '，可移动 ' + Object.keys(moves).length + ' 格，可攻击 '
+        + Object.keys(ranges).length + ' 格'
+        + (Object.keys(heals).length ? '，可治疗 ' + Object.keys(heals).length + ' 个友军' : '')
+        + (left > 1 ? '，本回合还能行动 ' + left + ' 次' : ''));
+      return;
+    }
+    if(P.state.turn === mySide && selR >= 0 && moves[key]){ sendMove(selR, selC, r, c); return; }
+    if(P.state.turn === mySide && selR >= 0 && p && p.s !== mySide && ranges[key]){ sendMove(selR, selC, r, c); return; }
+    if(p){
+      view = {id:p.id}; sel = null; selR = -1; selC = -1; moves = {}; ranges = {}; heals = {};
+      renderAll();
+      say(glyph(p) + '，生命 ' + p.hp + '，攻击 ' + p.atk);
+      return;
+    }
+    if(P.state.turn !== mySide){ X.sfx.error(); X.toast(__('还没轮到你')); return; }
+    sel = null; view = null; moves = {}; ranges = {}; heals = {}; renderAll();
+  }
+
+  document.addEventListener('click', function(e){
+    var board = $('xqmBoard');
+    if(!board || !board.contains(e.target)) return;
+    var cell = e.target.closest('.xqm-cell');
+    if(!cell) return;
+    kbd = false;
+    pickCell(VR(+cell.dataset.r), VC(+cell.dataset.c));
+  });
+
+  document.addEventListener('keydown', function(e){
+    var board = $('xqmBoard');
+    if(!board || !P || over) return;
+    var tag = (e.target.tagName || '').toLowerCase();
+    if(tag === 'input' || tag === 'textarea') return;
+    var keys = {ArrowUp:[-1,0], ArrowDown:[1,0], ArrowLeft:[0,-1], ArrowRight:[0,1]};
+    if(keys[e.key]){
+      e.preventDefault();
+      kbd = true;
+      cursor.r = Math.max(0, Math.min(9, cursor.r + keys[e.key][0]));
+      cursor.c = Math.max(0, Math.min(8, cursor.c + keys[e.key][1]));
+      renderBoard();
+      return;
+    }
+    if(e.key === 'Escape'){ kbd = true; sel = null; view = null; moves = {}; ranges = {}; heals = {}; renderAll(); return; }
+    if(e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      kbd = true;
+      pickCell(VR(cursor.r), VC(cursor.c));
+      renderBoard();
+    }
+  });
+
+  $('xqmPassBtn').onclick = function(){
+    if(over || busy || !P || P.state.turn !== mySide) return;
+    busy = true;
+    renderPanel();
+    X.api('/api/xqm/game/' + GID + '/pass', {method:'POST'}).then(function(r){
+      busy = false;
+      if(!r.ok){ X.sfx.error(); X.toast(r.msg || __('操作失败')); renderPanel(); return; }
+      if(sameState(r.state, P.state)) return;
+      var p = JSON.parse(JSON.stringify(P));
+      p.state = r.state;
+      p.turn_left = r.turn_left !== undefined ? r.turn_left : 150;
+      apply(p, r.events || []);
+    }).catch(function(){ busy = false; X.sfx.error(); X.toast(__('网络异常')); renderPanel(); });
+  };
+
+  $('xqmDrawBox').addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if(!b || over || busy || !P) return;
+    var act = b.dataset.act;
+    var url = {offer:'/draw', withdraw:'/draw', accept:'/draw/accept', decline:'/draw/decline'}[act];
+    if(!url) return;
+    busy = true;
+    X.api('/api/xqm/game/' + GID + url, {method:'POST'}).then(function(r){
+      busy = false;
+      if(!r.ok){ X.sfx.error(); X.toast(r.msg || __('操作失败')); renderPanel(); return; }
+      if(r.state && !sameState(r.state, P.state)){
+        var p = JSON.parse(JSON.stringify(P));
+        p.state = r.state;
+        apply(p);
+      } else { renderPanel(); }
+    }).catch(function(){ busy = false; X.sfx.error(); X.toast(__('网络异常')); });
+  });
+
+  var sfxBtn = $('xqmSfxBtn');
+  function paintSfx(){
+    if(!sfxBtn) return;
+    sfxBtn.textContent = X.sfx.on() ? '音效 开' : '音效 关';
+    sfxBtn.style.opacity = X.sfx.on() ? '' : '.55';
+  }
+  sfxBtn.onclick = function(){ X.sfx.set(!X.sfx.on()); paintSfx(); };
+  paintSfx();
+
+  $('xqmLogBtn').onclick = function(){
+    var p = document.querySelector('.xqm-panel-log');
+    if(p) p.classList.toggle('open');
+  };
+
+  $('xqmQuitBtn').onclick = function(){
+    if(over){ location.href = '/game/xqmaster'; return; }
+    var ask = true;
+    try{ ask = localStorage.getItem('xqm_confirm_resign') !== '0'; }catch(e){}
+    if(ask && !confirm(__('退出后本局判负，确定退出？'))) return;
+    if(pollTimer) clearInterval(pollTimer);
+    if(turnTimer){ clearInterval(turnTimer); turnTimer = null; }
+    X.api('/api/xqm/game/' + GID + '/resign', {method:'POST'}).then(function(){
+      location.href = '/game/xqmaster';
+    }).catch(function(){ location.href = '/game/xqmaster'; });
+  };
+
+  var rz = null;
+  window.addEventListener('resize', function(){
+    if(rz) clearTimeout(rz);
+    rz = setTimeout(fitBattle, 120);
+  });
+  window.addEventListener('orientationchange', function(){ setTimeout(fitBattle, 260); });
+  /* 强制横屏舞台换尺寸时会派发这个事件，棋盘要跟着重算 */
+  window.addEventListener('xqmland', function(){ setTimeout(fitBattle, 60); });
+
+  var TUT = [
+    ['第一步 · 点棋子', function(m){
+      return m + '方是你。点任意一枚' + m + '棋，棋盘上会亮出它能走、能打的位置。';
+    }],
+    ['第二步 · 认颜色', function(){
+      return '玉绿实心格可以走过去，鎏金斜纹格可以攻击。金色小数字是那一击的预计伤害。';
+    }],
+    ['第三步 · 三点行动', function(){
+      return '走一步或打一下各消耗 1 点，用完自动换手；也可以点「结束回合」提前交棒。探、豹、鼓这类棋子一回合能行动两次，全队总行动点一般是 3 点（帝在场则 4 点）。斩掉对方帅/将/帝即胜。';
+    }]
+  ];
+  function tutShow(){
+    var box = $('xqmTut'); if(!box) return;
+    var mine = mySide === 'red' ? '红' : '黑';
+    var turn = $('xqmTurnPanel');
+    var step = 0;
+    if (turn) turn.style.display = 'none';
+    function paint(){
+      $('xqmTutT').textContent = TUT[step][0];
+      $('xqmTutP').textContent = TUT[step][1](mine);
+      var st = $('xqmTutSt').children;
+      for(var i=0;i<st.length;i++) st[i].className = i <= step ? 'on' : '';
+      $('xqmTutNext').textContent = step === TUT.length - 1 ? '开始对局' : '下一步';
+    }
+    function close(){
+      box.style.display = 'none';
+      if (turn) turn.style.display = '';
+      try{ localStorage.setItem('xqm_tut', '1'); }catch(e){}
+    }
+    box.style.display = '';
+    paint();
+    $('xqmTutSkip').onclick = close;
+    $('xqmTutNext').onclick = function(){
+      X.sfx.click();
+      if(step === TUT.length - 1){ close(); return; }
+      step++; paint();
+    };
+  }
+
+  document.body.classList.add('xqm-bt-page');
+  if(X.bgm) X.bgm.play('battle');
+
+  load();
+})();
+</script>
+{% endblock %}

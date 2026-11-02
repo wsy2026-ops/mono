@@ -1,0 +1,420 @@
+{% extends "_admin_base.html" %}
+{% block title %}运行监控 · 管理后台{% endblock %}
+{% block admin_icon %}🖥{% endblock %}
+{% block admin_heading %}运行监控{% endblock %}
+{% block admin_desc %}服务器状态与攻击态势 · 数据永久留存 · 采样 60 秒 / 归属地离线查询后缓存{% endblock %}
+
+{% block admin_actions %}
+<span class="mon-live"><i class="mon-dot" id="monDot"></i><span id="monLiveTxt">连接中…</span></span>
+{% endblock %}
+
+{% block admin_content %}
+<style>
+  .mon-live{font-size:12.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;
+    padding:5px 12px;border-radius:99px;background:var(--soft);border:1px solid var(--line);}
+  .mon-dot{width:7px;height:7px;border-radius:50%;background:#1a7f37;display:inline-block;flex-shrink:0;}
+  .mon-dot.stale{background:#c9a227;}
+  .mon-dot.dead{background:#c0392b;}
+
+  .mon-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(152px,1fr));gap:10px;margin-bottom:14px;}
+  .mon-cell{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:13px 15px;
+    transition:border-color .16s ease;}
+  .mon-cell:hover{border-color:#d0d0d4;}
+  .mon-cell .k{font-size:11.5px;color:var(--muted);margin-bottom:6px;letter-spacing:.03em;}
+  .mon-cell .v{font-size:23px;font-weight:800;line-height:1.15;letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums;}
+  .mon-cell .u{font-size:12px;font-weight:400;color:var(--muted);margin-left:2px;}
+  .mon-cell .x{font-size:11px;color:var(--muted);margin-top:5px;}
+
+  .mon-bar{height:5px;border-radius:99px;background:#ebebed;margin-top:9px;overflow:hidden;}
+  .mon-bar > i{display:block;height:100%;background:var(--fg);border-radius:99px;transition:width .35s ease;}
+
+  .mon-sec{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:18px 20px;margin-bottom:14px;}
+  .mon-sec h3{margin:0 0 12px;font-size:14.5px;font-weight:700;}
+  .mon-sec h3 .hint{font-weight:400;font-size:12px;color:var(--muted);margin-left:6px;}
+
+  .mon-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .mon-hd h3{margin:0;}
+  .mon-range{display:flex;gap:6px;flex-wrap:wrap;}
+  .mon-range .btn{min-height:36px;padding:6px 13px;font-size:12.5px;line-height:1.4;display:inline-flex;align-items:center;justify-content:center;}
+  .mon-range .btn.active{background:var(--fg);color:#fff;border-color:var(--fg);}
+  @media (max-width:640px){
+    .mon-hd{align-items:flex-start;}
+    .mon-range{width:100%;gap:6px;}
+    .mon-range .btn{flex:1 1 0;min-width:0;padding:6px 4px;min-height:38px;}
+  }
+
+  .mon-svc{display:flex;gap:10px;flex-wrap:wrap;font-size:13px;}
+  .mon-svc span{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;
+    border-radius:99px;background:var(--soft);border:1px solid var(--line);color:#4b4b53;}
+
+  .mon-big{display:grid;grid-template-columns:repeat(auto-fit,minmax(142px,1fr));gap:10px;}
+  .mon-big div{text-align:center;padding:10px 0;background:var(--soft);
+    border:1px solid var(--line);border-radius:10px;}
+  .mon-big b{display:block;font-size:26px;font-weight:800;line-height:1.2;
+    font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
+  .mon-big em{font-style:normal;font-size:11.5px;color:var(--muted);}
+  .mon-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+
+  .mon-charts{display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);gap:14px;}
+  @media(max-width:760px){.mon-charts{grid-template-columns:minmax(0, 1fr);}}
+  .mon-chart{position:relative;height:184px;}
+
+  table.mon-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:520px;}
+  .mon-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table.mon-tbl th{text-align:left;font-weight:600;color:var(--muted);font-size:11.5px;
+    letter-spacing:.05em;text-transform:uppercase;
+    padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--soft);}
+  table.mon-tbl th:first-child{border-top-left-radius:8px;}
+  table.mon-tbl th:last-child{border-top-right-radius:8px;}
+  table.mon-tbl td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  table.mon-tbl tr:last-child td{border-bottom:0;}
+  table.mon-tbl tbody tr{transition:background .14s ease;}
+  table.mon-tbl tbody tr:hover{background:var(--soft);}
+  table.mon-tbl .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+  .mon-ip{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;}
+
+  .mon-kind{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;
+    background:var(--soft);color:#5e5e67;border:1px solid var(--line);white-space:nowrap;}
+  .mon-kind.hot{background:#fdf1f0;color:#b42318;border-color:#f2cfcb;}
+
+  .mon-empty{color:var(--muted);font-size:13px;text-align:center;padding:26px 0;}
+  .mon-scroll{max-height:340px;overflow:auto;}
+
+  @media (max-width:820px){
+    .mon-sec{padding:14px 15px;}
+    .mon-cell{padding:11px 13px;}
+    .mon-cell .v{font-size:20px;}
+  }
+</style>
+
+<div class="mon-grid" id="monMetrics">
+  <div class="mon-cell"><div class="k">CPU 使用率</div><div class="v" id="mCpu">—</div><div class="mon-bar"><i id="bCpu" style="width:0"></i></div></div>
+  <div class="mon-cell"><div class="k">内存</div><div class="v" id="mMem">—</div><div class="mon-bar"><i id="bMem" style="width:0"></i></div><div class="x" id="mMemX"></div></div>
+  <div class="mon-cell"><div class="k">磁盘</div><div class="v" id="mDisk">—</div><div class="mon-bar"><i id="bDisk" style="width:0"></i></div><div class="x" id="mDiskX"></div></div>
+  <div class="mon-cell"><div class="k">系统负载</div><div class="v" id="mLoad">—</div><div class="x" id="mLoadX"></div></div>
+  <div class="mon-cell"><div class="k">活动连接</div><div class="v" id="mConn">—</div><div class="x" id="mConnX"></div></div>
+  <div class="mon-cell"><div class="k">已运行</div><div class="v" id="mUp">—</div><div class="x" id="mUpX"></div></div>
+</div>
+
+<div class="mon-sec">
+  <h3>服务状态</h3>
+  <div class="mon-svc" id="monServices"><span class="muted">读取中…</span></div>
+</div>
+
+<div class="mon-sec">
+  <h3>攻击拦截总览 <span class="hint">含 SSH 爆破、连接层限流、应用层拦截 · 历史数据已从 auth.log 回溯</span></h3>
+  <div class="mon-big">
+    <div><b id="aTotal">—</b><em>累计拦截</em><div class="mon-sub" id="aTodaySub">—</div></div>
+    <div><b id="aKinds">—</b><em>拦截类型</em></div>
+    <div><b id="aSince" style="font-size:15px;line-height:1.5;">—</b><em>最早记录</em></div>
+  </div>
+  <div id="aKindList" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+</div>
+
+<div class="mon-sec">
+  <div class="mon-hd">
+    <h3>趋势 <span class="hint" id="rangeHint">最近 3 小时</span></h3>
+    <div class="mon-range">
+      <a class="btn" href="?minutes=60">1h</a>
+      <a class="btn" href="?minutes=180">3h</a>
+      <a class="btn" href="?minutes=720">12h</a>
+      <a class="btn" href="?minutes=1440">1d</a>
+      <a class="btn" href="?minutes=10080">7d</a>
+      <a class="btn" href="?minutes=43200">30d</a>
+      <a class="btn" href="?minutes=129600">90d</a>
+    </div>
+  </div>
+  <div class="mon-charts">
+    <div><div class="muted" style="font-size:12px;margin-bottom:4px;">资源占用（CPU % / 内存 %）</div>
+      <div class="mon-chart"><canvas id="chartRes"></canvas></div></div>
+    <div><div class="muted" style="font-size:12px;margin-bottom:4px;">拦截次数</div>
+      <div class="mon-chart"><canvas id="chartAtk"></canvas></div></div>
+  </div>
+</div>
+
+<div class="mon-sec">
+  <h3>攻击来源 IP <span class="hint">按拦截次数排序 · 归属地为离线查询后永久缓存</span></h3>
+  <div class="mon-scroll">
+    <table class="mon-tbl">
+      <thead><tr><th>IP</th><th>国家 / 地区</th><th>运营商</th><th>类型</th><th class="num">次数</th><th>最近</th></tr></thead>
+      <tbody id="tbIps"><tr><td colspan="6" class="mon-empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mon-sec">
+  <h3>来源地区分布</h3>
+  <div class="mon-scroll">
+    <table class="mon-tbl">
+      <thead><tr><th>国家 / 地区</th><th class="num">独立 IP</th><th class="num">拦截次数</th><th style="width:40%;">占比</th></tr></thead>
+      <tbody id="tbGeo"><tr><td colspan="4" class="mon-empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mon-sec">
+  <h3>拦截事件 <span class="hint">按时间倒序 · 向下滚动自动加载更早记录</span>
+    <span style="float:right;font-weight:400;font-size:12px;color:var(--muted);" id="evStat">—</span>
+  </h3>
+  <div class="mon-scroll" id="evScroll" style="max-height:460px;overflow-y:scroll;">
+    <table class="mon-tbl">
+      <thead style="position:sticky;top:0;background:var(--card);z-index:1;">
+        <tr><th>时间</th><th>类型</th><th>来源 IP</th><th>归属地</th><th>路径 / 说明</th><th class="num">次数</th></tr>
+      </thead>
+      <tbody id="tbEvents"><tr><td colspan="6" class="mon-empty">加载中…</td></tr></tbody>
+    </table>
+    <div id="evMore" style="text-align:center;padding:10px;font-size:12px;color:var(--muted);"></div>
+  </div>
+</div>
+
+<script src="{{ cdn_url("js/chart.umd.min.js") }}"></script>
+<script>
+(function(){
+  var MINUTES = {{ request.args.get('minutes', '180')|tojson }};
+  // 区间提示原来是写死的「最近 3 小时」，选 7d/90d 也不变 —— 顺手改成动态
+  (function(){
+    var m = parseInt(MINUTES, 10) || 180;
+    var txt = m < 60 ? (m + ' 分钟')
+            : (m < 1440 ? (Math.round(m / 60) + ' 小时')
+            : (Math.round(m / 1440) + ' 天'));
+    var hint = document.getElementById('rangeHint');
+    if (hint) hint.textContent = '最近 ' + txt;
+    var links = document.querySelectorAll('.mon-range .btn');
+    for (var i = 0; i < links.length; i++) {
+      if (links[i].getAttribute('href') === '?minutes=' + m) links[i].className += ' active';
+    }
+  })();
+  var KIND_NAME = {
+    ssh_brute:'SSH 密码爆破', ssh_ban:'SSH 爆破封禁', nginx_rate:'连接层限流',
+    app_rate:'应用层限流', login_fail:'登录失败', login_block:'登录退避拦截',
+    register_block:'注册超限', upload_block:'上传超限', ai_ip_block:'AI 单IP超限',
+    ai_global_break:'AI 全局熔断', sio_reject:'长连接被拒'
+  };
+  function kindName(k){ return KIND_NAME[k] || k; }
+  function locText(o){
+    var parts = [o.country_cn || o.country, o.region, o.city].filter(Boolean);
+    return parts.join(' · ') || '未知';
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmtTime(ts){
+    if(!ts) return '—';
+    var d = new Date(ts*1000), p = function(n){ return n<10?'0'+n:''+n; };
+    return p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+  }
+  function fmtDur(sec){
+    if(sec==null) return '—';
+    var d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60);
+    if(d>0) return d+' 天 '+(h>0?h+' 时':'');
+    if(h>0) return h+' 时 '+m+' 分';
+    return m+' 分';
+  }
+  function setBar(id, pct){ var e=document.getElementById(id); if(e) e.style.width=Math.max(0,Math.min(100,pct||0))+'%'; }
+  function txt(id, v){ var e=document.getElementById(id); if(e) e.textContent = v; }
+  function setDot(state){
+    var d=document.getElementById('monDot');
+    d.className='mon-dot'+(state==='ok'?'':(state==='stale'?' stale':' dead'));
+  }
+
+  function loadLive(){
+    fetch('/api/admin/monitor/live',{headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok) throw 0;
+        var s = j.sample || {};
+        var age = j.server_time - (s.ts||0);
+        setDot(age < 180 ? 'ok' : (age < 600 ? 'stale' : 'dead'));
+        txt('monLiveTxt', age < 180 ? '实时' : ('数据延迟 '+Math.round(age/60)+' 分钟'));
+
+        txt('mCpu', s.cpu_pct==null ? '—' : s.cpu_pct.toFixed(1));
+        setBar('bCpu', s.cpu_pct);
+        if(s.mem_total_mb){
+          var mp = s.mem_used_mb / s.mem_total_mb * 100;
+          txt('mMem', mp.toFixed(0)+'%'); setBar('bMem', mp);
+          txt('mMemX', s.mem_used_mb+' / '+s.mem_total_mb+' MB');
+        } else { txt('mMem','—'); txt('mMemX',''); }
+        if(s.disk_total_gb){
+          var dp = s.disk_used_gb / s.disk_total_gb * 100;
+          txt('mDisk', dp.toFixed(0)+'%'); setBar('bDisk', dp);
+          txt('mDiskX', s.disk_used_gb+' / '+s.disk_total_gb+' GB');
+        } else { txt('mDisk','—'); txt('mDiskX',''); }
+        txt('mLoad', s.load1==null?'—':s.load1);
+        txt('mLoadX', s.load5==null?'':('5分 '+s.load5+' · 15分 '+s.load15));
+        txt('mConn', s.conn_estab==null?'—':s.conn_estab);
+        txt('mConnX', s.app_threads==null?'':('应用线程 '+s.app_threads));
+        txt('mUp', fmtDur(s.uptime_sec));
+        txt('mUpX', s.req_count==null?'':('本周期请求 '+s.req_count+(s.req_avg_ms?(' · 均 '+s.req_avg_ms+'ms'):'')));
+
+        var svc = j.services || {}, html = '';
+        ['mono','nginx','fail2ban','ufw'].forEach(function(n){
+          var st = svc[n] || 'unknown';
+          var ok = (st==='active');
+          html += '<span><i class="mon-dot'+(ok?'':' dead')+'"></i>'+esc(n)+
+                  ' <span class="muted">'+esc(st)+'</span></span>';
+        });
+        document.getElementById('monServices').innerHTML = html;
+
+        var sm = j.summary || {};
+        txt('aTotal', (sm.total||0).toLocaleString());
+        txt('aTodaySub', '其中今日 ' + (sm.today||0).toLocaleString() + ' 次');
+        txt('aKinds', (sm.by_kind||[]).length);
+        txt('aSince', sm.first_ts ? fmtTime(sm.first_ts) : '暂无');
+        var kl = '';
+        (sm.by_kind||[]).forEach(function(k){
+          kl += '<span class="mon-kind'+(k.count>50?' hot':'')+'">'+esc(kindName(k.kind))+' '+k.count+'</span>';
+        });
+        document.getElementById('aKindList').innerHTML = kl || '<span class="muted" style="font-size:12px;">暂无拦截记录</span>';
+      })
+      .catch(function(){ setDot('dead'); txt('monLiveTxt','连接失败'); });
+  }
+
+  var cRes = null, cAtk = null;
+  function loadSeries(){
+    fetch('/api/admin/monitor/series?minutes='+MINUTES,{headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok) throw 0;
+        var labels = j.samples.map(function(s){ return fmtTime(s.ts); });
+        var cpu = j.samples.map(function(s){ return s.cpu_pct; });
+        var mem = j.samples.map(function(s){
+          return (s.mem_total_mb ? (s.mem_used_mb/s.mem_total_mb*100) : null); });
+
+        if(!cRes){
+          cRes = new Chart(document.getElementById('chartRes'), {
+            type:'line',
+            data:{ labels:labels, datasets:[
+              {label:'CPU %', data:cpu, borderColor:'#111', backgroundColor:'rgba(17,17,17,.06)',
+               borderWidth:1.5, pointRadius:0, tension:.25, fill:true, spanGaps:true},
+              {label:'内存 %', data:mem, borderColor:'#8a8a8a', backgroundColor:'rgba(138,138,138,.06)',
+               borderWidth:1.5, pointRadius:0, tension:.25, fill:true, spanGaps:true}
+            ]},
+            options:{responsive:true, maintainAspectRatio:false, animation:false,
+              plugins:{legend:{labels:{boxWidth:10, font:{size:11}}}},
+              scales:{y:{beginAtZero:true, max:100, ticks:{font:{size:10}}},
+                      x:{ticks:{font:{size:10}, maxTicksLimit:6}}}}
+          });
+        } else {
+          cRes.data.labels = labels;
+          cRes.data.datasets[0].data = cpu;
+          cRes.data.datasets[1].data = mem;
+          cRes.update('none');
+        }
+
+        var alabels = j.attacks.map(function(a){ return fmtTime(a.ts); });
+        var acount = j.attacks.map(function(a){ return a.count; });
+        if(!cAtk){
+          cAtk = new Chart(document.getElementById('chartAtk'), {
+            type:'bar',
+            data:{ labels:alabels, datasets:[
+              {label:'拦截次数', data:acount, backgroundColor:'#c0392b', borderRadius:2}
+            ]},
+            options:{responsive:true, maintainAspectRatio:false, animation:false,
+              plugins:{legend:{display:false}},
+              scales:{y:{beginAtZero:true, ticks:{font:{size:10}, precision:0}},
+                      x:{ticks:{font:{size:10}, maxTicksLimit:6}}}}
+          });
+        } else {
+          cAtk.data.labels = alabels;
+          cAtk.data.datasets[0].data = acount;
+          cAtk.update('none');
+        }
+      })
+      .catch(function(){});
+  }
+
+  function loadSources(){
+    fetch('/api/admin/monitor/sources',{headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok) throw 0;
+        var tb = document.getElementById('tbIps');
+        if(!j.ips.length){ tb.innerHTML='<tr><td colspan="6" class="mon-empty">暂无攻击记录</td></tr>'; }
+        else {
+          tb.innerHTML = j.ips.map(function(r){
+            var kinds = (r.kinds||'').split(',').map(function(k){
+              return '<span class="mon-kind">'+esc(kindName(k))+'</span>'; }).join(' ');
+            return '<tr><td class="mon-ip">'+esc(r.ip)+'</td><td>'+esc(locText(r))+
+                   '</td><td class="muted">'+esc(r.isp||'—')+'</td><td>'+kinds+
+                   '</td><td class="num">'+(r.c||0).toLocaleString()+
+                   '</td><td class="muted">'+fmtTime(r.last_ts)+'</td></tr>';
+          }).join('');
+        }
+        var gb = document.getElementById('tbGeo');
+        var maxc = j.countries.length ? (j.countries[0].c||1) : 1;
+        if(!j.countries.length){ gb.innerHTML='<tr><td colspan="4" class="mon-empty">暂无数据</td></tr>'; }
+        else {
+          gb.innerHTML = j.countries.map(function(r){
+            var w = Math.round((r.c/maxc)*100);
+            return '<tr><td>'+esc(r.country_cn || r.country)+'</td><td class="num">'+r.ips+
+                   '</td><td class="num">'+(r.c||0).toLocaleString()+
+                   '</td><td><div class="mon-bar" style="margin:0;"><i style="width:'+w+'%"></i></div></td></tr>';
+          }).join('');
+        }
+      })
+      .catch(function(){});
+  }
+
+  var evOffset = 0, evTotal = 0, evLoading = false, evDone = false;
+  var EV_PAGE = 60;
+
+  function evRow(e){
+    var desc = e.path ? '<span class="mon-ip">'+esc(e.path)+'</span>' : '';
+    if(e.detail) desc += (desc?' · ':'') + '<span class="muted">'+esc(e.detail)+'</span>';
+    return '<tr><td class="muted">'+fmtTime(e.ts)+'</td>'+
+           '<td><span class="mon-kind'+(e.count>200?' hot':'')+'">'+esc(kindName(e.kind))+'</span></td>'+
+           '<td class="mon-ip">'+esc(e.ip)+'</td><td class="muted">'+esc(locText(e))+'</td>'+
+           '<td>'+desc+'</td><td class="num">'+e.count+'</td></tr>';
+  }
+
+  function loadEvents(reset){
+    if(evLoading || evDone) return;
+    if(reset){ evOffset = 0; evDone = false; evLoading = false; }
+    evLoading = true;
+    fetch('/api/admin/monitor/events?limit='+EV_PAGE+'&offset='+evOffset,
+          {headers:{'Accept':'application/json'}})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || !j.ok) throw 0;
+        evTotal = j.total || 0;
+        var tb = document.getElementById('tbEvents');
+        if(reset){
+          tb.innerHTML = j.events.length ? '' :
+            '<tr><td colspan="6" class="mon-empty">暂无拦截事件</td></tr>';
+        }
+        if(j.events.length){
+          tb.insertAdjacentHTML('beforeend', j.events.map(evRow).join(''));
+          evOffset += j.events.length;
+        }
+        if(j.events.length < EV_PAGE) evDone = true;
+        document.getElementById('evStat').textContent =
+          '已加载 ' + evOffset + ' / 共 ' + evTotal + ' 条';
+        document.getElementById('evMore').textContent =
+          evDone ? (evOffset ? '— 已到最早记录 —' : '') : '↓ 继续向下滚动加载更多';
+        evLoading = false;
+      })
+      .catch(function(){ evLoading = false; });
+  }
+
+  (function(){
+    var el = document.getElementById('evScroll');
+    el.addEventListener('scroll', function(){
+      if(el.scrollTop + el.clientHeight >= el.scrollHeight - 120) loadEvents(false);
+    });
+  })();
+
+  function refreshAll(){
+    loadLive(); loadSeries(); loadSources(); loadEvents(true);
+  }
+  refreshAll();
+  setInterval(loadLive, 10000);     // 实时指标 10 秒
+  setInterval(loadSeries, 60000);   // 趋势 60 秒
+  setInterval(loadSources, 30000);  // 来源 30 秒
+  setInterval(function(){
+    var el = document.getElementById('evScroll');
+    if(el && el.scrollTop < 40) loadEvents(true);
+  }, 20000);
+})();
+</script>
+{% endblock %}

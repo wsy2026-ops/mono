@@ -1,0 +1,143 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}中国象棋大师{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-home">
+  <div class="xqm-hleft">
+    <div class="xqm-hboard" id="xqmHomeBoard"></div>
+    <div class="xqm-hcap">麾下阵容 · <a href="{{ url_for('xqmaster_lineup_page') }}">点兵布阵</a></div>
+  </div>
+  <div class="xqm-hright">
+    <a class="xqm-homeback" href="/">← 返回主页</a>
+    <div class="xqm-badge">MONO · 国风战棋</div>
+    <h1>中国象棋大师</h1>
+    <p class="xqm-sub">
+      棋子皆有血性，一击未死，胜负未定<br>
+      每回合三点行动 · 斩帅定乾坤 · 亦可自定布阵
+    </p>
+
+    <div id="xqmHomeResume" style="display:none"></div>
+    <div class="xqm-hstat" id="xqmHomeStat" style="display:none"></div>
+    <div class="xqm-hassets" id="xqmHomeAssets" style="display:none"></div>
+    <div class="xqm-hach" id="xqmHomeAch" style="display:none"></div>
+
+    <div class="xqm-hbtns">
+      <a class="xqm-btn xqm-btn-p" href="{{ url_for('xqmaster_match_page') }}">开始匹配 <span class="arr">›</span></a>
+      <a class="xqm-btn xqm-btn-g" href="{{ url_for('xqmaster_lineup_page') }}">编辑阵容 <span class="arr">›</span></a>
+      <a class="xqm-btn xqm-btn-o" href="{{ url_for('xqmaster_codex_page') }}">棋子图鉴 <span class="arr">›</span></a>
+      <a class="xqm-btn xqm-btn-o" href="{{ url_for('xqmaster_rank_page') }}">巅峰榜 <span class="arr">›</span></a>
+      <a class="xqm-btn xqm-btn-o" href="{{ url_for('xqmaster_settings_page') }}">设置 <span class="arr">›</span></a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var board = document.getElementById('xqmHomeBoard');
+  X.fitHboard(board);
+
+  function renderHalf(layout){
+    var html = '<div class="xqm-palace p1"></div>';
+    var at = {};
+    (layout||[]).forEach(function(it){ at[it[1]+','+it[2]] = it[0]; });
+    for(var r=5;r<=9;r++) for(var c=0;c<9;c++){
+      html += '<div class="xqm-cell" data-r="'+r+'" data-c="'+c+'">';
+      var t = at[r+','+c];
+      if(t){
+        var d = X.PD[t];
+        html += X.pcHTML({t:t, s:'red', hp:d.hp, mh:d.hp, id:'h'+r+'_'+c}, {});
+      }
+      html += '</div>';
+    }
+    board.innerHTML = html;
+  }
+
+  X.api('/api/xqm/lineup').then(function(r){
+    renderHalf(r.layout || r.default);
+  }).catch(function(){ renderHalf(null); });
+
+  var ME = null, GROW = null;
+
+  function paintAch(){
+    if(!ME || !GROW) return;
+    var box = document.getElementById('xqmHomeAch');
+    if(!box) return;
+    var ACH = [
+      ['首胜', '赢下第一局', ME.wins >= 1],
+      ['十胜', '累计赢 10 局', ME.wins >= 10],
+      ['常客', '打满 20 局', ME.total >= 20],
+      ['过半', '胜率超过 50%', ME.total >= 5 && ME.rate > 50],
+      ['满级', '有棋子升到满级', GROW.maxed >= 1],
+      ['富甲', '弈铢攒到 1000', (ME.yizhu || 0) >= 1000]
+    ];
+    var on = ACH.filter(function(a){ return a[2]; }).length;
+    box.style.display = '';
+    box.innerHTML = ACH.map(function(a){
+      return '<span class="b' + (a[2] ? ' on' : '') + '" title="' + a[1] + '">'
+        + (a[2] ? '★ ' : '☆ ') + a[0] + '</span>';
+    }).join('') + '<span class="b" title="已解锁成就">' + on + '/' + ACH.length + '</span>';
+  }
+
+  X.api('/api/xqm/me').then(function(r){
+    if(!r.ok) return;
+    ME = r;
+    var total = r.total || 0, w = r.wins || 0, l = r.losses || 0, d = r.draws || 0;
+    var pw = total ? w/total*100 : 0, pl = total ? l/total*100 : 0, pd = total ? d/total*100 : 0;
+    var st = document.getElementById('xqmHomeStat');
+    if(st){
+      st.style.display = '';
+      st.innerHTML =
+        '<div class="row"><span class="big">' + r.rating + '</span><span class="k">积分</span>'
+        + '<span style="margin-left:auto" class="k">胜率 '
+        + '<b style="color:var(--fg);font-size:var(--t-md)">' + r.rate + '%</b></span></div>'
+        + '<div class="bar">'
+        + (pw ? '<i class="w" style="width:' + pw.toFixed(1) + '%"></i>' : '')
+        + (pd ? '<i class="d" style="width:' + pd.toFixed(1) + '%"></i>' : '')
+        + (pl ? '<i class="l" style="width:' + pl.toFixed(1) + '%"></i>' : '')
+        + '</div>'
+        + '<div class="legend"><span>共 <b>' + total + '</b> 局</span>'
+        + '<span>胜 <b>' + w + '</b></span><span>负 <b>' + l + '</b></span>'
+        + '<span>和 <b>' + d + '</b></span></div>';
+    }
+    var as = document.getElementById('xqmHomeAssets');
+    if(as){
+      as.style.display = '';
+      as.innerHTML =
+        '<div class="a"><div class="ico">铢</div><div><div class="v">' + (r.yizhu || 0) + '</div>'
+        + '<div class="k">弈铢</div></div></div>'
+        + '<div class="a" id="xqmHomeGrow"><div class="ico">阵</div>'
+        + '<div><div class="v">—</div><div class="k">阵容等级</div></div></div>';
+    }
+    paintAch();
+  }).catch(function(){});
+
+  X.api('/api/xqm/grow').then(function(r){
+    if(!r.ok) return;
+    var box = document.getElementById('xqmHomeGrow');
+    if(!box) return;
+    var lv = 0, maxed = 0;
+    (r.pieces || []).forEach(function(p){
+      lv += p.level || 1;
+      if(p.maxed) maxed++;
+    });
+    box.querySelector('.v').textContent = lv;
+    box.querySelector('.k').textContent = '阵容等级' + (maxed ? ' · 满级 ' + maxed : '');
+    GROW = {lv: lv, maxed: maxed};
+    paintAch();
+  }).catch(function(){});
+
+  X.api('/api/xqm/current').then(function(r){
+    if(!(r && r.ok && r.gid)) return;
+    var box = document.getElementById('xqmHomeResume');
+    if(!box) return;
+    box.style.display = '';
+    box.innerHTML = '<a class="xqm-resume" href="/game/xqmaster/battle/' + r.gid + '">'
+      + '<span class="dot"></span><span>你有一局没打完</span>'
+      + '<span class="go">回到对局 ›</span></a>';
+  }).catch(function(){});
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+{% block title %}{{ problem.title }} - MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .pr-wrap{max-width:1560px;margin:0 auto;padding:16px 16px 60px;}
+  .pr-crumb{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-size:12.5px;color:var(--fg-3);margin-bottom:14px;
+  }
+  .pr-crumb a{color:var(--fg-3);text-decoration:none;padding:3px 9px;border-radius:6px;border:1px solid var(--line);}
+  .pr-crumb a:hover{background:var(--soft);color:var(--fg);}
+
+  .pr-layout{display:grid;grid-template-columns:minmax(0,0.7fr) minmax(0,1fr);gap:18px;align-items:stretch;}
+  .pr-left{min-width:0;display:flex;flex-direction:column;}
+  .pr-left .pr-card{flex:1;margin-bottom:0;}
+
+  .pr-card{
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    padding:20px 22px;margin-bottom:14px;
+  }
+  .pr-title{font-size:20px;font-weight:800;margin:0 0 12px;line-height:1.4;}
+  .pr-badges{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  .pr-badge{
+    font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:6px;
+    background:var(--soft);color:var(--fg-2);
+  }
+  .pr-badge.diff{background:#e8f5e9;color:#1b5e20;}
+  .pr-badge.tag{background:var(--bg-sunken);color:var(--fg-3);font-weight:600;}
+  .pr-adminlink{background:#111;color:#fff;text-decoration:none;}
+  .pr-adminlink:hover{opacity:.8;}
+  .pr-limits{
+    display:flex;gap:18px;flex-wrap:wrap;
+    font-size:12.5px;color:var(--fg-3);padding-bottom:16px;
+    border-bottom:1px solid var(--line);margin-bottom:18px;
+  }
+  .pr-limits b{color:var(--fg-2);font-weight:700;}
+  .pr-mystate{
+    margin-left:auto;font-size:11.5px;font-weight:800;
+    padding:3px 10px;border-radius:6px;
+  }
+  .pr-mystate.done{background:#c8e6c9;color:#1b5e20;}
+  .pr-mystate.tried{background:#fff3e0;color:#e65100;}
+  .pr-countnote{
+    margin:-6px 0 16px;padding:9px 13px;border-radius:9px;
+    background:#fff8e1;color:#8a5a00;font-size:12.5px;font-weight:700;
+  }
+
+  .pr-sec{margin-bottom:20px;}
+  .pr-sec:last-child{margin-bottom:0;}
+  .pr-sec h3{
+    font-size:13.5px;font-weight:700;margin:0 0 9px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .pr-sec h3::before{
+    content:"";width:3px;height:13px;border-radius:2px;background:var(--fg);
+  }
+  .pr-body{
+    font-size:13.5px;line-height:1.9;color:var(--fg-2);
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .pr-body code{
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    padding:1px 5px;border-radius:4px;background:var(--soft);color:var(--fg);
+    font-size:12.5px;
+  }
+
+  .pr-sample{margin-bottom:12px;}
+  .pr-sample-h{
+    font-size:12px;font-weight:700;color:var(--fg-3);margin-bottom:6px;
+  }
+  .pr-sample-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .pr-sample-box{
+    border:1px solid var(--line);border-radius:9px;overflow:hidden;
+    background:var(--bg-sunken);
+  }
+  .pr-sample-box .lb{
+    font-size:11px;font-weight:700;color:var(--fg-3);
+    padding:6px 11px;border-bottom:1px solid var(--line);background:var(--soft);
+  }
+  .pr-sample-box pre{
+    margin:0;padding:11px;font-size:12.5px;line-height:1.7;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    color:var(--fg);overflow-x:auto;white-space:pre;
+  }
+
+  .pr-ide{display:flex;flex-direction:column;min-width:0;}
+  .pr-ide-top{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:11px 14px;background:var(--soft);
+    border:1px solid var(--line);border-bottom:0;
+    border-radius:12px 12px 0 0;
+  }
+  .pr-sel{
+    padding:5px 10px;border:1px solid var(--line);border-radius:7px;
+    background:var(--bg-elev);color:var(--fg);
+    font-size:12.5px;font-family:inherit;outline:none;cursor:pointer;
+  }
+  .pr-o2{
+    display:flex;align-items:center;gap:6px;
+    font-size:12.5px;color:var(--fg-2);cursor:pointer;user-select:none;
+  }
+  .pr-o2 input{width:15px;height:15px;cursor:pointer;accent-color:var(--fg);}
+  .pr-ide-top .spacer{flex:1;}
+  .pr-tip{font-size:11.5px;color:var(--fg-3);}
+
+  .pr-editor{
+    border:1px solid var(--line);border-radius:0 0 12px 12px;
+    overflow:hidden;display:flex;flex-direction:column;background:var(--bg-elev);
+    flex:1;min-height:0;
+  }
+  .pr-edit{display:flex;flex:1;min-height:320px;overflow:hidden;}
+  .pr-lines{
+    flex:0 0 auto;width:56px;padding:14px 10px 14px 0;
+    text-align:right;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13.5px;line-height:1.65;
+    color:var(--fg-3);background:var(--bg-sunken);
+    border-right:1px solid var(--line);
+    overflow:hidden;user-select:none;white-space:pre;
+  }
+  .pr-code{
+    flex:1;padding:14px 16px;border:0;outline:none;resize:none;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:13.5px;line-height:1.65;
+    background:var(--bg-elev);color:var(--fg);
+    tab-size:4;-moz-tab-size:4;overflow:auto;
+    white-space:pre;word-wrap:normal;caret-color:var(--fg);
+  }
+  .pr-code::selection{background:var(--soft);}
+
+  .pr-foot{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:12px 14px;background:var(--soft);
+    border-top:1px solid var(--line);
+  }
+  .pr-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:8px 22px;border:0;border-radius:8px;cursor:pointer;
+    font-size:13.5px;font-weight:700;font-family:inherit;
+    background:var(--fg);color:var(--bg);
+  }
+  .pr-btn:hover{opacity:.85;}
+  .pr-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .pr-btn.ghost{background:none;color:var(--fg);border:1px solid var(--line);}
+  .pr-btn.ghost:hover{background:var(--bg-sunken);}
+  .pr-status{font-size:12px;color:var(--fg-3);margin-left:auto;}
+  .pr-lastrec{
+    font-size:12px;font-weight:700;color:var(--fg-3);text-decoration:none;
+    padding:5px 11px;border-radius:7px;border:1px solid var(--line);margin-left:4px;
+  }
+  .pr-lastrec:hover{background:var(--bg-elev);color:var(--fg);}
+  .pr-spin{
+    width:12px;height:12px;border-radius:50%;display:inline-block;
+    border:2px solid var(--line);border-top-color:var(--fg);
+    animation:prSpin .7s linear infinite;vertical-align:-1px;margin-right:5px;
+  }
+  @keyframes prSpin{to{transform:rotate(360deg);}}
+
+  .pr-res{margin-top:14px;display:none;}
+  .pr-res.on{display:block;}
+  .pr-verdict{
+    display:flex;align-items:center;gap:10px;
+    padding:13px 16px;border-radius:10px;font-size:14px;font-weight:700;
+  }
+  .pr-verdict.ac{background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}
+  .pr-verdict.wa{background:#fdecea;color:#a32d2d;border:1px solid #f5b5b0;}
+  .pr-verdict.tle{background:#fff8e1;color:#8a5a00;border:1px solid #f0d98a;}
+  .pr-verdict.other{background:var(--soft);color:var(--fg-2);border:1px solid var(--line);}
+  .pr-score{
+    font-size:12.5px;color:var(--fg-2);margin-top:8px;line-height:1.8;
+    padding:8px 12px;border-radius:8px;background:var(--soft);
+  }
+  .pr-score b{font-size:15px;color:var(--fg);}
+  .pr-pre{
+    margin-top:12px;padding:13px 15px;border-radius:10px;
+    background:var(--bg-sunken);border:1px solid var(--line);
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.65;
+    color:var(--fg-2);white-space:pre-wrap;word-break:break-all;
+    max-height:260px;overflow:auto;
+  }
+  .pr-pre .ce{color:#c62828;font-weight:700;}
+
+  @media (max-width:980px){
+    .pr-layout{grid-template-columns:minmax(0,1fr);}
+    .pr-left .pr-card{flex:0 0 auto;}
+    .pr-editor{flex:0 0 auto;}
+    .pr-edit{flex:0 0 auto;height:340px;min-height:0;}
+  }
+  @media (max-width:768px){
+    .pr-lines{width:52px;font-size:16px;padding-right:8px;}
+    .pr-code{font-size:16px;padding:14px 12px;}
+  }
+  @media (max-width:640px){
+    .pr-wrap{padding:12px 10px 50px;}
+    .pr-card{padding:16px 14px;}
+    .pr-sample-grid{grid-template-columns:1fr;}
+    .pr-edit{height:380px;}
+    .pr-tip{display:none;}
+    .pr-status{margin-left:0;width:100%;}
+  }
+</style>
+
+<div class="pr-wrap">
+  <div class="pr-crumb">
+    <a href="{{ url_for('oj_home') }}">题库</a>
+    {% if contest %}
+    <span>/</span>
+    <a href="{{ url_for('oj_contest', cid=contest.id) }}">{{ contest.title }}</a>
+    {% endif %}
+    <span>/</span>
+    <span>{{ problem.title }}</span>
+  </div>
+
+  <div class="pr-layout">
+    <div class="pr-left">
+      <div class="pr-card">
+        <h1 class="pr-title">{{ problem.title }}</h1>
+        <div class="pr-badges">
+          {% if problem.difficulty %}
+          <span class="pr-badge diff">{{ problem.difficulty }}</span>
+          {% else %}
+          <span class="pr-badge">暂无评定</span>
+          {% endif %}
+          {% if problem.tags %}
+            {% for t in problem.tags.split() %}
+            <span class="pr-badge tag">{{ t }}</span>
+            {% endfor %}
+          {% endif %}
+          {% if me and me.is_admin %}
+          <a class="pr-badge pr-adminlink" href="{{ url_for('oj_admin_problem', pid=problem.id) }}">管理此题 →</a>
+          {% endif %}
+        </div>
+        <div class="pr-limits">
+          <span>时间限制 <b>{{ limits.time_text }}</b></span>
+          <span>内存限制 <b>{{ limits.mem_text }}</b></span>
+          <span>测试点 <b>{{ problem.test_count }}</b></span>
+          {% if my_state %}
+          <span class="pr-mystate {{ my_state_cls }}">{{ my_state }}</span>
+          {% endif %}
+        </div>
+        {% if count_note %}
+        <div class="pr-countnote">{{ count_note }}</div>
+        {% endif %}
+
+        {% if problem.description %}
+        <div class="pr-sec">
+          <h3>题目描述</h3>
+          <div class="pr-body">{{ problem.description }}</div>
+        </div>
+        {% endif %}
+
+        {% if problem.input_format %}
+        <div class="pr-sec">
+          <h3>输入格式</h3>
+          <div class="pr-body">{{ problem.input_format }}</div>
+        </div>
+        {% endif %}
+
+        {% if problem.output_format %}
+        <div class="pr-sec">
+          <h3>输出格式</h3>
+          <div class="pr-body">{{ problem.output_format }}</div>
+        </div>
+        {% endif %}
+
+        {% if samples %}
+        <div class="pr-sec">
+          <h3>样例</h3>
+          {% for s in samples %}
+          <div class="pr-sample">
+            <div class="pr-sample-h">样例 #{{ loop.index }}</div>
+            <div class="pr-sample-grid">
+              <div class="pr-sample-box">
+                <div class="lb">输入</div>
+                <pre>{{ s['in'] }}</pre>
+              </div>
+              <div class="pr-sample-box">
+                <div class="lb">输出</div>
+                <pre>{{ s['out'] }}</pre>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if problem.hint %}
+        <div class="pr-sec">
+          <h3>提示 / 说明</h3>
+          <div class="pr-body">{{ problem.hint }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="pr-ide">
+      <div class="pr-ide-top">
+        <select class="pr-sel" id="prLang">
+          {% for k, v in langs.items() %}
+          <option value="{{ k }}" {{ 'selected' if k == 'c++14' else '' }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <label class="pr-o2">
+          <input type="checkbox" id="prO2" checked>
+          <span>开启 O2 优化</span>
+        </label>
+        <span class="spacer"></span>
+        <span class="pr-tip">Ctrl+Enter 提交</span>
+      </div>
+
+      <div class="pr-editor">
+        <div class="pr-edit">
+          <div class="pr-lines" id="prLines">1</div>
+          <textarea class="pr-code" id="prCode" spellcheck="false"
+            autocomplete="off" autocorrect="off" autocapitalize="off"
+            wrap="off">{% if last and last.code %}{{ last.code }}{% else %}#include <iostream>
+using namespace std;
+
+int main() {
+    
+    return 0;
+}{% endif %}</textarea>
+        </div>
+
+        <div class="pr-foot">
+          <button class="pr-btn" id="prSubmit">提交评测</button>
+          <button class="pr-btn ghost" id="prReset">重置</button>
+          <span class="pr-status" id="prStatus">就绪</span>
+          {% if last %}
+          <a class="pr-lastrec" href="{{ url_for('oj_record', sid=last.id) }}">上次评测 R{{ last.id }} →</a>
+          {% endif %}
+          <a class="pr-lastrec" href="{{ url_for('oj_records') }}?pid={{ problem.id }}{{ '&scope=all' if me and me.is_super_admin else '' }}">全部记录</a>
+        </div>
+      </div>
+
+      <div class="pr-res" id="prResult"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var PID = {{ problem.id }};
+  var ta = document.getElementById('prCode');
+  var lines = document.getElementById('prLines');
+  var submit = document.getElementById('prSubmit');
+  var reset = document.getElementById('prReset');
+  var status = document.getElementById('prStatus');
+  var box = document.getElementById('prResult');
+  var langSel = document.getElementById('prLang');
+  var o2Box = document.getElementById('prO2');
+  if (!ta) return;
+
+  var TAB = '    ';
+  var PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
+  var CLOSERS = { ')': 1, ']': 1, '}': 1 };
+  var polling = null;
+
+  function syncLines(){
+    var n = ta.value.split('\n').length;
+    var txt = '';
+    for (var i = 1; i <= n; i++) txt += i + '\n';
+    if (lines.textContent !== txt) lines.textContent = txt;
+    lines.scrollTop = ta.scrollTop;
+  }
+
+  function lineStart(pos){
+    var s = ta.value.lastIndexOf('\n', pos - 1);
+    return s < 0 ? 0 : s + 1;
+  }
+  function lineEnd(pos){
+    var e = ta.value.indexOf('\n', pos);
+    return e < 0 ? ta.value.length : e;
+  }
+  function indentOf(line){
+    var m = line.match(/^[ \t]*/);
+    return m ? m[0] : '';
+  }
+  function replaceRange(a, b, t){
+    ta.setRangeText(t, a, b, 'end');
+    syncLines();
+  }
+  function isSelected(){ return ta.selectionStart !== ta.selectionEnd; }
+
+  ta.addEventListener('input', syncLines);
+  ta.addEventListener('scroll', function(){ lines.scrollTop = ta.scrollTop; });
+
+  ta.addEventListener('keydown', function(e){
+    var v = ta.value, s = ta.selectionStart, en = ta.selectionEnd;
+
+    if (e.key === 'Tab'){
+      e.preventDefault();
+      var ls = lineStart(s), le = lineEnd(en);
+      var block = v.slice(ls, le);
+      if (block.indexOf('\n') >= 0){
+        var rows = block.split('\n'), out = [];
+        for (var i = 0; i < rows.length; i++){
+          out.push(e.shiftKey ? rows[i].replace(/^ {1,4}/, '').replace(/^\t/, '') : TAB + rows[i]);
+        }
+        replaceRange(ls, le, out.join('\n'));
+        ta.selectionStart = ls;
+        ta.selectionEnd = ls + out.join('\n').length;
+      } else {
+        if (e.shiftKey){
+          var head = v.slice(ls, s);
+          var cut = head.replace(/^ {1,4}$/, '').replace(/\t$/, '');
+          if (cut !== head) replaceRange(ls, s, cut);
+        } else {
+          replaceRange(s, en, TAB);
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'Enter'){
+      e.preventDefault();
+      var ls2 = lineStart(s);
+      var cur = v.slice(ls2, lineEnd(s));
+      var ind = indentOf(cur);
+      var before = v.slice(ls2, s).replace(/\s+$/, '');
+      var after = v.slice(s, lineEnd(s));
+      var openBrace = /[{([]$/.test(before);
+      var closeBrace = /^[)\]}]/.test(after.trim());
+
+      if (openBrace && closeBrace){
+        replaceRange(s, en, '\n' + ind + TAB + '\n' + ind);
+        ta.selectionStart = ta.selectionEnd = s + 1 + ind.length + TAB.length;
+        return;
+      }
+      if (openBrace){ replaceRange(s, en, '\n' + ind + TAB); return; }
+      replaceRange(s, en, '\n' + ind);
+      return;
+    }
+
+    if (e.key === 'Backspace' && !isSelected()){
+      var prev = v.charAt(s - 1), next = v.charAt(s);
+      if (PAIRS[prev] && PAIRS[prev] === next){
+        e.preventDefault();
+        replaceRange(s - 1, s + 1, '');
+        return;
+      }
+      if (s > 0 && s % 4 === 0){
+        var head2 = v.slice(lineStart(s), s);
+        if (/^ +$/.test(head2) && head2.length >= 4){
+          e.preventDefault();
+          replaceRange(s - 4, s, '');
+          return;
+        }
+      }
+      return;
+    }
+
+    if (CLOSERS[e.key] && !isSelected() && v.charAt(s) === e.key){
+      e.preventDefault();
+      ta.selectionStart = ta.selectionEnd = s + 1;
+      return;
+    }
+
+    if (PAIRS[e.key]){
+      e.preventDefault();
+      if (isSelected()){
+        var a = Math.min(ta.selectionStart, ta.selectionEnd);
+        var b = Math.max(ta.selectionStart, ta.selectionEnd);
+        var txt = v.slice(a, b);
+        replaceRange(a, b, e.key + txt + PAIRS[e.key]);
+        ta.selectionStart = a + 1;
+        ta.selectionEnd = a + 1 + txt.length;
+        return;
+      }
+      var nx = v.charAt(s);
+      if (nx && /[\w"')\]}]/.test(nx) && e.key !== '"' && e.key !== "'"){
+        replaceRange(s, en, e.key);
+        return;
+      }
+      replaceRange(s, en, e.key + PAIRS[e.key]);
+      ta.selectionStart = ta.selectionEnd = s + 1;
+      return;
+    }
+  });
+
+  document.addEventListener('keydown', function(e){
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+      e.preventDefault();
+      submit.click();
+    }
+  });
+
+  function setStatus(html, busy){
+    status.innerHTML = html;
+    submit.disabled = !!busy;
+    submit.textContent = busy ? '评测中…' : '提交评测';
+  }
+  function esc(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function vClass(v){
+    if (v === 'AC') return 'ac';
+    if (v === 'WA' || v === 'RE' || v === 'CE') return 'wa';
+    if (v === 'TLE' || v === 'MLE' || v === 'OLE') return 'tle';
+    return 'other';
+  }
+  function vName(v){
+    var m = { AC:'通过', WA:'答案错误', TLE:'超时', MLE:'内存超限',
+              RE:'运行时错误', CE:'编译错误', OLE:'输出超限', SE:'系统错误' };
+    return (m[v] || '未知') + '　' + v;
+  }
+
+  function render(t){
+    var v = t.verdict || '';
+    var html = '<div class="pr-verdict ' + vClass(v) + '">' + vName(v) + '</div>';
+    if (t.full_score){
+      html += '<div class="pr-score">得分 <b>' + (t.score || 0) + '</b> / '
+           + t.full_score + '　通过 ' + (t.passed || 0) + ' / ' + (t.total || 0)
+           + '　最慢 ' + (t.time_ms || 0) + ' ms'
+           + '　峰值 ' + Math.round((t.memory_kb || 0) / 1024) + ' MB</div>';
+    }
+    if (v === 'CE' && t.message){
+      html += '<div class="pr-pre"><span class="ce">编译错误</span>\n\n' + esc(t.message) + '</div>';
+    }
+    if (t.tests && t.tests.length){
+      html += '<div class="pr-pre">';
+      for (var i = 0; i < t.tests.length; i++){
+        var c = t.tests[i];
+        html += '测试点 #' + c.index + '　' + (c.verdict || '')
+             + '　' + (c.time_ms || 0) + ' ms'
+             + '　' + Math.round((c.memory_kb || 0) / 1024) + ' MB\n';
+      }
+      html += '</div>';
+    }
+    box.innerHTML = html;
+    box.classList.add('on');
+  }
+
+  function poll(tid){
+    if (polling) clearTimeout(polling);
+    var n = 0;
+    function tick(){
+      n++;
+      if (n > 260){
+        setStatus('已转后台', false);
+        box.innerHTML = '<div class="pr-verdict other">评测还在跑，结果由服务器继续跟踪。稍后刷新页面就能看到成绩，不用重新提交。</div>';
+        box.classList.add('on');
+        return;
+      }
+      fetch('/oj/status/' + tid, {credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (!j.ok){
+            polling = setTimeout(tick, 1500);
+            return;
+          }
+          var t = j.task || {};
+          if (t.status === 'compiling') setStatus('<span class="pr-spin"></span>编译中', true);
+          else if (t.status === 'running') setStatus('<span class="pr-spin"></span>评测中（共 ' + (t.total || '?') + ' 个测试点）', true);
+          else if (t.status === 'pending') setStatus('<span class="pr-spin"></span>排队中', true);
+
+          if (t.status === 'done'){
+            setStatus('完成', false);
+            render(t);
+            return;
+          }
+          polling = setTimeout(tick, n > 40 ? 1500 : 450);
+        })
+        .catch(function(){ polling = setTimeout(tick, 1500); });
+    }
+    tick();
+  }
+
+  submit.addEventListener('click', function(){
+    if (!ta.value.trim()){
+      box.innerHTML = '<div class="pr-verdict other">代码不能为空</div>';
+      box.classList.add('on');
+      return;
+    }
+    setStatus('<span class="pr-spin"></span>提交中', true);
+    box.classList.remove('on');
+    box.innerHTML = '';
+
+    var body = 'problem_id=' + PID
+             + '&std=' + encodeURIComponent(langSel.value)
+             + (o2Box.checked ? '&o2=1' : '')
+             + '&code=' + encodeURIComponent(ta.value);
+
+    fetch('/oj/submit', {
+      method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: body
+    })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j.ok){
+          setStatus('提交失败', false);
+          box.innerHTML = '<div class="pr-verdict other">' + esc(j.msg || '提交失败') + '</div>';
+          box.classList.add('on');
+          return;
+        }
+        if (j.sub_id){
+          setStatus('已提交，正在打开评测记录', true);
+          location.href = '/oj/record/' + j.sub_id;
+          return;
+        }
+        poll(j.task_id);
+      })
+      .catch(function(){
+        setStatus('网络错误', false);
+        box.innerHTML = '<div class="pr-verdict other">网络错误，请重试</div>';
+        box.classList.add('on');
+      });
+  });
+
+  if (reset){
+    reset.addEventListener('click', function(){
+      ta.value = '#include <iostream>\nusing namespace std;\n\nint main() {\n    \n    return 0;\n}';
+      syncLines();
+      box.classList.remove('on');
+      box.innerHTML = '';
+      setStatus('就绪', false);
+      ta.focus();
+    });
+  }
+
+  syncLines();
+  ta.focus();
+  ta.setSelectionRange(0, 0);
+})();
+</script>
+{% endblock %}

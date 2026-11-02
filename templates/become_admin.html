@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}成为管理员 - MONO 社区{% endblock %}
+{% set active = 'admin' %}
+{% block content %}
+<div class="card narrow">
+  <h1>成为管理员</h1>
+  <p class="sub">输入管理员通行证以获取管理权限</p>
+  <form method="post">
+    <label>管理员通行证</label>
+    <input type="text" name="passcode" required autofocus>
+    <button type="submit" class="btn block">提交</button>
+  </form>
+</div>
+{% endblock %}

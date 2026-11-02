@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ problem.title }} - MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .opp-wrap{max-width:860px;margin:0 auto;padding:16px 16px 60px;}
+  .opp-crumb{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:#6b7280;margin-bottom:14px;}
+  .opp-crumb a{color:#6b7280;text-decoration:none;padding:3px 9px;border-radius:6px;border:1px solid #e6e8eb;}
+  .opp-crumb a:hover{background:#f5f6f7;color:#111;}
+  .opp-card{border:1px solid #e6e8eb;border-radius:12px;background:#fff;padding:20px 22px;margin-bottom:14px;}
+  .opp-title{font-size:20px;font-weight:800;margin:0 0 12px;line-height:1.4;}
+  .opp-badges{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  .opp-badge{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:6px;background:#f1f2f4;color:#4b5563;}
+  .opp-badge.diff{background:#e8f5e9;color:#1b5e20;}
+  .opp-limits{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:#6b7280;
+    padding-bottom:16px;border-bottom:1px solid #e6e8eb;margin-bottom:18px;}
+  .opp-limits b{color:#374151;}
+  .opp-note{margin:-6px 0 16px;padding:9px 13px;border-radius:9px;background:#fff8e1;color:#8a5a00;
+    font-size:12.5px;font-weight:700;}
+  .opp-sec{margin-bottom:20px;}
+  .opp-sec:last-child{margin-bottom:0;}
+  .opp-sec h3{font-size:13.5px;font-weight:700;margin:0 0 9px;display:flex;align-items:center;gap:8px;}
+  .opp-sec h3::before{content:"";width:3px;height:13px;border-radius:2px;background:#111;}
+  .opp-body{font-size:13.5px;line-height:1.9;color:#374151;white-space:pre-wrap;word-break:break-word;}
+  .opp-sample{margin-bottom:12px;}
+  .opp-sample-h{font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px;}
+  .opp-sample-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .opp-sample-box{border:1px solid #e6e8eb;border-radius:9px;overflow:hidden;background:#fafbfc;}
+  .opp-sample-box .lb{font-size:11px;font-weight:700;color:#6b7280;padding:6px 10px;background:#f1f2f4;}
+  .opp-sample-box pre{margin:0;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12.5px;line-height:1.6;overflow-x:auto;white-space:pre;}
+  .opp-cta{border:1px solid #111;border-radius:12px;background:#111;color:#fff;padding:22px;text-align:center;}
+  .opp-cta p{margin:0 0 14px;font-size:14px;line-height:1.7;color:rgba(255,255,255,.85);}
+  .opp-cta .btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .opp-cta a{display:inline-block;padding:9px 18px;border-radius:9px;font-size:13.5px;text-decoration:none;
+    border:1px solid rgba(255,255,255,.4);color:#fff;}
+  .opp-cta a.primary{background:#fff;color:#111;border-color:#fff;font-weight:700;}
+  @media (max-width:600px){
+    .opp-sample-grid{grid-template-columns:1fr;}
+    .opp-card{padding:16px;}
+  }
+</style>
+
+<div class="opp-wrap">
+  <div class="opp-crumb">
+    <a href="{{ url_for('oj_home') }}">← 题库</a>
+    <span>MONO OJ</span>
+  </div>
+
+  <div class="opp-card">
+    <h1 class="opp-title">{{ problem.title }}</h1>
+    <div class="opp-badges">
+      <span class="opp-badge">#{{ problem.id }}</span>
+      <span class="opp-badge diff">{{ problem.difficulty or '未评定' }}</span>
+      {% if problem.tags %}
+        {% for t in problem.tags.split() %}
+        <span class="opp-badge">{{ t }}</span>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div class="opp-limits">
+      <span>时间限制 <b>{{ limits.time_text }}</b></span>
+      <span>内存限制 <b>{{ limits.mem_text }}</b></span>
+      <span>测试点 <b>{{ problem.test_count }}</b></span>
+    </div>
+
+    {% if count_note %}<div class="opp-note">{{ count_note }}</div>{% endif %}
+
+    {% if problem.description %}
+    <div class="opp-sec"><h3>题目描述</h3><div class="opp-body">{{ problem.description }}</div></div>
+    {% endif %}
+    {% if problem.input_format %}
+    <div class="opp-sec"><h3>输入格式</h3><div class="opp-body">{{ problem.input_format }}</div></div>
+    {% endif %}
+    {% if problem.output_format %}
+    <div class="opp-sec"><h3>输出格式</h3><div class="opp-body">{{ problem.output_format }}</div></div>
+    {% endif %}
+
+    {% if samples %}
+    <div class="opp-sec">
+      <h3>样例</h3>
+      {% for s in samples %}
+      <div class="opp-sample">
+        <div class="opp-sample-h">样例 #{{ loop.index }}</div>
+        <div class="opp-sample-grid">
+          <div class="opp-sample-box"><div class="lb">输入</div><pre>{{ s['in'] }}</pre></div>
+          <div class="opp-sample-box"><div class="lb">输出</div><pre>{{ s['out'] }}</pre></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if problem.hint %}
+    <div class="opp-sec"><h3>提示 / 说明</h3><div class="opp-body">{{ problem.hint }}</div></div>
+    {% endif %}
+  </div>
+
+  <div class="opp-cta">
+    <p>登录后可以在线写代码、提交评测。<br>没有账号？注册只要用户名和密码。</p>
+    <div class="btns">
+      <a class="primary" href="{{ url_for('register') }}">免费注册</a>
+      <a href="{{ url_for('login') }}">已有账号，登录</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

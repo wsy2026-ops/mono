@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}积分审计 - 管理后台{% endblock %}
+{% set active = 'admin' %}
+
+{% block content %}
+<style>
+  .pa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:18px;}
+  .pa-card{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--card);}
+  .pa-card h3{margin:0 0 12px;font-size:14px;font-weight:700;}
+  .pa-table{width:100%;font-size:12.5px;border-collapse:collapse;}
+  .pa-table th{text-align:left;padding:6px 7px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;white-space:nowrap;}
+  .pa-table td{padding:6px 7px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .pa-num{font-variant-numeric:tabular-nums;font-weight:700;}
+  .pa-pos{color:#c0392b;font-weight:700;}
+  .pa-neg{color:#15803d;font-weight:700;}
+  .pa-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .pa-filters input,.pa-filters select{padding:7px 11px;border:1px solid var(--line);
+    border-radius:9px;background:var(--bg-elev);color:var(--fg);font-size:13px;}
+  .pa-claw{display:flex;gap:6px;align-items:center;}
+  .pa-claw input{width:70px;padding:4px 8px;border:1px solid var(--line);border-radius:7px;
+    background:var(--bg-elev);color:var(--fg);font-size:12px;}
+  .pa-claw button{padding:4px 10px;font-size:12px;border:1px solid #c0392b;color:#c0392b;
+    background:none;border-radius:7px;cursor:pointer;}
+  .pa-claw button:hover{background:rgba(192,57,43,.08);}
+</style>
+
+<h2>045 积分审计</h2>
+<p class="sub">流水唯一入口 award() · 币与经验双线覆盖 · 幂等键防重 · 回收走统一入口自动留痕</p>
+
+<h2 style="margin-top:26px;">092 经济看板</h2>
+<p class="sub">看三件事：存量分布（中位数才是真实体感）· 消费率 · 有没有渠道在印钞</p>
+
+<div class="pa-grid">
+  <div class="pa-card">
+    <h3>存量分布</h3>
+    <table class="pa-table">
+      <tr><td>总存量</td><td class="pa-num">{{ econ.total }}</td></tr>
+      <tr><td>人均</td><td class="pa-num">{{ '%.0f'|format(econ.avg) }}</td></tr>
+      <tr><td><b>中位数</b></td><td class="pa-num"><b>{{ econ.median }}</b></td></tr>
+      <tr><td>75% 分位</td><td class="pa-num">{{ econ.p75 }}</td></tr>
+      <tr><td>90% 分位</td><td class="pa-num">{{ econ.p90 }}</td></tr>
+      <tr><td>最高</td><td class="pa-num">{{ econ.max }}</td></tr>
+      <tr><td>余额为 0</td><td class="pa-num {{ 'pa-pos' if econ.zero_pct > 30 else '' }}">{{ econ.zero }} 人（{{ '%.0f'|format(econ.zero_pct) }}%）</td></tr>
+    </table>
+    <p class="sub" style="margin:10px 0 0;font-size:11.5px;">
+      中位数远低于人均 = 钱集中在少数人手里，多数人参与不了经济。
+    </p>
+  </div>
+
+  <div class="pa-card">
+    <h3>收支与消费率</h3>
+    <table class="pa-table">
+      <tr><td>累计产出（玩家）</td><td class="pa-num pa-pos">+{{ econ['in'] }}</td></tr>
+      <tr><td>玩家消耗</td><td class="pa-num pa-neg">-{{ econ.out_player }}</td></tr>
+      <tr><td><b>消费率</b></td><td class="pa-num {{ 'pa-pos' if econ.burn < 50 else 'pa-neg' }}"><b>{{ '%.1f'|format(econ.burn) }}%</b></td></tr>
+      <tr><td>系统回收<br><span style="font-weight:400;color:var(--muted);font-size:11px;">管理员调整 / 成就重算</span></td><td class="pa-num pa-neg">-{{ econ.out_sys }}</td></tr>
+      <tr><td>净增（流通量）</td><td class="pa-num">{{ '%+d'|format(econ.net) }}</td></tr>
+    </table>
+    <p class="sub" style="margin:10px 0 0;font-size:11.5px;">
+      消费率 = <b>玩家消耗</b> ÷ 产出（不含管理员调整与成就重算）。低于 50% 说明发得多、花得少，积分在堆积。
+    </p>
+  </div>
+
+  <div class="pa-card">
+    <h3>玩法净收益（正数 = 在印钞）</h3>
+    <table class="pa-table">
+      <tr><th>玩法</th><th>次数</th><th>发放</th><th>成本</th><th>净额</th></tr>
+      {% for p in play %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td class="pa-num">{{ p.n }}</td>
+        <td class="pa-num pa-pos">+{{ p['in'] }}</td>
+        <td class="pa-num pa-neg">-{{ p.cost }}</td>
+        <td class="pa-num {{ 'pa-pos' if p.net > 0 else 'pa-neg' }}">{{ '%+d'|format(p.net) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="sub" style="margin:10px 0 0;font-size:11.5px;">
+      净额为正 = 玩家玩这个能赚钱，可以无限循环。红字就是印钞机。
+    </p>
+  </div>
+</div>
+
+<div class="pa-card" style="margin-bottom:18px;">
+  <h3>近 14 天产出 / 消耗</h3>
+  <table class="pa-table">
+    <tr><th>日期</th><th>产出</th><th>消耗</th><th>净额</th></tr>
+    {% for d in daily %}
+    <tr>
+      <td>{{ d.d }}</td>
+      <td class="pa-num pa-pos">+{{ d.inn }}</td>
+      <td class="pa-num pa-neg">-{{ d.out }}</td>
+      <td class="pa-num {{ 'pa-pos' if (d.inn - d.out) > 0 else 'pa-neg' }}">{{ '%+d'|format(d.inn - d.out) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="pa-grid">
+  <div class="pa-card">
+    <h3>净发放 TOP20</h3>
+    <table class="pa-table">
+      <tr><th>用户</th><th>净额</th><th>笔数</th><th>回收</th></tr>
+      {% for t in top_users %}
+      <tr>
+        <td>{% if t.username %}{{ t.username }}{% else %}#{{ t.user_id }}{% endif %}</td>
+        <td class="pa-num {{ 'pa-pos' if t.net > 0 else ('pa-neg' if t.net < 0 else '') }}">{{ t.net }}</td>
+        <td class="pa-num">{{ t.n }}</td>
+        <td>
+          <form class="pa-claw" method="post" action="{{ url_for('admin_clawback') }}"
+                onsubmit="return confirm(__('确认回收 {name} 的积分？将走流水并通知用户。', {name: {{ t.username|tojson }}}));">
+            <input type="hidden" name="uid" value="{{ t.user_id }}">
+            <input type="number" name="amount" min="1" placeholder="数量" required>
+            <input type="text" name="reason" placeholder="原因" style="width:90px;" required>
+            <button type="submit">回收</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="pa-card">
+    <h3>近 24h 发放异常 TOP10</h3>
+    <table class="pa-table">
+      <tr><th>用户</th><th>发放</th><th>笔数</th></tr>
+      {% for a in anomalies %}
+      <tr>
+        <td>{% if a.username %}{{ a.username }}{% else %}#{{ a.user_id }}{% endif %}</td>
+        <td class="pa-num pa-pos">+{{ a.s }}</td>
+        <td class="pa-num">{{ a.n }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">近 24 小时无发放记录</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="pa-card">
+    <h3>对账差异（流水净额 ≠ 当前余额）</h3>
+    <table class="pa-table">
+      <tr><th>用户</th><th>余额</th><th>流水净额</th><th>差</th></tr>
+      {% for d in drift %}
+      <tr>
+        <td>{% if d.username %}{{ d.username }}{% else %}#{{ d.id }}{% endif %}</td>
+        <td class="pa-num">{{ d.coins }}</td>
+        <td class="pa-num">{{ d.net }}</td>
+        <td class="pa-num" style="color:#c0392b;">{{ d.coins - d.net }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">全部对平 ✓</td></tr>
+      {% endfor %}
+    </table>
+    <p class="muted" style="font-size:11px;margin:8px 0 0;">差异来自历史直改/导入数据，仅供参考，不自动修。</p>
+  </div>
+</div>
+
+<div class="pa-card">
+  <h3>流水明细</h3>
+  <form class="pa-filters" method="get" action="{{ url_for('admin_points_audit') }}">
+    <input type="text" name="u" value="{{ q_user }}" placeholder="用户名 / ID">
+    <select name="t">
+      <option value="">全部类型</option>
+      {% for t in types %}
+      <option value="{{ t.source_type }}" {{ 'selected' if q_type == t.source_type }}>{{ t.source_type }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn sm">筛选</button>
+    <span class="muted" style="font-size:12px;">共 {{ total }} 条</span>
+  </form>
+  <div style="overflow-x:auto;">
+    <table class="pa-table">
+      <tr><th>ID</th><th>用户</th><th>变动</th><th>类型</th><th>原因</th><th>关联</th><th>操作者</th><th>幂等键</th><th>时间</th></tr>
+      {% for l in logs %}
+      <tr>
+        <td class="pa-num">{{ l.id }}</td>
+        <td>{% if l.username %}{{ l.username }}{% else %}#{{ l.user_id }}{% endif %}</td>
+        <td class="pa-num {{ 'pa-pos' if l.delta > 0 else 'pa-neg' }}">{{ '+' if l.delta > 0 }}{{ l.delta }}</td>
+        <td>{{ l.source_type }}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;">{{ l.reason }}</td>
+        <td class="pa-num">{{ l.ref_id or '' }}</td>
+        <td class="pa-num">{{ l.admin_id or '' }}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;font-size:11px;">{{ l.idem_key or '' }}</td>
+        <td class="pa-num">{{ l.created_at | dt_local }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="muted">没有记录</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div style="display:flex;gap:6px;margin-top:12px;font-size:12.5px;">
+    {% for i in range(1, pages + 1) %}
+    <a href="{{ url_for('admin_points_audit', page=i, u=q_user, t=q_type) }}"
+       style="padding:3px 10px;border:1px solid var(--line);border-radius:7px;color:inherit;text-decoration:none;{{ 'background:#111;color:#fff;' if i == page }}">{{ i }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

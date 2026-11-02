@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}对局复盘 · MONO{% endblock %}
+
+{% block content %}
+<style>
+  .rp-wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+  .rp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .rp-head h1 { font-size: 20px; margin: 0; }
+  .rp-meta { font-size: 13px; color: var(--muted, #888); }
+  .rp-board {
+    display: grid; gap: 2px; justify-content: center;
+    background: #2b2b2b; padding: 10px; border-radius: 10px; margin: 0 auto 16px;
+    width: fit-content;
+  }
+  .rp-cell {
+    width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; border-radius: 3px;
+    background: #3a3a3a; color: #e8e8e8; font-family: ui-monospace, monospace;
+  }
+  .rp-cell.empty { background: #2f2f2f; color: transparent; }
+  .rp-cell.p1 { background: #1f1f1f; color: #fff; }
+  .rp-cell.p2 { background: #f0f0f0; color: #111; }
+  .rp-cell.last { outline: 2px solid #f59e0b; }
+  .rp-ctrl { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .rp-ctrl button {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid #444;
+    background: #2b2b2b; color: #e8e8e8; cursor: pointer; font-size: 14px;
+  }
+  .rp-ctrl button:hover { background: #3a3a3a; }
+  .rp-ctrl button:disabled { opacity: .4; cursor: not-allowed; }
+  .rp-step { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--muted, #888); }
+  .rp-none { text-align: center; padding: 40px 16px; color: #888; line-height: 1.8; }
+  .rp-legend { text-align: center; font-size: 12px; color: #888; margin-top: 10px; line-height: 1.7; }
+</style>
+
+<div class="rp-wrap">
+  <div class="rp-head">
+    <h1 id="rpTitle">对局复盘</h1>
+    <div class="rp-meta" id="rpMeta"></div>
+  </div>
+
+  <div id="rpBody"><div class="rp-none">加载中…</div></div>
+
+  <div class="rp-ctrl" id="rpCtrl" style="display:none">
+    <button id="rpFirst" title="回到开局">⏮</button>
+    <button id="rpPrev">◀ 上一步</button>
+    <button id="rpPlay">▶ 播放</button>
+    <button id="rpNext">下一步 ▶</button>
+    <button id="rpLast" title="跳到终局">⏭</button>
+    <span class="rp-step" id="rpStep"></span>
+  </div>
+
+  <div class="rp-legend" id="rpLegend"></div>
+</div>
+
+<script>
+(function(){
+  var GAME = {{ game | tojson }};
+  var RID = {{ rid | int }};
+
+  // 棋盘尺寸（列 × 行）
+  var DIM = { xq: [9, 10], chess: [8, 8], gomoku: [15, 15], reversi: [8, 8], go: [19, 19], jq: [9, 10] };
+  var NAME = { xq: '中国象棋', chess: '国际象棋', gomoku: '五子棋', reversi: '翻转棋', go: '围棋', jq: '军棋' };
+
+  var states = [], idx = 0, timer = null;
+
+  var elBody = document.getElementById('rpBody');
+  var elCtrl = document.getElementById('rpCtrl');
+  var elStep = document.getElementById('rpStep');
+  var elTitle = document.getElementById('rpTitle');
+  var elMeta = document.getElementById('rpMeta');
+  var elLegend = document.getElementById('rpLegend');
+
+  elTitle.textContent = (NAME[GAME] || GAME) + ' · 对局复盘';
+
+  function esc(s){ return String(s == null ? '' : s); }
+
+  // 字符 → 样式类
+  function cls(ch){
+    if (ch === '.' || ch === ' ' || ch === '0') return 'empty';
+    // 象棋/国象：大写=红/白，小写=黑
+    if (/[A-Z]/.test(ch)) return 'p1';
+    if (/[a-z]/.test(ch)) return 'p2';
+    if (ch === '1') return 'p1';
+    if (ch === '2') return 'p2';
+    return 'p1';
+  }
+
+  function render(){
+    if (!states.length) return;
+    var dim = DIM[GAME] || [15, 15];
+    var cols = dim[0], rows = dim[1];
+    var s = states[idx] || '';
+    var grid = document.createElement('div');
+    grid.className = 'rp-board';
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', 26px)';
+    for (var i = 0; i < cols * rows; i++) {
+      var ch = s[i] || '.';
+      var c = document.createElement('div');
+      c.className = 'rp-cell ' + cls(ch);
+      c.textContent = (ch === '.' || ch === ' ') ? '' : ch;
+      grid.appendChild(c);
+    }
+    elBody.innerHTML = '';
+    elBody.appendChild(grid);
+    elStep.textContent = (idx + 1) + ' / ' + states.length + '（第 ' + idx + ' 步后）';
+  }
+
+  function go(n){
+    if (!states.length) return;
+    idx = Math.max(0, Math.min(states.length - 1, n));
+    render();
+  }
+
+  function stopPlay(){
+    if (timer) { clearInterval(timer); timer = null; }
+    document.getElementById('rpPlay').textContent = '▶ 播放';
+  }
+
+  document.getElementById('rpFirst').onclick = function(){ stopPlay(); go(0); };
+  document.getElementById('rpPrev').onclick  = function(){ stopPlay(); go(idx - 1); };
+  document.getElementById('rpNext').onclick  = function(){ stopPlay(); go(idx + 1); };
+  document.getElementById('rpLast').onclick  = function(){ stopPlay(); go(states.length - 1); };
+  document.getElementById('rpPlay').onclick  = function(){
+    if (timer) { stopPlay(); return; }
+    if (idx >= states.length - 1) idx = 0;
+    document.getElementById('rpPlay').textContent = '⏸ 暂停';
+    timer = setInterval(function(){
+      if (idx >= states.length - 1) { stopPlay(); return; }
+      idx++; render();
+    }, 420);
+  };
+
+  fetch('/api/board/replay/' + GAME + '/' + RID, { credentials: 'same-origin' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) {
+        elBody.innerHTML = '<div class="rp-none">' + esc(d && d.msg || '加载失败') + '</div>';
+        return;
+      }
+      elMeta.textContent = (d.status === 'finished' ? '已结束' : d.status || '') +
+                           ' · 共 ' + (d.moves || []).length + ' 步';
+      if (!d.supported) {
+        elBody.innerHTML = '<div class="rp-none">这局暂时无法复盘<br>' + esc(d.reason || '') + '</div>';
+        return;
+      }
+      states = d.states || [];
+      if (!states.length) {
+        elBody.innerHTML = '<div class="rp-none">没有可播放的局面</div>';
+        return;
+      }
+      elCtrl.style.display = 'flex';
+      idx = states.length - 1;   // 默认停在终局
+      render();
+      elLegend.textContent = '深色 = 先手 / 白方，浅色 = 后手 / 黑方；橙框是最后一步';
+    })
+    .catch(function(){
+      elBody.innerHTML = '<div class="rp-none">加载失败，请稍后再试</div>';
+    });
+})();
+</script>
+{% endblock %}

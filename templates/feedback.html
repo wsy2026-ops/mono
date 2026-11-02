@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}反馈 - MONO 社区{% endblock %}
+{% set active = 'feedback' %}
+{% block content %}
+<style>
+  .fb-head{margin-bottom:18px;}
+  .fb-head h2{margin:0 0 6px;font-size:24px;font-weight:800;}
+  .fb-head p{color:var(--muted,#888);font-size:13.5px;margin:0;line-height:1.8;}
+  .fb-card{
+    border:1px solid var(--line,#e6e6e6);border-radius:18px;background:var(--bg-elev);
+    padding:20px;margin-bottom:16px;
+  }
+  .fb-card h3{margin:0 0 14px;font-size:15px;font-weight:800;}
+  .fb-kinds{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .fb-kind{
+    flex:1 1 140px;min-height:52px;border:1px solid var(--line,#e6e6e6);border-radius:14px;
+    background:transparent;color:var(--fg,#222);cursor:pointer;font-family:inherit;
+    font-size:14px;font-weight:600;transition:all .18s ease;padding:8px 12px;
+  }
+  .fb-kind:hover{border-color:#d4b96a;}
+  .fb-kind.on{border-color:#111;background:#111;color:#fff;}
+  .fb-kind small{display:block;font-weight:400;font-size:11.5px;opacity:.7;margin-top:3px;}
+  .fb-input,.fb-area{
+    width:100%;border:1px solid var(--line,#e6e6e6);border-radius:12px;
+    padding:12px 14px;font-family:inherit;font-size:14px;background:transparent;
+    color:var(--fg,#222);box-sizing:border-box;
+  }
+  .fb-area{min-height:120px;resize:vertical;line-height:1.7;}
+  .fb-row{display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+  .fb-file{
+    font-size:13px;color:var(--muted,#888);
+  }
+  .fb-submit{
+    min-height:46px;padding:12px 28px;border:0;border-radius:12px;cursor:pointer;
+    background:#111;color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;
+  }
+  .fb-submit:disabled{opacity:.5;cursor:default;}
+  .fb-tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .fb-tab{
+    padding:8px 16px;border-radius:11px;border:1px solid var(--line,#e6e6e6);
+    background:transparent;color:var(--fg,#222);font-size:13.5px;font-weight:600;
+    text-decoration:none;font-family:inherit;
+  }
+  .fb-tab.on{background:#111;color:#fff;border-color:#111;}
+  .fb-item{
+    border:1px solid var(--line,#e6e6e6);border-radius:14px;padding:14px 16px;margin-bottom:10px;
+    background:var(--bg-elev);
+  }
+  .fb-item.done{opacity:.55;}
+  .fb-item-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+  .fb-tag{
+    font-size:11.5px;padding:3px 9px;border-radius:8px;font-weight:700;
+    background:#eef2f7;color:#3b5266;
+  }
+  .fb-tag.bug{background:#fdecec;color:#a32d2d;}
+  .fb-tag.ok{background:#e8f5e9;color:#2e6b3e;}
+  .fb-who{font-size:12.5px;color:var(--muted,#888);}
+  .fb-text{font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-word;}
+  .fb-img{max-width:100%;max-height:320px;border-radius:12px;margin-top:10px;display:block;}
+  .fb-empty{color:var(--muted,#888);font-size:13.5px;padding:20px 0;text-align:center;}
+  .fb-reply{
+    margin-top:10px;padding:10px 12px;border-radius:10px;background:#eef2f7;
+    color:#3b5266;font-size:13.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word;
+  }
+  .fb-reply-form{display:flex;gap:8px;margin-top:10px;}
+  .fb-reply-form .fb-input{flex:1;min-height:38px;padding:8px 12px;font-size:13.5px;}
+  .fb-reply-form .fb-done{margin-top:0;flex:0 0 auto;}
+  .fb-done{
+    margin-top:10px;font-size:12.5px;padding:6px 14px;border-radius:10px;cursor:pointer;
+    border:1px solid var(--line,#e6e6e6);background:transparent;color:var(--fg,#222);
+    font-family:inherit;
+  }
+</style>
+
+<div class="fb-head">
+  <h2>📮 反馈</h2>
+  <p>功能建议和 Bug 反馈都可以提，能传图片就传图片，比文字描述清楚得多。</p>
+</div>
+
+<div class="fb-card">
+  <h3>提一条反馈</h3>
+  <form method="post" action="{{ url_for('feedback_submit') }}" enctype="multipart/form-data">
+    <div class="fb-kinds" id="fbKinds">
+      <button type="button" class="fb-kind on" data-kind="idea">功能建议<small>希望加什么、改什么</small></button>
+      <button type="button" class="fb-kind" data-kind="bug">Bug 反馈<small>哪里坏了、怎么复现</small></button>
+    </div>
+    <input type="hidden" name="kind" id="fbKind" value="idea">
+    <textarea class="fb-area" name="content" id="fbContent" maxlength="2000"
+      placeholder="写清楚一点：你想做什么、看到什么、期望是什么。有截图的话下面传一张。"></textarea>
+    <div class="fb-row">
+      <input type="file" name="image" id="fbImage" class="fb-file" accept="image/*">
+      <button type="submit" class="fb-submit" id="fbSubmit">提交</button>
+    </div>
+  </form>
+</div>
+
+{% if seen_all %}
+<div class="fb-card">
+  <h3>收到的反馈</h3>
+  <div class="fb-tabs">
+    {% for k in tabs %}
+    <a class="fb-tab {{ 'on' if k == kind else '' }}" href="{{ url_for('feedback_page', kind=k) }}">
+      {{ kinds[k] }} <span style="opacity:.6;">{{ counts.get(k, 0) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if rows %}
+    {% for r in rows %}
+    <div class="fb-item {{ 'done' if r['status'] == 'done' else '' }}" id="fb{{ r['id'] }}">
+      <div class="fb-item-top">
+        <span class="fb-tag {{ 'bug' if r['kind'] == 'bug' else '' }}">{{ kinds[r['kind']] }}</span>
+        {% if r['status'] == 'done' %}<span class="fb-tag ok">已处理</span>{% endif %}
+        <span class="fb-who">{{ r['username'] or ('用户 ' ~ r['user_id']) }}</span>
+        <span class="fb-who">{{ r['created_at'] | fmttime('%m-%d %H:%M') }}</span>
+        <button type="button" class="fb-done" onclick="fbDone({{ r['id'] }})">
+          {{ '重新打开' if r['status'] == 'done' else '标记已处理' }}
+        </button>
+      </div>
+      <div class="fb-text">{{ r['content'] }}</div>
+      {% if r['reply'] %}
+      <div class="fb-reply"><b>回复：</b>{{ r['reply'] }}</div>
+      {% endif %}
+      {% if seen_all %}
+      <form class="fb-reply-form" method="post" action="{{ url_for('feedback_reply', fid=r['id']) }}">
+        <input class="fb-input" name="reply" maxlength="1000" placeholder="写个回复…">
+        <button type="submit" class="fb-done">发送</button>
+      </form>
+      {% endif %}
+      {% if r['image'] %}
+      <a href="{{ cdn_url('feedback/' ~ r['image']) }}" target="_blank" rel="noopener">
+        <img class="fb-img" src="{{ cdn_url('feedback/' ~ r['image']) }}" alt="反馈图片" loading="lazy">
+      </a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="fb-empty">这一类还没有人提过</div>
+  {% endif %}
+</div>
+{% else %}
+<div class="fb-card">
+  <h3>我提过的</h3>
+  <div class="fb-tabs">
+    {% for k in tabs %}
+    <a class="fb-tab {{ 'on' if k == kind else '' }}" href="{{ url_for('feedback_page', kind=k) }}">
+      {{ kinds[k] }} <span style="opacity:.6;">{{ counts.get(k, 0) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% if rows %}
+    {% for r in rows %}
+    <div class="fb-item">
+      <div class="fb-item-top">
+        <span class="fb-tag {{ 'bug' if r['kind'] == 'bug' else '' }}">{{ kinds[r['kind']] }}</span>
+        {% if r['status'] == 'done' %}<span class="fb-tag ok">已处理</span>{% endif %}
+        <span class="fb-who">{{ r['created_at'] | fmttime('%m-%d %H:%M') }}</span>
+      </div>
+      <div class="fb-text">{{ r['content'] }}</div>
+      {% if r['reply'] %}
+      <div class="fb-reply"><b>回复：</b>{{ r['reply'] }}</div>
+      {% endif %}
+      {% if seen_all %}
+      <form class="fb-reply-form" method="post" action="{{ url_for('feedback_reply', fid=r['id']) }}">
+        <input class="fb-input" name="reply" maxlength="1000" placeholder="写个回复…">
+        <button type="submit" class="fb-done">发送</button>
+      </form>
+      {% endif %}
+      {% if r['image'] %}
+      <img class="fb-img" src="{{ cdn_url('feedback/' ~ r['image']) }}" alt="反馈图片" loading="lazy">
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="fb-empty">还没提过反馈</div>
+  {% endif %}
+</div>
+{% endif %}
+
+<script>
+(function(){
+  var kinds = document.getElementById('fbKinds');
+  if (!kinds) return;
+  kinds.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.fb-kind') : null;
+    if (!b) return;
+    kinds.querySelectorAll('.fb-kind').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    document.getElementById('fbKind').value = b.getAttribute('data-kind');
+  });
+
+  document.querySelector('form').addEventListener('submit', function(){
+    var btn = document.getElementById('fbSubmit');
+    btn.disabled = true;
+    btn.textContent = '提交中…';
+  });
+})();
+
+function fbDone(id){
+  fetch('/feedback/' + id + '/done', {method:'POST', credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok){ alert((j && j.msg) || __('操作失败')); return; }
+      location.reload();
+    })
+    .catch(function(){ alert(__('网络不太好，再试一次')); });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "_admin_base.html" %}
+{% block title %}举报处理 · 管理后台{% endblock %}
+{% block admin_icon %}🚩{% endblock %}
+{% block admin_heading %}全站举报处理{% endblock %}
+{% block admin_desc %}三种处理方式：忽略（需备注）· 限时处罚 · 上报超级管理员{% endblock %}
+
+{% block admin_content %}
+{% set pending = reports|selectattr('status','equalto','pending')|list|length %}
+
+<div class="adm-card">
+  <div class="adm-grid">
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ reports|length }}</div>
+      <div class="adm-stat-label">举报总数</div>
+    </div>
+    <div class="adm-stat {{ 'warn' if pending else 'ok' }}">
+      <div class="adm-stat-num">{{ pending }}</div>
+      <div class="adm-stat-label">待处理</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ reports|selectattr('status','equalto','ignored')|list|length }}</div>
+      <div class="adm-stat-label">已忽略</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ reports|selectattr('status','equalto','punished')|list|length }}</div>
+      <div class="adm-stat-label">已处罚</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ reports|selectattr('status','equalto','escalated')|list|length }}</div>
+      <div class="adm-stat-label">已上报</div>
+    </div>
+  </div>
+</div>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>举报明细</h3>
+    <span class="adm-hint">按时间倒序 · 处理动作会记入超管日志</span>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:64px;">ID</th>
+          <th style="width:110px;">举报人</th>
+          <th style="width:80px;">类型</th>
+          <th style="width:110px;">分类</th>
+          <th>违规内容快照</th>
+          <th style="width:140px;">举报理由</th>
+          <th style="width:100px;">状态</th>
+          <th style="width:300px;">处理</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reports %}
+        <tr>
+          <td class="adm-id">{{ r.id }}</td>
+          <td>{{ r.reporter_name }}</td>
+          <td><span class="adm-pill">{{ r.target_type }}</span></td>
+          <td>{{ r.category }}</td>
+          <td class="adm-wrap">{{ r.snapshot }}</td>
+          <td class="adm-wrap">{{ r.reason or "—" }}</td>
+          <td>
+            {% if r.status == 'pending' %}<span class="adm-pill warn">待处理</span>
+            {% elif r.status == 'ignored' %}<span class="adm-pill off">已忽略</span>
+            {% elif r.status == 'punished' %}<span class="adm-pill danger">已处罚</span>
+            {% else %}<span class="adm-pill warn">已上报</span>{% endif %}
+          </td>
+          <td>
+            {% if r.status == 'pending' %}
+              <form method="post" action="{{ url_for('admin_report_ignore', rid=r.id) }}" class="adm-form-row">
+                <input type="text" name="handler_note" placeholder="忽略理由（必填）" style="width:118px;">
+                <button class="btn sm ghost" type="submit">忽略</button>
+              </form>
+
+              <form method="post" action="{{ url_for('admin_report_punish', rid=r.id) }}" class="adm-form-row">
+                <select name="ptype" style="width:auto;">
+                  <option value="mute">禁言</option>
+                  <option value="ban">封禁</option>
+                </select>
+                <input type="number" name="days" min="0" max="99" value="1" style="width:52px;" title="天">
+                <span class="muted" style="font-size:11px;">天</span>
+                <input type="number" name="hours" min="0" max="23" value="0" style="width:46px;" title="时">
+                <span class="muted" style="font-size:11px;">时</span>
+                <input type="number" name="minutes" min="0" max="59" value="0" style="width:46px;" title="分">
+                <span class="muted" style="font-size:11px;">分</span>
+                <button class="btn sm" type="submit">处罚</button>
+                {% if is_super %}
+                <button class="btn sm danger" type="submit" name="mode" value="permanent"
+                        title="无视时长，直接永久处罚">永久</button>
+                {% endif %}
+              </form>
+
+              {% if not is_super %}
+              <form method="post" action="{{ url_for('admin_report_escalate', rid=r.id) }}" class="adm-form-row">
+                <input type="text" name="handler_note" placeholder="上报理由" style="width:118px;">
+                <button class="btn sm ghost" type="submit">上报超管</button>
+              </form>
+              {% endif %}
+            {% else %}
+              <span class="muted">{{ r.handler_note or '（无备注）' }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">
+            <div class="adm-empty">
+              <div class="adm-empty-ico">🚩</div>
+              <div class="adm-empty-text">暂无举报 —— 社区很太平</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

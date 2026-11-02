@@ -1,0 +1,306 @@
+<style>
+  .mm-box{
+    border:1px solid var(--line,#e6e6e6);border-radius:18px;background:var(--bg-elev);
+    padding:26px 22px;text-align:center;margin-bottom:18px;
+  }
+  .mm-go{
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    min-width:210px;min-height:52px;padding:14px 30px;
+    border:0;border-radius:14px;cursor:pointer;font-family:inherit;
+    background:#111;color:#fff;font-size:16px;font-weight:700;
+    transition:transform .16s ease,opacity .16s ease;
+  }
+  .mm-go:hover{transform:translateY(-2px);}
+  .mm-go:disabled{opacity:.5;cursor:default;transform:none;}
+  .mm-hint{margin:12px 0 0;font-size:12.5px;color:var(--muted,#888);line-height:1.7;}
+  .mm-alt{margin-top:16px;}
+  .mm-alt form{display:inline;}
+  .mm-alt-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-height:42px;padding:10px 22px;border-radius:12px;cursor:pointer;
+    border:1px solid var(--line,#e6e6e6);background:transparent;
+    color:var(--fg,#222);font-size:14px;font-family:inherit;font-weight:600;
+  }
+  .mm-alt-btn:hover{background:var(--soft,#f5f5f5);}
+  .mm-spin{
+    width:44px;height:44px;margin:2px auto 16px;border-radius:50%;
+    border:3px solid var(--line,#e6e6e6);border-top-color:#111;
+    animation:mmSpin .9s linear infinite;
+  }
+  @keyframes mmSpin{to{transform:rotate(360deg);}}
+  .mm-tip{margin:0;font-size:15px;font-weight:700;color:var(--fg,#222);}
+  .mm-sub{margin:8px 0 0;font-size:13px;color:var(--muted,#888);}
+  .mm-sub b{color:var(--fg,#222);font-variant-numeric:tabular-nums;}
+  .mm-cancel{
+    margin-top:18px;min-height:40px;padding:9px 20px;border-radius:11px;cursor:pointer;
+    border:1px solid var(--line,#e6e6e6);background:transparent;
+    color:var(--fg,#222);font-size:13.5px;font-family:inherit;
+  }
+  .mm-cancel:hover{background:var(--soft,#f5f5f5);border-color:var(--fg,#222);}
+  .mm-me{
+    margin:0 0 16px;padding:12px 14px;border-radius:12px;
+    background:var(--soft,#f6f6f6);color:var(--fg,#222);
+    font-size:13px;line-height:1.75;text-align:left;
+  }
+  .mm-me:empty{display:none;}
+  .mm-me b{font-variant-numeric:tabular-nums;}
+  .mm-me .mm-big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .mm-resume{
+    margin:0 0 14px;padding:13px 14px;border-radius:12px;text-align:left;
+    background:#fff8e1;color:#8a5a00;font-size:13.5px;font-weight:600;line-height:1.7;
+  }
+  .mm-resume button{
+    margin-left:8px;padding:6px 14px;border-radius:10px;cursor:pointer;
+    border:1px solid #e0c98a;background:#fff;color:#8a5a00;
+    font-family:inherit;font-size:13px;font-weight:700;
+  }
+  .mm-resume button.mm-resume-go{background:#8a5a00;border-color:#8a5a00;color:#fff;}
+  .mm-aihint{
+    display:none;margin:16px 0 0;padding:11px 14px;border-radius:11px;
+    background:#fff8e1;color:#8a5a00;font-size:12.5px;font-weight:600;
+  }
+  .mm-aihint.on{display:block;}
+</style>
+
+<div class="mm-box" id="mmBox" data-game="{{ mm_game }}" data-room="{{ mm_room }}"
+     data-has-ai="{{ '1' if mm_has_ai else '0' }}">
+  <div id="mmIdle">
+    <p class="mm-me" id="mmMe"></p>
+    <button type="button" class="mm-go" id="mmGo">开始匹配</button>
+    <p class="mm-hint">点一下就行，系统自动帮你找对手</p>
+  </div>
+
+  <div id="mmWait" style="display:none">
+    <div class="mm-spin"></div>
+    <p class="mm-tip" id="mmTip">正在寻找对手…</p>
+    <p class="mm-sub">已等待 <b id="mmSec">0</b> 秒 · 队列里还有 <b id="mmQ">0</b> 人</p>
+    <button type="button" class="mm-cancel" id="mmCancel">取消匹配</button>
+    <p class="mm-aihint" id="mmAiHint"></p>
+  </div>
+</div>
+
+<script src="{{ cdn_url('js/mono_fp.js') }}"></script>
+<script>
+(function(){
+  var box = document.getElementById('mmBox');
+  if (!box) return;
+  var GAME = box.getAttribute('data-game');
+  var ROOM = box.getAttribute('data-room');
+  var HAS_AI = box.getAttribute('data-has-ai') === '1';
+  var aiWait = 12;   // 每次点匹配时随机 8~15 秒
+  var idle = document.getElementById('mmIdle');
+  var wait = document.getElementById('mmWait');
+  var btn = document.getElementById('mmGo');
+  var secEl = document.getElementById('mmSec');
+  var qEl = document.getElementById('mmQ');
+  var tip = document.getElementById('mmTip');
+  var aiHint = document.getElementById('mmAiHint');
+  var timer = null, tick = null, started = 0, busy = false, autoDone = false;
+  var meEl = document.getElementById('mmMe');
+
+  function loadMe(){
+    monoFetch('/api/mm/me?game=' + encodeURIComponent(GAME))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) return;
+        if (!j.rating){
+          meEl.innerHTML = '还没打过计分局 · 打完第一局就有评级了';
+        } else {
+          meEl.innerHTML = '你的评级 <span class="mm-big">' + j.rating.toFixed(1) + '</span>'
+            + '<br>已下 <b>' + j.games + '</b> 局（赢 <b>' + j.wins + '</b> 负 <b>' + j.losses + '</b>）';
+        }
+      })
+      .catch(function(){});
+  }
+  loadMe();
+
+  // 有没打完的局就问一句要不要重连（关掉页面 / 刷新之后能回来）
+  monoFetch('/api/mm/pending?game=' + encodeURIComponent(GAME))
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok || !j.rid) return;
+      var box = document.createElement('div');
+      box.className = 'mm-resume';
+      box.innerHTML = '你有未完成的对局'
+        + '<button type="button" class="mm-resume-go" id="mmResumeGo">重连</button>'
+        + '<button type="button" id="mmResumeNo">不用了</button>';
+      box.querySelector('#mmResumeGo').addEventListener('click', function(){
+        location.href = ROOM + j.rid;
+      });
+      box.querySelector('#mmResumeNo').addEventListener('click', function(){
+        box.parentNode.removeChild(box);
+      });
+      box.setAttribute('data-rid', j.rid);
+      var host = document.getElementById('mmBox');
+      host.insertBefore(box, host.firstChild);
+    })
+    .catch(function(){});
+
+  function autoAi(){
+    if (autoDone || !HAS_AI) return;
+    autoDone = true;
+    clearInterval(tick);
+    tip.textContent = '正在匹配对手…';
+    monoFetch('/api/mm/ai?game=' + encodeURIComponent(GAME), {method:'POST'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (j && j.ok && j.rid){ toRoom(j.rid); return; }
+        autoDone = false;
+        tip.textContent = '正在寻找对手…';
+        aiHint.textContent = '暂时匹配不到人，再等等看';
+        aiHint.classList.add('on');
+        timer = setTimeout(poll, 1500);
+      })
+      .catch(function(){
+        autoDone = false;
+        tip.textContent = '正在寻找对手…';
+        timer = setTimeout(poll, 2000);
+      });
+  }
+
+  function showWait(){
+    idle.style.display = 'none';
+    wait.style.display = 'block';
+    started = Date.now();
+    secEl.textContent = '0';
+    autoDone = false;
+    dropTries = 0;
+    aiHint.textContent = '';
+    aiHint.classList.remove('on');
+    tip.textContent = '正在寻找对手…';
+    clearInterval(tick);
+    tick = setInterval(function(){
+      var s = Math.floor((Date.now() - started) / 1000);
+      secEl.textContent = s;
+      if (HAS_AI){
+        if (s >= aiWait) autoAi();
+      } else if (s >= 25){
+        aiHint.textContent = '暂时没人在线，再等等看吧';
+        aiHint.classList.add('on');
+      }
+    }, 1000);
+  }
+
+  function showIdle(){
+    clearInterval(tick);
+    clearTimeout(timer);
+    tick = timer = null;
+    wait.style.display = 'none';
+    idle.style.display = 'block';
+    btn.disabled = false;
+  }
+
+  function toRoom(rid){
+    clearInterval(tick);
+    clearTimeout(timer);
+    location.href = ROOM + rid;
+  }
+
+  function poll(){
+    monoFetch('/api/mm/poll?game=' + encodeURIComponent(GAME))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) return;
+        if (typeof j.queue === 'number') qEl.textContent = j.queue;
+        if (j.status === 'matched' && j.rid){ toRoom(j.rid); return; }
+        if (j.status === 'idle'){ dropped(); return; }
+        timer = setTimeout(poll, 1200);
+      })
+      .catch(function(){ timer = setTimeout(poll, 1800); });
+  }
+
+  var dropTries = 0;
+  function dropped(){
+    clearInterval(tick);
+    clearTimeout(timer);
+    if (dropTries < 3){
+      dropTries++;
+      tip.textContent = '匹配中断，正在重新排队…';
+      wait.style.display = 'block';
+      idle.style.display = 'none';
+      busy = true;
+      btn.disabled = true;
+      started = Date.now();
+      secEl.textContent = '0';
+      monoFetch('/api/mm/start?game=' + encodeURIComponent(GAME), {method:'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (!j || !j.ok){
+            dropTries = 0;
+            busy = false;
+            btn.disabled = false;
+            idle.style.display = 'block';
+            wait.style.display = 'none';
+            tip.textContent = (j && j.msg) || '匹配失败，稍后再试';
+            return;
+          }
+          if (j.status === 'matched' && j.rid){ toRoom(j.rid); return; }
+          busy = false;
+          tick = setInterval(function(){
+            var s = Math.floor((Date.now() - started) / 1000);
+            secEl.textContent = s;
+            if (HAS_AI && s >= aiWait) autoAi();
+          }, 1000);
+          timer = setTimeout(poll, 1200);
+        })
+        .catch(function(){
+          dropTries = 0;
+          busy = false;
+          btn.disabled = false;
+          idle.style.display = 'block';
+          wait.style.display = 'none';
+          tip.textContent = '网络不稳，请再试一次';
+        });
+      return;
+    }
+    dropTries = 0;
+    showIdle();
+    aiHint.textContent = '匹配断开了，点上面再试一次';
+    aiHint.classList.add('on');
+  }
+
+  btn.addEventListener('click', function(){
+    if (busy) return;
+    busy = true;
+    aiWait = 8 + Math.random() * 7;   // 8~15 秒随机，别让每次等待时长都一样
+    btn.disabled = true;
+    monoFetch('/api/mm/start?game=' + encodeURIComponent(GAME), {method:'POST'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        busy = false;
+        if (!j || !j.ok){
+          btn.disabled = false;
+          alert((j && j.msg) || __('匹配失败，稍后再试'));
+          return;
+        }
+        if (j.status === 'matched' && j.rid){ toRoom(j.rid); return; }
+        if (j.status === 'cooldown'){
+          tip.textContent = '刚下过一局，歇 ' + (j.wait || 10) + ' 秒再匹配';
+          btn.disabled = false;
+          setTimeout(function(){
+            if (!busy && btn.offsetParent !== null) btn.click();
+          }, ((j.wait || 10) + 1) * 1000);
+          return;
+        }
+        showWait();
+        qEl.textContent = j.queue || 0;
+        timer = setTimeout(poll, 1000);
+      })
+      .catch(function(){
+        busy = false;
+        btn.disabled = false;
+        alert(__('网络不太好，再试一次'));
+      });
+  });
+
+  document.getElementById('mmCancel').addEventListener('click', function(){
+    monoFetch('/api/mm/cancel?game=' + encodeURIComponent(GAME), {method:'POST'})
+      .catch(function(){})
+      .then(function(){ showIdle(); });
+  });
+
+  window.addEventListener('pagehide', function(){
+    try { navigator.sendBeacon('/api/mm/cancel?game=' + encodeURIComponent(GAME)); } catch (e) {}
+  });
+})();
+</script>

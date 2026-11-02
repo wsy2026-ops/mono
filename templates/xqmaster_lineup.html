@@ -1,0 +1,167 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}编辑阵容{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-head">
+  <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="{{ url_for('xqmaster_page') }}">← 返回</a>
+  <h1>编辑阵容</h1>
+  <span class="xqm-hsub" id="xqmLuCount">已摆 0 / 16</span>
+</div>
+<div class="xqm-lu">
+  <div class="xqm-lu-left">
+    <div class="xqm-hboard xqm-lu-board" id="xqmLuBoard"></div>
+    <div class="xqm-lu-tip">先选中一种棋子，再点棋盘空格摆放；点已摆的棋子可收回</div>
+  </div>
+  <div class="xqm-lu-right">
+    <div class="xqm-lu-rhead">棋子库</div>
+    <div id="xqmLuPool"></div>
+    <div class="xqm-lufoot">
+      <button class="xqm-btn xqm-btn-o" id="xqmLuReset">恢复默认</button>
+      <button class="xqm-btn xqm-btn-p" id="xqmLuSave">保存阵容</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var boardEl = document.getElementById('xqmLuBoard');
+  var poolEl = document.getElementById('xqmLuPool');
+  X.fitHboard(boardEl);
+  var ORDER = [], COUNTS = {}, DEFAULT = [];
+  var layout = [], sel = null;
+  var BOSS = ['king', 'lord', 'di'];     // 主帅位三选一
+
+  var ZONE_NAME = {grain:'限己方半场', lord:'限九宫', king:'限九宫', advisor:'限九宫', elephant:'限己方半场',
+                   horse:'限己方半场', chariot:'限己方半场', cannon:'限己方半场', pawn:'限己方半场',
+                   zu:'限己方半场', min:'限己方半场', shi:'限己方半场', pai:'限己方半场',
+                   tan:'限己方半场', huo:'限己方半场',
+                   dun:'限己方半场', gong:'限己方半场', nu:'限己方半场', mao:'限己方半场',
+                   fu:'限己方半场', chui:'限己方半场', qi:'限己方半场', gu:'限己方半场',
+                   zhen:'限己方半场', yao:'限己方半场', chi:'限己方半场', ci:'限己方半场',
+                   jing:'限己方半场',
+                   hu:'限己方半场', bao:'限己方半场', ying:'限己方半场', lang:'限己方半场',
+                   yi:'限己方半场', jiang:'限己方半场', di:'限九宫', long:'限己方半场',
+                   yi2:'限己方半场', wei:'限己方半场', xu:'限己方半场', biao:'限己方半场',
+                   duan:'限己方半场', can:'限己方半场', bian:'限己方半场', teng:'限己方半场'};
+
+  function zoneOK(t, r, c){
+    if (r < 5 || r > 9 || c < 0 || c > 8) return false;
+    if (BOSS.indexOf(t) >= 0 || t === 'advisor') return (c >= 3 && c <= 5 && r >= 7);
+    return true;
+  }
+
+  var LOCKED = {};
+
+  function poolCounts(){
+    var p = {};
+    ORDER.forEach(function(t){ p[t] = (BOSS.indexOf(t) >= 0) ? 1 : (COUNTS[t] || 99); });
+    layout.forEach(function(it){ p[it[0]]--; });
+    var has = {};
+    layout.forEach(function(it){ has[it[0]] = 1; });
+    BOSS.forEach(function(b){ if(has[b]) BOSS.forEach(function(o){ if(o !== b) p[o] = 0; }); });
+    ORDER.forEach(function(t){ if(LOCKED[t]) p[t] = 0; });
+    return p;
+  }
+
+  function renderBoard(){
+    var at = {};
+    layout.forEach(function(it){ at[it[1]+','+it[2]] = it[0]; });
+    var html = '<div class="xqm-palace p1"></div>';
+    for(var r=5;r<=9;r++) for(var c=0;c<9;c++){
+      html += '<div class="xqm-cell" data-r="'+r+'" data-c="'+c+'">';
+      var t = at[r+','+c];
+      if(t){
+        var d = X.PD[t];
+        html += X.pcHTML({t:t, s:'red', hp:d.hp, mh:d.hp, id:'l'+r+'_'+c}, {});
+      } else if(sel && zoneOK(sel, r, c)){
+        html += '<div class="xqm-lucan"></div>';
+      }
+      html += '</div>';
+    }
+    boardEl.innerHTML = html;
+  }
+
+  function renderPool(){
+    var p = poolCounts();
+    poolEl.innerHTML = ORDER.filter(function(t){ return !LOCKED[t]; }).map(function(t){
+      var d = X.PD[t];
+      var cls = 'xqm-luitem' + (sel===t ? ' on' : '') + (p[t] <= 0 ? ' empty' : '');
+      return '<div class="'+cls+'" data-t="'+t+'">'
+        + X.pcHTML({t:t, s:'red', hp:d.hp, mh:d.hp, id:'p'+t}, {})
+        + '<div><div class="nm">'+d.name.split(' / ')[0]+'</div>'
+        + '<div class="rl">'+(LOCKED[t] ? '未解锁 · 图鉴里花 30 碎片解锁' : (ZONE_NAME[t] || '限己方半场'))+'</div></div>'
+        + '<div class="n">'+(LOCKED[t] ? '锁' : '× ' + Math.max(0, p[t]))+'</div></div>';
+    }).join('');
+  }
+
+  function paintCount(){
+    var el = document.getElementById('xqmLuCount');
+    if(!el) return;
+    el.textContent = '已摆 ' + layout.length + ' / ' + (DEFAULT.length || 16);
+  }
+
+  function render(){ renderBoard(); renderPool(); paintCount(); }
+
+  poolEl.addEventListener('click', function(e){
+    var it = e.target.closest('.xqm-luitem');
+    if(!it) return;
+    var t = it.dataset.t;
+    if(sel === t){ sel = null; }
+    else {
+      if(LOCKED[t]){ X.toast(__('这个棋子还没解锁，去图鉴花 30 碎片解锁')); return; }
+      var p = poolCounts();
+      if(p[t] <= 0){ X.toast(__('这种棋子已经摆完了')); return; }
+      sel = t;
+    }
+    render();
+  });
+
+  boardEl.addEventListener('click', function(e){
+    var cell = e.target.closest('.xqm-cell');
+    if(!cell) return;
+    var r = +cell.dataset.r, c = +cell.dataset.c;
+    var idx = -1;
+    for(var i=0;i<layout.length;i++){ if(layout[i][1]===r && layout[i][2]===c){ idx=i; break; } }
+    if(idx >= 0){ layout.splice(idx,1); render(); return; }
+    if(!sel){ X.toast(__('先选中一种棋子')); return; }
+    if(!zoneOK(sel, r, c)){ X.toast(__('这种棋子不能摆在这里')); return; }
+    layout.push([sel, r, c]);
+    var p = poolCounts();
+    if(p[sel] <= 0) sel = null;
+    render();
+  });
+
+  document.getElementById('xqmLuReset').onclick = function(){
+    layout = DEFAULT.map(function(it){ return [it[0], it[1], it[2]]; });
+    sel = null;
+    render();
+  };
+
+  document.getElementById('xqmLuSave').onclick = function(){
+    var total = DEFAULT.length;   // 默认阵容的长度就是标准总数（16）
+    if(layout.length !== total){
+      X.toast(__('要摆满 {n} 枚棋子，现在还差 {m} 枚', {n: total, m: total - layout.length})); return;
+    }
+    X.api('/api/xqm/lineup', {method:'POST', body:{layout:layout}}).then(function(r){
+      if(!r.ok){ X.toast(r.msg || __('保存失败')); return; }
+      X.toast(__('阵容已保存'));
+      setTimeout(function(){ location.href = '{{ url_for("xqmaster_page") }}'; }, 700);
+    }).catch(function(){ X.toast(__('网络异常')); });
+  };
+
+  X.api('/api/xqm/grow').then(function(g){
+    (g.pieces || []).forEach(function(it){ if(it.locked) LOCKED[it.type] = 1; });
+    return X.api('/api/xqm/lineup');
+  }).then(function(r){
+    if(!r || !r.ok) return;
+    ORDER = r.order; COUNTS = r.counts; DEFAULT = r.default;
+    layout = (r.layout || r.default).map(function(it){ return [it[0], it[1], it[2]]; })
+      .filter(function(it){ return !LOCKED[it[0]]; });
+    render();
+  }).catch(function(){ X.toast(__('阵容加载失败')); });
+})();
+</script>
+{% endblock %}

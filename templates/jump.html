@@ -1,0 +1,773 @@
+{% extends "base.html" %}
+{% block title %}黑白跳一跳 - MONO 社区</div>
+{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="games-page">
+<style>
+<style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .games-page {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            gap: 30px;
+            user-select: none;
+        }
+
+        .top-bar {
+            position: fixed;
+            top: 76px;
+            left: 30px;
+            font-size: 14px;
+        }
+        .top-bar a {
+            color: #222;
+            text-decoration: none;
+            border-bottom: 1px solid #000;
+        }
+
+        .user-bar {
+            position: fixed;
+            top: 76px;
+            right: 30px;
+            background: #fff;
+            border: 1px solid #000;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        .user-bar .high-score {
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .game-container {
+            position: relative;
+            background: #fff;
+            border: 2px solid #000;
+            padding: 30px;
+            width: 560px;
+        }
+
+        .rank-container {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 25px;
+            width: 280px;
+            height: fit-content;
+        }
+
+        .rank-title {
+            font-size: 22px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 2px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #000;
+            margin-bottom: 15px;
+        }
+
+        .rank-list {
+            list-style: none;
+        }
+
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 16px;
+        }
+
+        .rank-item:last-child {
+            border-bottom: none;
+        }
+
+        .rank-item.self {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .rank-num {
+            width: 30px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .rank-name {
+            flex: 1;
+            padding: 0 10px;
+        }
+
+        .rank-score {
+            font-weight: bold;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #000;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 4px;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 12px 20px;
+            border: 1px solid #000;
+        }
+
+        .info-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .tip-text {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        #gameCanvas {
+            background: #ffffff;
+            border: 1px solid #000;
+            display: block;
+            margin: 0 auto;
+            cursor: pointer;
+        }
+
+        #powerBar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border: 1px solid #000;
+            margin-top: 15px;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #powerFill {
+            height: 100%;
+            width: 0%;
+            background: #111;
+            transition: width 0.03s linear;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 40px;
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+        }
+
+        .modal h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #000;
+            letter-spacing: 2px;
+        }
+
+        .modal p {
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .new-record {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .final-score {
+            font-size: 36px;
+            font-weight: bold;
+            color: #000;
+            margin: 20px 0;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .restart-btn, .back-btn {
+            padding: 12px 24px;
+            font-size: 15px;
+            border: 2px solid #000;
+            background: #fff;
+            color: #000;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .restart-btn:hover, .back-btn:hover {
+            background: #000;
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            .games-page {
+                flex-direction: column;
+                gap: 20px;
+                padding-top: 70px;
+            }
+            .game-container {
+                width: 100%;
+                max-width: 560px;
+            }
+            .rank-container {
+                width: 100%;
+                max-width: 560px;
+            }
+            .user-bar {
+                top: 10px;
+                right: 10px;
+            }
+            .top-bar {
+                top: 10px;
+                left: 10px;
+            }
+            #gameCanvas {
+                width: 100%;
+                height: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .game-container { padding: 20px 15px; }
+            .info-value { font-size: 18px; }
+        }
+    </style>
+
+    <div class="top-bar">
+        <a href="{{ url_for('games_center') }}">← 返回大厅</a>
+    </div>
+
+    <div class="user-bar">
+        {{ user.username }}
+        <span>最高分：<span class="high-score" id="userHighScore">{{ user.high_score_jump }}</span></span>
+    </div>
+
+    <div class="game-container">
+        <div class="header">
+            <h1>黑白跳一跳</h1>
+        </div>
+
+        <div class="info-bar">
+            <div class="info-item">
+                <div class="info-label">当前得分</div>
+                <div class="info-value" id="scoreDisplay">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">本局最高</div>
+                <div class="info-value" id="sessionHigh">0</div>
+            </div>
+        </div>
+
+        <div class="tip-text">按住 空格 / 鼠标左键 蓄力，松开跳跃 | 落在平台中心额外+2分</div>
+
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+
+        <div id="powerBar"><div id="powerFill"></div></div>
+    </div>
+
+    <div class="rank-container">
+        <h3 class="rank-title">排行榜</h3>
+        <ul class="rank-list" id="rankList">
+            {% for item in rank_list %}
+            <li class="rank-item {% if item.username == user.username %}self{% endif %}">
+                <span class="rank-num">{{ loop.index }}</span>
+                <span class="rank-name">{{ item.username }}</span>
+                <span class="rank-score">{{ item.score }}</span>
+            </li>
+            {% endfor %}
+            {% if user_rank > 10 %}
+            <li class="rank-item self">
+                <span class="rank-num">{{ user_rank }}</span>
+                <span class="rank-name">{{ user.username }}</span>
+                <span class="rank-score">{{ user.high_score_jump }}</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal">
+            <h2>游戏结束</h2>
+            <p>挑战结束</p>
+            <div class="new-record" id="newRecordTip" style="display:none;">🎉 新纪录！</div>
+            <div class="final-score" id="finalScore">0</div>
+            <div class="modal-btns">
+                <button class="back-btn" onclick="location.href='{{ url_for('games_center') }}'">返回大厅</button>
+                <button class="restart-btn" onclick="restartGame()">再来一局</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('scoreDisplay');
+        const sessionHighEl = document.getElementById('sessionHigh');
+        /* 服务端复算用：每次有效起跳的蓄力值 + 起跳点/目标平台几何 */
+        let jumpLog = [];
+        const powerBar = document.getElementById('powerBar');
+        const powerFill = document.getElementById('powerFill');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const finalScoreEl = document.getElementById('finalScore');
+        const newRecordTip = document.getElementById('newRecordTip');
+        const rankListEl = document.getElementById('rankList');
+        const userHighScoreEl = document.getElementById('userHighScore');
+
+        let score = 0;
+        let centerStreak = 0;      // 连续落在平台中心的次数（成就用）
+        let sessionHigh = 0;
+        let gameRunning = true;
+        let submitted = false;
+
+        window.MONO_GAME = { game: 'jump', sub: '', kind: 'score' };
+        window.MONO_GAME_RENDER = function(s, el){
+            const o = {sc: score, pl: player, pf: platforms, pw: power, ch: charging};
+            window.__monoReplay = true;
+            score = s.sc;
+            Object.keys(s.pl).forEach(function(k){ player[k] = s.pl[k]; });
+            platforms = s.pl2;
+            power = s.pw; charging = false;
+            const oc = canvas, ox = ctx;
+            el.innerHTML = '';
+            const nc = document.createElement('canvas');
+            nc.width = oc.width; nc.height = oc.height;
+            nc.style.maxWidth = '100%';
+            el.appendChild(nc);
+            canvas = nc; ctx = nc.getContext('2d');
+            render();
+            canvas = oc; ctx = ox;
+            score = o.sc;
+            Object.keys(o.pl).forEach(function(k){ player[k] = o.pl[k]; });
+            platforms = o.pf; power = o.pw; charging = o.ch;
+            render();
+            window.__monoReplay = false;
+        };
+        let charging = false;
+        let power = 0;
+        const maxPower = 100;
+        const chargeSpeed = 1.2;
+        const minValidPower = 8;
+        const powerToVx = 0.12;
+        const jumpAngleRatio = 1.2;
+
+        let jumpStretch = 0;
+        let landSquash = 0;
+        let shakeIntensity = 0;
+
+        const player = {
+            x: 100,
+            y: 0,
+            width: 30,
+            height: 30,
+            vx: 0,
+            vy: 0,
+            onGround: false,
+            fillColor: '#ffffff',
+            strokeColor: '#111111',
+            lineWidth: 3
+        };
+
+        const gravity = 0.75;
+
+        let platforms = [];
+        const platformHeight = 20;
+        const minPlatformW = 70;
+        const maxPlatformW = 130;
+        const minGap = 100;
+        const maxGap = 220;
+
+        let cameraX = 0;
+        let targetCameraX = 0;
+
+        function initGame() {
+            score = 0;
+            jumpLog = [];   // 服务端复算：新局清空跳跃序列
+            if (window.MONO_REC) window.MONO_REC.start();
+            gameRunning = true;
+            submitted = false;
+            power = 0;
+            charging = false;
+            jumpStretch = 0;
+            landSquash = 0;
+            shakeIntensity = 0;
+            cameraX = 0;
+            targetCameraX = 0;
+
+            updateDisplay();
+            initPlatforms();
+
+            gameOverModal.style.display = 'none';
+            newRecordTip.style.display = 'none';
+            powerBar.style.opacity = '0';
+            powerFill.style.width = '0%';
+        }
+
+        function initPlatforms() {
+            platforms = [];
+            platforms.push({
+                x: 50,
+                y: 380,
+                width: 120,
+                height: platformHeight,
+                color: '#111111'
+            });
+
+            player.x = 50 + 120/2 - player.width/2;
+            player.y = 380 - player.height;
+            player.vx = 0;
+            player.vy = 0;
+            player.onGround = true;
+
+            targetCameraX = player.x - 150;
+            cameraX = targetCameraX;
+
+            generatePlatform();
+        }
+
+        function generatePlatform() {
+            const last = platforms[platforms.length - 1];
+            const gap = minGap + Math.random() * (maxGap - minGap);
+            const width = minPlatformW + Math.random() * (maxPlatformW - minPlatformW);
+            const yOffset = (Math.random() - 0.5) * 80;
+
+            platforms.push({
+                x: last.x + last.width + gap,
+                y: Math.max(150, Math.min(430, last.y + yOffset)),
+                width: width,
+                height: platformHeight,
+                color: '#111111'
+            });
+        }
+
+        function startCharge() {
+            if (!gameRunning || !player.onGround) return;
+            charging = true;
+            power = 0;
+            jumpStretch = 0;
+            landSquash = 0;
+            powerBar.style.opacity = '1';
+            powerFill.style.opacity = '1';
+        }
+
+        function releaseJump() {
+            if (!charging) return;
+            charging = false;
+            powerBar.style.opacity = '0';
+            powerFill.style.opacity = '1';
+
+            if (player.onGround && power > minValidPower) {
+                const jumpVx = power * powerToVx;
+                player.vx = jumpVx;
+                player.vy = -jumpVx * jumpAngleRatio;
+                player.onGround = false;
+                jumpStretch = 1;
+                /* 服务端复算：蓄力值 + 起跳点 + 目标平台（platforms[1]）几何 */
+                var tgt = platforms[1];
+                if (tgt) jumpLog.push({
+                    power: power,
+                    x0: player.x, y0: player.y,
+                    tx: tgt.x, ty: tgt.y, tw: tgt.width
+                });
+            }
+
+            powerFill.style.width = '0%';
+            power = 0;
+            shakeIntensity = 0;
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            if (charging && player.onGround) {
+                power = Math.min(maxPower, power + chargeSpeed);
+                powerFill.style.width = power + '%';
+                shakeIntensity = (power / maxPower) * 1.5;
+
+                if (power >= maxPower * 0.95) {
+                    powerFill.style.opacity = Math.sin(Date.now() / 50) * 0.3 + 0.7;
+                } else if (power >= maxPower * 0.8) {
+                    powerFill.style.opacity = Math.sin(Date.now() / 100) * 0.2 + 0.8;
+                } else {
+                    powerFill.style.opacity = '1';
+                }
+            }
+
+            if (jumpStretch > 0) {
+                jumpStretch -= 0.08;
+                if (jumpStretch < 0) jumpStretch = 0;
+            }
+
+            if (landSquash > 0) {
+                landSquash -= 0.12;
+                if (landSquash < 0) landSquash = 0;
+            }
+
+            if (!player.onGround) {
+                player.vy += gravity;
+                player.x += player.vx;
+                player.y += player.vy;
+
+                for (let i = 0; i < platforms.length; i++) {
+                    const p = platforms[i];
+                    if (player.vy > 0 &&
+                        player.x + player.width > p.x &&
+                        player.x < p.x + p.width &&
+                        player.y + player.height >= p.y &&
+                        player.y + player.height <= p.y + p.height + player.vy) {
+
+                        player.y = p.y - player.height;
+                        player.vy = 0;
+                        player.vx = 0;
+                        player.onGround = true;
+                        landSquash = 1;
+
+                        if (i === 1) {
+                            const centerPlayer = player.x + player.width / 2;
+                            const centerPlatform = p.x + p.width / 2;
+                            const dist = Math.abs(centerPlayer - centerPlatform);
+                            if (dist < 5) {
+                                score += 3;
+                                centerStreak++;          // 连续落在中心
+                            } else {
+                                score += 1;
+                                centerStreak = 0;        // 断了
+                            }
+                            if (score > sessionHigh) sessionHigh = score;
+                            updateDisplay();
+
+                            platforms.shift();
+                            generatePlatform();
+                        }
+
+                        targetCameraX = player.x - 150;
+                        break;
+                    }
+                }
+
+                if (player.y > canvas.height + 100) {
+                    endGame();
+                }
+            }
+
+            if (player.y < canvas.height) {
+                cameraX += (targetCameraX - cameraX) * 0.08;
+            }
+        }
+
+        function render() {
+            if (window.MONO_REC && window.MONO_REC.active){
+                window.MONO_REC.snap({
+                    sc: score, pl: JSON.parse(JSON.stringify(player)),
+                    pl2: JSON.parse(JSON.stringify(platforms)),
+                    pw: power, ch: charging
+                });
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-cameraX, 0);
+
+            for (let p of platforms) {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+                ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                ctx.fillRect(p.x, p.y, p.width, 4);
+            }
+
+            let scaleX = 1;
+            let scaleY = 1;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (charging) {
+                const squash = 1 - (power / maxPower) * 0.35;
+                const stretch = 1 + (power / maxPower) * 0.25;
+                scaleX = stretch;
+                scaleY = squash;
+
+                if (shakeIntensity > 0) {
+                    offsetX = (Math.random() - 0.5) * shakeIntensity;
+                    offsetY = (Math.random() - 0.5) * shakeIntensity;
+                }
+            } else if (jumpStretch > 0) {
+                const stretchAmount = jumpStretch * 0.3;
+                scaleX = 1 - stretchAmount * 0.5;
+                scaleY = 1 + stretchAmount;
+            } else if (landSquash > 0) {
+                const squashAmount = landSquash * 0.25;
+                scaleX = 1 + squashAmount * 0.5;
+                scaleY = 1 - squashAmount;
+            }
+
+            ctx.save();
+            ctx.translate(
+                player.x + player.width/2 + offsetX,
+                player.y + player.height + offsetY
+            );
+            ctx.scale(scaleX, scaleY);
+
+            ctx.fillStyle = player.fillColor;
+            ctx.fillRect(-player.width/2, -player.height, player.width, player.height);
+
+            ctx.strokeStyle = player.strokeColor;
+            ctx.lineWidth = player.lineWidth;
+            ctx.strokeRect(-player.width/2, -player.height, player.width, player.height);
+
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        function loop() {
+            update();
+            render();
+            requestAnimationFrame(loop);
+        }
+
+        function updateDisplay() {
+            scoreEl.textContent = score;
+            sessionHighEl.textContent = sessionHigh;
+        }
+
+        function endGame() {
+            if (submitted) return;
+            submitted = true;
+            if (window.MONO_REC) window.MONO_REC.finish(score);
+            gameRunning = false;
+
+            finalScoreEl.textContent = score;
+            gameOverModal.style.display = 'flex';
+
+            // 成就：连续 20 次落在平台中心
+            if (centerStreak >= 20) {
+                fetch('/api/game/ach_flag', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({field: 'jump_center_streak', value: centerStreak})
+                }).catch(function(){});
+            }
+
+            fetch('/api/game/submit/jump', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    score: score,
+                    seq: {canvas_h: canvas.height, jumps: jumpLog}
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.new_best) {
+                        newRecordTip.style.display = 'block';
+                        userHighScoreEl.textContent = score;
+                    }
+                    rankListEl.innerHTML = '';
+                    data.rank_list.forEach((item, idx) => {
+                        const li = document.createElement('li');
+                        li.className = 'rank-item' + (item.username === {{ user.username|tojson }} ? ' self' : '');
+                        li.innerHTML = `
+                            <span class="rank-num">${idx + 1}</span>
+                            <span class="rank-name">${item.username}</span>
+                            <span class="rank-score">${item.score}</span>
+                        `;
+                        rankListEl.appendChild(li);
+                    });
+                }
+            });
+        }
+
+        function restartGame() {
+            initGame();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (!charging) startCharge();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                releaseJump();
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) startCharge();
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (e.button === 0) releaseJump();
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startCharge();
+        });
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            releaseJump();
+        });
+
+        initGame();
+        loop();
+    </script>
+{% endblock %}

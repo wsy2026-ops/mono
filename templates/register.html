@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+{% block title %}{{ tr('reg.title') }} - {{ tr('brand') }}{% endblock %}
+{% set active = 'register' %}
+{% block content %}
+<style>
+  .rg-hint{font-size:12.5px;margin:-2px 0 12px;min-height:17px;color:var(--muted);line-height:1.5;}
+  .rg-hint.ok{color:#10b981;}
+  .rg-hint.bad{color:#c0392b;}
+  .rg-hint.warn{color:#d97706;}
+  .rg-strength{height:5px;border-radius:3px;background:var(--soft);overflow:hidden;margin:-2px 0 8px;}
+  .rg-strength i{display:block;height:100%;width:0;background:#c0392b;transition:width .2s,background .2s;}
+  .rg-inv input{
+    text-transform:uppercase;letter-spacing:.14em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;
+  }
+  .cap-tick{
+    position:absolute;top:-3px;bottom:-3px;width:2px;display:none;
+    background:linear-gradient(180deg,transparent,#c9a227 18%,#c9a227 82%,transparent);
+    pointer-events:none;z-index:2;
+  }
+  .cap-tick::after{
+    content:'';position:absolute;left:-3px;top:-1px;
+    border:4px solid transparent;border-top-color:#c9a227;
+  }
+  .cap-pow{
+    display:flex;align-items:center;gap:7px;margin:-6px 0 12px;
+    font-size:11.5px;color:var(--muted);min-height:17px;
+  }
+  .cap-pow i{
+    width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+    background:#c9a227;animation:capPulse 1.1s ease-in-out infinite;
+  }
+  .cap-pow.ok i{background:#10b981;animation:none}
+  .cap-pow.warn i{background:#c9a227;animation:none}
+  .cap-pow.bad i{background:#c0392b;animation:none}
+  @keyframes capPulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+
+  .cap-track{
+    position:relative;height:46px;border-radius:10px;
+    background:var(--soft);border:1px solid var(--line);
+    overflow:hidden;user-select:none;-webkit-user-select:none;
+    margin-bottom:6px;
+  }
+  .cap-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(16,185,129,.16);transition:background .2s;}
+  .cap-fill.ok{background:rgba(16,185,129,.28);}
+  .cap-knob{
+    position:absolute;left:2px;top:2px;width:42px;height:42px;border-radius:8px;
+    background:var(--accent);color:var(--accent-fg);
+    display:flex;align-items:center;justify-content:center;font-size:15px;
+    cursor:grab;touch-action:none;z-index:2;
+  }
+  .cap-knob:active{cursor:grabbing;}
+  .cap-hint{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:13px;color:var(--muted);pointer-events:none;padding-left:44px;
+  }
+  .cap-hint.ok{color:#10b981;font-weight:600;}
+
+/* 注册页邮箱验证码 */
+.rg-mail-code{display:flex;gap:8px;margin-top:6px;}
+.rg-mail-code input{flex:1;min-width:0;}
+.rg-mail-code button{flex:0 0 auto;white-space:nowrap;}
+</style>
+
+<div class="card narrow">
+  <h1>{{ tr('reg.title') }}</h1>
+  <p class="sub">{{ tr('reg.sub') }}</p>
+  <form method="post" id="rgForm">
+    <label>{{ tr('reg.user') }}</label>
+    <input type="text" name="username" id="rgUser" required maxlength="16"
+           autofocus autocomplete="username">
+    <div class="rg-hint" id="rgUserHint">{{ tr('reg.user_hint') }}</div>
+
+    <label>{{ tr('reg.pass') }}</label>
+    <input type="password" name="password" id="rgPw" required minlength="4"
+           autocomplete="new-password">
+    <div class="rg-strength"><i id="rgBar"></i></div>
+    <div class="rg-hint" id="rgPwHint">{{ tr('reg.pass_hint') }}</div>
+
+    <label>{{ tr('reg.pass2') }}</label>
+    <input type="password" name="password2" id="rgPw2" required minlength="4"
+           autocomplete="new-password">
+    <div class="rg-hint" id="rgPw2Hint"></div>
+
+    <label>{{ tr('reg.email') }} <span style="font-weight:400;opacity:.65;">{{ tr('reg.optional') }}</span></label>
+    <input type="email" name="email" id="rgMail" maxlength="120"
+           autocomplete="email" spellcheck="false"
+           placeholder="{{ tr('reg.email_ph') }}">
+    <div class="rg-mail-code">
+      <input type="text" name="email_code" id="rgMailCode" maxlength="6"
+             inputmode="numeric" autocomplete="one-time-code" placeholder="{{ tr('login.code') }}">
+      <button type="button" class="btn sm ghost" id="rgMailBtn">{{ tr('reg.send_code') }}</button>
+    </div>
+    <div class="rg-hint" id="rgMailHint">{{ tr('reg.email_hint') }}</div>
+
+    {% if inv_open %}
+    <div class="rg-inv">
+      <label>{{ tr('reg.invite') }}</label>
+      <input type="text" name="invite_code" id="rgInv" maxlength="16"
+             autocomplete="off" spellcheck="false" placeholder="{{ tr('reg.invite_ph') }}">
+      <div class="rg-hint">{{ tr('reg.invite_hint') }}</div>
+    </div>
+    {% endif %}
+
+    <label>{{ tr('reg.captcha') }}</label>
+    <div class="cap-track" id="capTrack">
+      <div class="cap-fill" id="capFill"></div>
+      <span class="cap-hint" id="capHint">{{ tr('reg.captcha_hint') }}</span>
+      <div class="cap-knob" id="capKnob">→</div>
+      <div class="cap-tick" id="capTick"></div>
+    </div>
+    <input type="hidden" name="cap_data" id="capData">
+    <div class="rg-hint" id="capMsg"></div>
+    <div class="cap-pow" id="capPow"><i></i><span>{{ tr('reg.captcha_loading') }}</span></div>
+
+    <button type="submit" class="btn block" id="rgSubmit">{{ tr('reg.title') }}</button>
+  </form>
+  <hr>
+  <p class="center muted">{{ tr('reg.have_account') }}<a href="{{ url_for('login') }}" style="text-decoration:underline;">{{ tr('reg.to_login') }}</a></p>
+</div>
+
+<script src="/static/js/mono_pow.js"></script>
+<script>
+(function(){
+  var form = document.getElementById('rgForm');
+  var u = document.getElementById('rgUser'), uh = document.getElementById('rgUserHint');
+  var pw = document.getElementById('rgPw'), ph = document.getElementById('rgPwHint');
+  var bar = document.getElementById('rgBar');
+  var pw2 = document.getElementById('rgPw2'), ph2 = document.getElementById('rgPw2Hint');
+  if (!form || !u || !pw) return;
+
+  function set(el, cls, msg){ el.className = 'rg-hint' + (cls ? ' ' + cls : ''); el.textContent = msg; }
+
+  var utimer = null, useq = 0;
+  u.addEventListener('input', function(){
+    clearTimeout(utimer);
+    var v = u.value.trim();
+    if (!v){ set(uh, '', '2-16 个字，中文、字母、数字、下划线'); return; }
+    if (v.length < 2){ set(uh, 'bad', '至少 2 个字'); return; }
+    if (v.length > 16){ set(uh, 'bad', '最多 16 个字'); return; }
+    if (!/^[\w\u4e00-\u9fa5]+$/.test(v)){ set(uh, 'bad', '只能用中文、字母、数字、下划线'); return; }
+    set(uh, '', '检查中…');
+    var my = ++useq;
+    utimer = setTimeout(function(){
+      fetch('/api/check-username?u=' + encodeURIComponent(v))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (my !== useq) return;              // 输入已经变了，这次结果作废
+          set(uh, d.ok ? 'ok' : 'bad', d.msg);
+        })
+        .catch(function(){
+          if (my === useq) set(uh, '', '网络不太好，提交时会再检查一次');
+        });
+    }, 350);
+  });
+
+  function strength(v){
+    var s = 0;
+    if (v.length >= 4) s++;
+    if (v.length >= 8) s++;
+    if (/[a-zA-Z]/.test(v) && /[0-9]/.test(v)) s++;
+    if (/[^a-zA-Z0-9]/.test(v)) s++;
+    return Math.min(s, 4);
+  }
+  pw.addEventListener('input', function(){
+    var v = pw.value, s = strength(v);
+    bar.style.width = [0, 25, 50, 75, 100][s] + '%';
+    bar.style.background = ['#c0392b', '#c0392b', '#d97706', '#10b981', '#10b981'][s];
+    if (!v) set(ph, '', '建议字母和数字混着用');
+    else if (v.length < 4) set(ph, 'bad', '至少 4 位');
+    else if (s <= 1) set(ph, 'bad', '有点弱，加点数字或字母更好');
+    else if (s === 2) set(ph, '', '还可以，再复杂点更安全');
+    else set(ph, 'ok', '不错');
+    check2();
+  });
+
+  function check2(){
+    if (!pw2.value){ set(ph2, '', ''); return; }
+    set(ph2, pw2.value === pw.value ? 'ok' : 'bad',
+        pw2.value === pw.value ? '一致' : '两次输入不一样');
+  }
+  pw2.addEventListener('input', check2);
+
+  form.addEventListener('submit', function(e){
+    if (u.value.trim().length < 2){ e.preventDefault(); alert(__('用户名至少 2 个字')); u.focus(); return; }
+    if (pw.value.length < 4){ e.preventDefault(); alert(__('密码至少 4 位')); pw.focus(); return; }
+    if (pw.value !== pw2.value){ e.preventDefault(); alert(__('两次输入的密码不一致')); pw2.focus(); return; }
+  });
+})();
+
+(function(){
+  var track = document.getElementById('capTrack');
+  var knob  = document.getElementById('capKnob');
+  var fill  = document.getElementById('capFill');
+  var hint  = document.getElementById('capHint');
+  var msg   = document.getElementById('capMsg');
+  var tick  = document.getElementById('capTick');
+  var powEl = document.getElementById('capPow');
+  var dataEl= document.getElementById('capData');
+  if (!track || !knob) return;
+
+  var CH = null;          // 当前这道题
+  var SOL = null;         // PoW 解
+  var POW = null;         // 算力验证的 promise（拖完时可能要等它算完）
+  var ok = false;
+  var dragging = false;
+  var path = [];          // 轨迹 [t, x]
+  var t0 = 0;
+  var lastX = 0;
+
+  function setMsg(cls, text){ msg.className = 'rg-hint' + (cls ? ' ' + cls : ''); msg.textContent = text; }
+  function setPow(cls, text){
+    if(!powEl) return;
+    powEl.className = 'cap-pow' + (cls ? ' ' + cls : '');
+    powEl.querySelector('span').textContent = text;
+  }
+
+  /* PoW：找 sha256(chal|n) 前 bits 位为 0 的 n。
+     用 crypto.subtle 异步算，主线程不卡。难度不高（~60-100ms），人感觉不出来，
+     但脚本要批量刷就会明显变慢。 */
+  function solvePow(chal, bits){
+    var enc = new TextEncoder();
+    function tryAt(n){
+      return crypto.subtle.digest('SHA-256', enc.encode(chal + '|' + n))
+        .then(function(ab){
+          var v = new DataView(ab), need = bits;
+          for (var i = 0; i < 32 && need > 0; i++){
+            var b = v.getUint8(i);
+            if (need >= 8){
+              if (b !== 0) return null;
+              need -= 8;
+            } else {
+              if (b & ((1 << need) - 1)) return null;
+              need = 0;
+            }
+          }
+          return n;
+        });
+    }
+    function loop(n){
+      if (n > 4000000) return Promise.reject(new Error('no solution'));
+      return tryAt(n).then(function(found){
+        if (found !== null) return found;
+        if (n % 500 === 0) setPow('', '正在计算… ' + n);
+        return loop(n + 1);
+      });
+    }
+    return loop(0);
+  }
+
+  function markFp(){
+    /* 画一点东西取指纹：字体渲染差异在同浏览器稳定、跨浏览器不同。
+       不追求唯一，只求「同一台机器每次算出来一样」。 */
+    try{
+      var c = document.createElement('canvas');
+      c.width = 200; c.height = 40;
+      var g = c.getContext('2d');
+      g.textBaseline = 'top';
+      g.font = '14px "Arial"';
+      g.fillStyle = '#f60'; g.fillRect(10, 5, 80, 20);
+      g.fillStyle = '#069'; g.font = '16px "Times New Roman"';
+      g.fillText('mono-fp-中文', 12, 8);
+      g.fillStyle = 'rgba(120,180,60,0.7)';
+      g.fillText('abcdefghijklmnop', 4, 22);
+      var d = c.toDataURL();
+      var s = 0;
+      for (var i = 0; i < d.length; i++){ s = (s * 31 + d.charCodeAt(i)) >>> 0; }
+      var nav = navigator.userAgent + '|' + screen.width + 'x' + screen.height +
+                '|' + screen.colorDepth + '|' + (navigator.hardwareConcurrency || 0) +
+                '|' + (navigator.maxTouchPoints || 0) + '|' + new Date().getTimezoneOffset();
+      var h = 0;
+      for (var j = 0; j < nav.length; j++){ h = (h * 33 + nav.charCodeAt(j)) >>> 0; }
+      return s.toString(36) + '.' + h.toString(36);
+    }catch(e){ return 'x'; }
+  }
+
+  function load(){
+    ok = false; SOL = null; path = []; CH = null; POW = null;
+    if (dataEl) dataEl.value = '';
+    knob.style.left = '2px'; fill.style.width = '0';
+    fill.classList.remove('ok'); hint.classList.remove('ok');
+    if (tick) tick.style.display = 'none';
+    hint.textContent = '按住滑块拖到指定位置';
+    setMsg('', '加载中…');
+    setPow('', '正在准备验证…');
+    /* 无 crypto.subtle 的旧 WebView（微信 X5 旧内核等）：领 nocrypto 低难度题，
+       用 mono_pow.js 纯 JS SHA-256 兜底算，不再走「跳过」分支
+       （跳过 -> 服务端 PoW 校验必失败 -> 注册死锁，2026-10-24 修）。 */
+    var nocrypto = !(window.crypto && crypto.subtle && window.TextEncoder);
+    fetch('/api/captcha/new' + (nocrypto ? '?nocrypto=1' : ''), { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        CH = d;
+        var mx = track.clientWidth - knob.offsetWidth - 4;
+        if (tick){
+          tick.style.display = 'block';
+          tick.style.left = (2 + mx * d.tmax / 100) + 'px';
+        }
+        hint.textContent = '拖到标记处松手';
+        setMsg('', '');
+        if (window.crypto && crypto.subtle && window.TextEncoder){
+          /* ⚠️ 把 solvePow 的 promise 存下来：用户可能在算力验证算完之前就把滑块拖完了，
+             那时候 SOL 还是 null，直接提交服务端会判失败 ✗
+             所以拖完那一步要 await 这个 promise，等算完再发请求 ✓ */
+          POW = solvePow(d.chal, d.bits).then(function(s){ SOL = s; setPow('ok', '验证就绪'); return s; });
+          return POW;
+        }
+        SOL = '';
+        setPow('warn', '当前环境跳过算力验证');
+      })
+      .catch(function(){ setMsg('bad', '验证加载失败，刷新页面重试'); setPow('bad', '准备失败'); });
+  }
+  load();
+
+  function maxX(){ return Math.max(1, track.clientWidth - knob.offsetWidth - 4); }
+  function pct(){ return Math.round((knob.offsetLeft - 2) / maxX() * 100); }
+
+  knob.addEventListener('pointerdown', function(e){
+    /* 验证还没准备好时**不要静默忽略** —— 用户拖了没反应，只会一脸问号，
+       然后提交时报「请先完成人机验证」，体验很差 ✗ 这里给个明确提示。 */
+    if (!CH){ setMsg('warn', '验证还在准备中，稍等一下再拖～'); return; }
+    if (ok) return;
+    dragging = true;
+    path = []; t0 = Date.now();
+    lastX = knob.offsetLeft;
+    path.push([0, 0]);
+    try { knob.setPointerCapture(e.pointerId); } catch(err){}
+    e.preventDefault();
+  });
+  knob.addEventListener('pointermove', function(e){
+    if (!dragging || ok) return;
+    var r = track.getBoundingClientRect();
+    var x = Math.max(0, Math.min(maxX(), e.clientX - r.left - knob.offsetWidth / 2));
+    knob.style.left = (x + 2) + 'px';
+    fill.style.width = (x + 2) + 'px';
+    var t = Date.now() - t0;
+    /* 采样：太密的点对熵没帮助，30ms 采一个足够 */
+    if (!path.length || t - path[path.length-1][0] >= 28) path.push([t, Math.round(x)]);
+    lastX = x;
+    e.preventDefault();
+  });
+
+  function end(){
+    if (!dragging || ok) return;
+    dragging = false;
+    var dur = Date.now() - t0;
+    path.push([dur, Math.round(lastX)]);
+    if (path.length < 8){
+      setMsg('bad', '拖得太快了，慢慢拖一次');
+      setTimeout(load, 800);
+      return;
+    }
+    var p = pct();
+    setMsg('', '验证中…');
+    /* 等算力验证算完（用户在它算完前就拖完滑块是常事）。
+       以前这里直接用 SOL，还是 null 就发出去 → 服务端判「验证没过」✗
+       现在等一下，最多 15 秒，算完了再发 ✓ */
+    var ready = POW || Promise.resolve();
+    var timeout = new Promise(function(res){ setTimeout(res, 15000); });
+    Promise.race([ready.catch(function(){}), timeout]).then(function(){
+      var payload = {
+        token: CH.token, sol: SOL, tmax: CH.tmax,
+        pos: p, dur: dur, path: path
+      };
+      return fetch('/api/captcha/check', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      }).then(function(r){ return r.json(); })
+        .then(function(r){
+          if (r && r.ok){
+            ok = true;
+            dataEl.value = JSON.stringify(payload);
+            fill.classList.add('ok'); hint.classList.add('ok');
+            hint.textContent = '验证通过';
+            setMsg('ok', '');
+            setPow('ok', '验证就绪');
+          } else {
+            setMsg('bad', (r && r.msg) || '验证没过，再试一次');
+            setTimeout(load, 1000);
+          }
+        });
+    }).catch(function(){ setMsg('bad', '验证请求失败，重试'); setTimeout(load, 1000); });
+  }
+  knob.addEventListener('pointerup', end);
+  knob.addEventListener('pointercancel', end);
+
+  var form = document.getElementById('rgForm');
+  if (form) form.addEventListener('submit', function(e){
+    if (ok){
+      var m = document.createElement('input');
+      m.type = 'hidden'; m.name = 'fp'; m.value = markFp();
+      form.appendChild(m);
+      return;
+    }
+    e.preventDefault();
+    /* 验证还没就绪时**不要直接判失败** ✗
+       用户很可能是一进页面就填完点提交的，那时滑块和算力验证都还在准备 ✗
+       这里等一会儿（最多 12 秒）：就绪了自动重提，真超时了才提示 ✓ */
+    var waited = 0;
+    setMsg('', CH ? '请把滑块拖到标记处完成验证～' : '验证还在准备中，稍等一下…');
+    var iv = setInterval(function(){
+      waited += 300;
+      if (ok){
+        clearInterval(iv);
+        setMsg('ok', '验证就绪，正在提交…');
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+        return;
+      }
+      if (waited >= 12000){
+        clearInterval(iv);
+        setMsg('bad', CH ? '还没完成人机验证，请把滑块拖到标记处'
+                         : '验证准备超时了，请刷新页面重试');
+      }
+    }, 300);
+  });
+})();
+</script>
+<script>
+(function(){
+  var inv = document.getElementById('rgInv');
+  if (!inv) return;
+  try{
+    var q = new URLSearchParams(location.search).get('code');
+    if (q) inv.value = q.trim().toUpperCase().slice(0, 16);
+  }catch(e){}
+  inv.addEventListener('input', function(){
+    inv.value = inv.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
+})();
+
+/* 注册页：发送邮箱验证码（选填） */
+(function(){
+  var btn  = document.getElementById('rgMailBtn');
+  var mail = document.getElementById('rgMail');
+  var code = document.getElementById('rgMailCode');
+  var hint = document.getElementById('rgMailHint');
+  if (!btn || !mail) return;
+  var timer = null, left = 0;
+
+  function setHint(t, ok){
+    hint.textContent = t;
+    hint.style.color = ok ? '#0a7d2c' : '#c0392b';
+  }
+
+  btn.addEventListener('click', function(){
+    var v = (mail.value || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      setHint('邮箱格式不对', false);
+      mail.focus();
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '发送中…';
+    fetch('/api/mail/code', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({email: v, purpose: 'register'})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.ok) {
+        setHint('验证码已发送，去邮箱查收（163 可能在垃圾箱）', true);
+        if (code) code.focus();
+        left = 60;
+        if (timer) clearInterval(timer);
+        timer = setInterval(function(){
+          if (left <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = '重新发送';
+            return;
+          }
+          btn.textContent = left + 's';
+          left--;
+        }, 1000);
+      } else {
+        setHint((d && d.msg) || '发送失败', false);
+        btn.disabled = false;
+        btn.textContent = '发送验证码';
+      }
+    }).catch(function(){
+      setHint('网络错误，稍后再试', false);
+      btn.disabled = false;
+      btn.textContent = '发送验证码';
+    });
+  });
+
+  // 邮箱留空时清掉验证码，避免误提交
+  mail.addEventListener('input', function(){
+    if (!(mail.value || '').trim() && code) code.value = '';
+  });
+})();
+</script>
+{% endblock %}

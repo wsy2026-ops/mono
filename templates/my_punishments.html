@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}我的处罚与申诉{% endblock %}
+{% set active = 'profile' %}
+{% block content %}
+<h2>我的处罚 · 申诉</h2>
+<p class="sub">仅可对自己的处罚发起申诉，不可代申诉、重复申诉</p>
+<div class="card table-scroll" style="padding:0;">
+  <table>
+    <thead><tr><th>ID</th><th>类型</th><th>时长</th><th>处罚原因</th><th>状态</th><th>发起申诉</th></tr></thead>
+    <tbody>
+    {% for r in records %}
+    <tr>
+      <td>{{ r.id }}</td>
+      <td>{% if r.ptype=='ban' %}封禁{% else %}禁言{% endif %}</td>
+      <td>{{ r.duration_text }}</td>
+      <td style="max-width:240px;">{{ r.reason or '—' }}</td>
+      <td>
+        {% if r.status=='effective' %}<span class="tag off">生效中</span>
+        {% elif r.status=='lifted' %}<span class="tag" style="background:#e6f4ea;color:#1a7f37;">已解除</span>
+        {% else %}<span class="tag" style="background:#fdecea;color:#c0392b;">已撤销</span>{% endif %}
+      </td>
+      <td>
+        {% if r.status=='effective' and r.id not in appealed %}
+        <form method="post" action="{{ url_for('appeal_new', pid=r.id) }}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <input type="text" name="reason" placeholder="申诉理由" required style="width:140px;padding:4px 8px;font-size:12px;">
+          <input type="file" name="screenshot" accept="image/*" style="font-size:12px;max-width:140px;">
+          <button class="btn sm" type="submit">提交申诉</button>
+        </form>
+        {% elif r.id in appealed %}
+        <span class="muted">已提交申诉</span>
+        {% else %}
+        <span class="muted">—</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="center muted" style="padding:30px;">你暂无处罚记录</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,318 @@
+{% extends "_admin_base.html" %}
+{% block admin_icon %}🛠{% endblock %}
+{% block admin_heading %}调试台{% endblock %}
+{% block admin_desc %}真机上开不了控制台，出了问题只能靠猜。这个页面把该看的都摊出来 —— 只有超管能进。{% endblock %}
+
+{% block admin_content %}
+<style>
+  .dbg-sec{
+    border:1px solid var(--line);border-radius:14px;background:var(--card);
+    padding:16px 18px;margin-bottom:14px;
+  }
+  .dbg-sec h3{margin:0 0 4px;font-size:14.5px;font-weight:700;}
+  .dbg-sec .hint{font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.7;}
+
+  .dbg-kv{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+    gap:8px;
+  }
+  .dbg-kv div{
+    font-size:12.5px;background:var(--bg-elev);border-radius:9px;
+    padding:9px 11px;word-break:break-all;
+  }
+  .dbg-kv b{color:var(--fg-3);font-weight:600;display:block;font-size:11px;margin-bottom:3px;}
+
+  .dbg-log{
+    max-height:300px;overflow-y:auto;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;
+    background:var(--bg-sunken);border-radius:10px;padding:11px;
+    line-height:1.65;white-space:pre-wrap;word-break:break-all;
+  }
+  .dbg-log .e{color:#dc2626;}
+  .dbg-log .w{color:#d97706;}
+  .dbg-log .ok{color:#10b981;}
+  .dbg-log .dim{color:var(--fg-3);}
+
+  .dbg-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .dbg-tbl th{
+    text-align:left;font-size:11px;color:var(--muted);font-weight:600;
+    padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  .dbg-tbl td{padding:7px 8px;border-bottom:1px solid var(--soft);vertical-align:top;}
+  .dbg-tbl tr:hover td{background:var(--soft);}
+  .bad{color:#dc2626;font-weight:700;}
+  .good{color:#10b981;font-weight:700;}
+
+  .dbg-acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+
+  @media (max-width:640px){
+    .dbg-sec{padding:13px 14px;}
+    .dbg-tbl th:nth-child(2),.dbg-tbl td:nth-child(2){display:none;}
+  }
+</style>
+
+<div class="dbg-sec">
+  <h3>📱 环境</h3>
+  <p class="hint">出问题时先看这里 —— 设备、网络、Service Worker 状态。</p>
+  <div class="dbg-kv" id="envBox">
+    <div><b>加载中</b>…</div>
+  </div>
+</div>
+
+<div class="dbg-sec">
+  <h3>🎵 音频流自检</h3>
+  <p class="hint">
+    逐首用 <code>Range: bytes=0-1023</code> 拉一次，看浏览器能不能拿到音频。
+    <b>状态码 206 = 正常</b>；0 或超时 = 网络/跨域问题；403/404 = 权限或文件问题。
+  </p>
+  <div class="dbg-acts">
+    <button class="btn sm" id="runStream">开始自检（前 10 首）</button>
+    <button class="btn sm ghost" id="runRaw">测原始音频元素</button>
+    <button class="btn sm ghost" id="runAllRaw">逐首测 audio 元素</button>
+    <button class="btn sm ghost" id="clearSW" style="color:#dc2626;border-color:#dc2626;">清缓存 + 注销 SW</button>
+  </div>
+  <p class="hint" style="margin-top:-4px;">
+    <b>「逐首测 audio 元素」</b>最接近真实播放（走媒体栈，不走 fetch）。
+    <b>「清缓存」</b>会注销 Service Worker 并清掉缓存 —— 如果清完就能播，说明是旧缓存的问题。
+  </p>
+  <div id="streamOut" class="dbg-log"><span class="dim">点上面按钮开始</span></div>
+</div>
+
+<div class="dbg-sec">
+  <h3>🐛 前端错误（最近 60 条）</h3>
+  <p class="hint">
+    全站自动收集：JS 报错、资源加载失败、请求失败。<b>手机上出问题后回到这页就能看到。</b>
+  </p>
+  <div class="dbg-acts">
+    <button class="btn sm" id="reloadErrs">刷新</button>
+    <button class="btn sm ghost" id="clearErrs">清空</button>
+  </div>
+  <div id="errOut" class="dbg-log"><span class="dim">（空）</span></div>
+</div>
+
+<div class="dbg-sec">
+  <h3>📁 曲目文件体检</h3>
+  <p class="hint">文件在不在、实际大小和数据库记录是否一致、服务端能不能读出头部字节。</p>
+  <div style="overflow-x:auto;">
+    <table class="dbg-tbl">
+      <thead>
+        <tr>
+          <th>ID</th><th>歌名</th><th>大小</th><th>时长</th><th>播放</th><th>文件</th><th>服务端自检</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in music %}
+        <tr>
+          <td>{{ m.id }}</td>
+          <td>{{ m.title }}{% if m.artist %} <span class="muted">- {{ m.artist }}</span>{% endif %}</td>
+          <td>
+            {{ (m.size / 1048576) | round(1) }} MB
+            {% if m.exists and m.real_size != m.size %}
+            <span class="bad">（实际 {{ (m.real_size / 1048576) | round(1) }}）</span>
+            {% endif %}
+          </td>
+          <td>{{ (m.duration | round(0) | int) if m.duration else '?' }}s</td>
+          <td>{{ m.plays }}</td>
+          <td>
+            {% if m.exists %}<span class="good">✓</span>{% else %}<span class="bad">✗ 缺失</span>{% endif %}
+          </td>
+          <td><button class="btn xs" data-check="{{ m.id }}">检查</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="fileOut" class="dbg-log" style="margin-top:12px;"><span class="dim">点「检查」看结果</span></div>
+</div>
+
+<div class="dbg-sec">
+  <h3>🖥 服务端最近异常</h3>
+  <p class="hint">从日志文件尾部抓的 ERROR / Traceback / 未捕获异常。</p>
+  <div class="dbg-log">{% if logs %}{% for l in logs %}<span class="e">{{ l }}</span>
+{% endfor %}{% else %}<span class="ok">没有异常记录 ✓</span>{% endif %}</div>
+</div>
+
+<div class="dbg-sec">
+  <h3>📂 路径</h3>
+  <div class="dbg-kv">
+    <div><b>音乐目录</b>{{ music_folder }}</div>
+    <div><b>数据目录</b>{{ base_dir }}</div>
+  </div>
+</div>
+
+<script>
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+(function(){
+  var box = document.getElementById('envBox');
+  var rows = [];
+  function add(k, v){ rows.push('<div><b>' + k + '</b>' + esc(v) + '</div>'); }
+  add('User-Agent', navigator.userAgent);
+  add('在线状态', navigator.onLine ? '在线' : '离线');
+  add('网络类型', (navigator.connection && (navigator.connection.effectiveType || navigator.connection.type)) || '未知');
+  add('屏幕', screen.width + '×' + screen.height + '（dpr ' + (window.devicePixelRatio || 1) + '）');
+  add('视口', window.innerWidth + '×' + window.innerHeight);
+  add('设备内存', navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '未知');
+  add('同源 iframe', window.self !== window.top ? '是（在壳里）' : '否');
+  add('Service Worker', ('serviceWorker' in navigator) ? (navigator.serviceWorker.controller ? '已接管' : '未接管') : '不支持');
+  try {
+    var n = 0;
+    for (var k in localStorage) if (Object.prototype.hasOwnProperty.call(localStorage, k)) n++;
+    add('localStorage', n + ' 个键');
+  } catch(e){ add('localStorage', '读取失败'); }
+  add('页面', location.pathname + location.search);
+  box.innerHTML = rows.join('');
+})();
+
+function log(el, cls, msg){
+  var d = document.createElement('div');
+  d.className = cls;
+  d.textContent = msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+document.getElementById('runStream').addEventListener('click', function(){
+  var out = document.getElementById('streamOut');
+  out.innerHTML = '';
+  var ids = Array.prototype.slice.call(document.querySelectorAll('[data-check]')).slice(0, 10)
+              .map(function(b){ return b.getAttribute('data-check'); });
+  if (!ids.length){ log(out, 'dim', '没有曲目'); return; }
+  log(out, 'dim', '开始检查 ' + ids.length + ' 首…');
+  var i = 0;
+  (function next(){
+    if (i >= ids.length){ log(out, 'ok', '—— 自检结束 ——'); return; }
+    var tid = ids[i++];
+    var t0 = Date.now();
+    fetch('/music/stream/' + tid, { headers: { 'Range': 'bytes=0-1023' } })
+      .then(function(r){
+        var ms = Date.now() - t0;
+        var cls = (r.status === 206 || r.status === 200) ? 'ok' : 'e';
+        log(out, cls, '#' + tid + ' → HTTP ' + r.status
+          + ' | ' + ms + 'ms'
+          + ' | type=' + (r.headers.get('Content-Type') || '-')
+          + ' | accept-ranges=' + (r.headers.get('Accept-Ranges') || '-')
+          + ' | len=' + (r.headers.get('Content-Length') || '-'));
+        return r.arrayBuffer().then(function(b){
+          log(out, 'dim', '      实际读到 ' + b.byteLength + ' 字节');
+        });
+      })
+      .catch(function(err){
+        log(out, 'e', '#' + tid + ' → 请求失败（' + (Date.now() - t0) + 'ms）: ' + (err && err.message || err));
+      })
+      .then(next);
+  })();
+});
+
+document.getElementById('runRaw').addEventListener('click', function(){
+  var out = document.getElementById('streamOut');
+  out.innerHTML = '';
+  var b = document.querySelector('[data-check]');
+  if (!b){ log(out, 'dim', '没有曲目'); return; }
+  var tid = b.getAttribute('data-check');
+  log(out, 'dim', '用 <audio> 元素直接加载 #' + tid + '…');
+  var a = new Audio();
+  a.preload = 'metadata';
+  a.src = '/music/stream/' + tid;
+  var done = false;
+  function fin(cls, msg){ if (done) return; done = true; log(out, cls, msg); }
+  a.addEventListener('loadedmetadata', function(){
+    fin('ok', 'loadedmetadata ✓ duration=' + a.duration + ' readyState=' + a.readyState);
+  });
+  a.addEventListener('error', function(){
+    var e = a.error;
+    fin('e', 'error ✗ code=' + (e ? e.code : '?') + ' message=' + (e ? e.message : '?')
+      + '（1=中止 2=网络 3=解码 4=不支持）');
+  });
+  setTimeout(function(){ fin('w', '10 秒内既没 loadedmetadata 也没 error —— 一直卡着（网络太慢或被拦截）'); }, 10000);
+});
+
+document.getElementById('runAllRaw').addEventListener('click', function(){
+  var out = document.getElementById('streamOut');
+  out.innerHTML = '';
+  var ids = Array.prototype.slice.call(document.querySelectorAll('[data-check]')).slice(0, 5)
+              .map(function(b){ return b.getAttribute('data-check'); });
+  if (!ids.length){ log(out, 'dim', '没有曲目'); return; }
+  log(out, 'dim', '逐首用 <audio> 加载 ' + ids.length + ' 首…');
+  var i = 0;
+  (function next(){
+    if (i >= ids.length){ log(out, 'ok', '—— 结束 ——'); return; }
+    var tid = ids[i++];
+    var t0 = Date.now();
+    var a = new Audio();
+    a.preload = 'metadata';
+    var done = false;
+    function fin(cls, msg){ if (done) return; done = true; log(out, cls, '#' + tid + ' → ' + msg); setTimeout(next, 250); }
+    a.addEventListener('loadedmetadata', function(){
+      fin('ok', 'OK ' + (Date.now()-t0) + 'ms | duration=' + a.duration.toFixed(1) + ' readyState=' + a.readyState);
+    });
+    a.addEventListener('error', function(){
+      var e = a.error;
+      fin('e', 'ERROR ' + (Date.now()-t0) + 'ms | code=' + (e?e.code:'?') + ' ' + (e?e.message:'')
+        + '（1=中止 2=网络 3=解码 4=不支持/404）');
+    });
+    setTimeout(function(){ fin('w', '超时 12s —— 一直卡着（网络太慢，或被浏览器拦截）'); }, 12000);
+    a.src = '/music/stream/' + tid;
+  })();
+});
+
+document.getElementById('clearSW').addEventListener('click', function(){
+  var out = document.getElementById('streamOut');
+  out.innerHTML = '';
+  log(out, 'w', '开始清理…');
+  var jobs = [];
+  if ('serviceWorker' in navigator){
+    jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){
+      return Promise.all(rs.map(function(r){ return r.unregister(); }))
+        .then(function(){ log(out, 'ok', '已注销 ' + rs.length + ' 个 Service Worker'); });
+    }).catch(function(e){ log(out, 'e', '注销 SW 失败: ' + e.message); }));
+  } else {
+    log(out, 'dim', '这个浏览器不支持 Service Worker');
+  }
+  if (window.caches){
+    jobs.push(caches.keys().then(function(ks){
+      return Promise.all(ks.map(function(k){ return caches.delete(k); }))
+        .then(function(){ log(out, 'ok', '已删除 ' + ks.length + ' 个缓存（' + ks.join(', ') + '）'); });
+    }).catch(function(e){ log(out, 'e', '清缓存失败: ' + e.message); }));
+  }
+  Promise.all(jobs).then(function(){
+    log(out, 'ok', '清理完成 —— 刷新页面再试播放（Ctrl/Cmd+Shift+R 或下拉刷新）');
+  });
+});
+
+function showErrs(){
+  var out = document.getElementById('errOut');
+  var arr = [];
+  try { arr = JSON.parse(localStorage.getItem('mono_errlog') || '[]'); } catch(e){}
+  if (!arr.length){ out.innerHTML = '<span class="dim">（空 —— 目前没抓到错误）</span>'; return; }
+  out.innerHTML = arr.slice().reverse().map(function(x){
+    var d = new Date(x.t);
+    var hh = ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2) + ':' + ('0'+d.getSeconds()).slice(-2);
+    var cls = x.kind === 'js' || x.kind === 'http' ? 'e' : (x.kind === 'network' ? 'w' : 'dim');
+    return '<div class="' + cls + '">[' + hh + '] ' + esc(x.kind) + ' | ' + esc(x.msg)
+      + (x.detail ? '\n        ' + esc(x.detail) : '')
+      + '\n        @ ' + esc(x.url || '') + '</div>';
+  }).join('');
+}
+document.getElementById('reloadErrs').addEventListener('click', showErrs);
+document.getElementById('clearErrs').addEventListener('click', function(){
+  try { localStorage.removeItem('mono_errlog'); } catch(e){}
+  showErrs();
+});
+showErrs();
+
+document.addEventListener('click', function(e){
+  var b = e.target.closest ? e.target.closest('[data-check]') : null;
+  if (!b) return;
+  var out = document.getElementById('fileOut');
+  var tid = b.getAttribute('data-check');
+  out.innerHTML = '';
+  log(out, 'dim', '检查 #' + tid + '…');
+  fetch('/api/debug/stream_check/' + tid)
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      log(out, j.ok ? 'ok' : 'e', JSON.stringify(j, null, 1));
+    })
+    .catch(function(err){ log(out, 'e', '检查失败: ' + err.message); });
+});
+</script>
+{% endblock %}

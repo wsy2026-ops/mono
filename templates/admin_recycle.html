@@ -1,0 +1,125 @@
+{% extends "_admin_base.html" %}
+{% block title %}帖子回收站 · 管理后台{% endblock %}
+{% block admin_icon %}🗑{% endblock %}
+{% block admin_heading %}帖子回收站{% endblock %}
+{% block admin_desc %}被删除的帖子会进入这里 · 管理员可恢复，超级管理员可彻底删除{% endblock %}
+
+{% block admin_content %}
+<style>
+  .rc-bar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:12px 14px;border-bottom:1px solid var(--line);background:var(--soft);
+  }
+  .rc-bar .rc-count{font-size:13px;color:var(--fg-2);}
+  .rc-bar .rc-count b{color:var(--fg);}
+  .rc-bar .sp{flex:1;}
+  .rc-bar button[disabled]{opacity:.45;cursor:not-allowed;}
+  .rc-check{width:16px;height:16px;cursor:pointer;vertical-align:-2px;}
+  .rc-warn{color:#b42318;}
+  @media (max-width:760px){
+    .rc-bar{padding:10px 12px;gap:8px;}
+    .rc-check{width:20px;height:20px;}
+  }
+</style>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>已删除帖子</h3>
+    <span class="adm-hint">共 {{ posts|length }} 篇</span>
+    <div class="adm-right">
+      <a href="{{ url_for('forum') }}" class="btn sm ghost">去论坛 →</a>
+    </div>
+  </div>
+
+  <form method="post" action="{{ url_for('admin_recycle_bulk') }}" id="rcForm">
+    <div class="rc-bar">
+      <span class="rc-count">已选 <b id="rcSel">0</b> 篇</span>
+      <span class="sp"></span>
+      <button class="btn sm" type="submit" name="action" value="restore" id="rcRestore" disabled>批量恢复</button>
+      {% if current_user and current_user.is_super_admin %}
+      <button class="btn sm ghost rc-warn" type="submit" name="action" value="purge" id="rcPurge" disabled
+              style="color:#b42318;border-color:#f2cfcb;"
+              onclick="return confirm(__('彻底删除后不可恢复，且会一并清掉评论、点赞、标签、浏览记录。确定删除选中的帖子？'));">
+        批量彻底删除
+      </button>
+      {% endif %}
+    </div>
+
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th style="width:44px;"><input type="checkbox" class="rc-check" id="rcAll" title="全选"></th>
+            <th style="width:70px;">ID</th>
+            <th>标题</th>
+            <th style="width:130px;">作者</th>
+            <th style="width:130px;">板块</th>
+            <th style="width:160px;">删除时间</th>
+            <th style="width:190px;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in posts %}
+          <tr>
+            <td><input type="checkbox" class="rc-check rc-row" name="ids" value="{{ p.id }}"></td>
+            <td class="adm-id">{{ p.id }}</td>
+            <td>
+              <a href="{{ url_for('view_post', post_id=p.id) }}" class="adm-clip"
+                 style="text-decoration:underline;text-underline-offset:3px;">{{ p.title }}</a>
+            </td>
+            <td>{{ p.username }}</td>
+            <td>{% if p.section_name %}<span class="adm-pill">{{ p.section_name }}</span>{% else %}—{% endif %}</td>
+            <td class="adm-nowrap adm-id">{{ p.updated_at|fmttime }}</td>
+            <td class="adm-nowrap">
+              <button class="btn sm" type="submit" formaction="{{ url_for('restore_post', post_id=p.id) }}"
+                      formnovalidate>恢复</button>
+              {% if current_user and current_user.is_super_admin %}
+              <button class="btn sm ghost" type="submit" formaction="{{ url_for('purge_post', post_id=p.id) }}"
+                      formnovalidate style="color:#b42318;border-color:#f2cfcb;"
+                      onclick="return confirm(__('彻底删除后不可恢复，确定？'));">彻底删除</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="adm-empty">
+                <div class="adm-empty-ico">🗑</div>
+                <div class="adm-empty-text">回收站是空的 —— 没有待处理的帖子</div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  var all = document.getElementById('rcAll');
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.rc-row'));
+  var sel = document.getElementById('rcSel');
+  var bRestore = document.getElementById('rcRestore');
+  var bPurge = document.getElementById('rcPurge');
+  if (!all) return;
+
+  function sync(){
+    var n = rows.filter(function(c){ return c.checked; }).length;
+    sel.textContent = n;
+    all.checked = n > 0 && n === rows.length;
+    all.indeterminate = n > 0 && n < rows.length;
+    bRestore.disabled = n === 0;
+    if (bPurge) bPurge.disabled = n === 0;
+  }
+
+  all.addEventListener('change', function(){
+    rows.forEach(function(c){ c.checked = all.checked; });
+    sync();
+  });
+  rows.forEach(function(c){ c.addEventListener('change', sync); });
+  sync();
+})();
+</script>
+{% endblock %}

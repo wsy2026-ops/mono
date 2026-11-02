@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}好友 - MONO 社区{% endblock %}
+{% set active = 'friends' %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+  <div class="muted" style="font-size:13px;">好友在线状态每 15 秒自动刷新</div>
+  <a href="{{ url_for('blacklist_page') }}" class="btn ghost sm">🚫 黑名单管理</a>
+</div>
+
+{% if requests %}
+<h2>好友请求</h2>
+<div class="friend-list" style="margin-bottom:32px;">
+  {% for req in requests %}
+  <div class="friend-card">
+    <img src="{{ get_avatar_url(req) }}" alt="" class="avatar {% if is_user_online(req) %}online{% else %}offline{% endif %}">
+    <div class="friend-info">
+      <div class="friend-name">
+        {{ req.username }}
+        {% if req.is_admin %}<span class="tag admin" style="margin-left:6px;">管理员</span>{% endif %}
+      </div>
+      <div class="muted" style="font-size:12px;">请求添加你为好友</div>
+    </div>
+    <div class="row">
+      <form method="post" action="{{ url_for('accept_friend', user_id=req.id) }}">
+        <button type="submit" class="btn sm">接受</button>
+      </form>
+      <form method="post" action="{{ url_for('reject_friend', user_id=req.id) }}">
+        <button type="submit" class="btn sm ghost">拒绝</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2>我的好友</h2>
+{% if friends %}
+<div class="friend-list">
+  {% for f in friends %}
+  <div class="friend-card" data-uid="{{ f.id }}">
+    <img src="{{ get_avatar_url(f) }}" alt="" class="avatar {% if is_user_online(f) %}online{% else %}offline{% endif %}" id="ava-{{ f.id }}">
+    <div class="friend-info">
+      <div class="friend-name">
+        {{ f.username }}
+        {% if f.is_admin %}<span class="tag admin">管理员</span>{% endif %}
+        {% if get_user_effect(f) == 'popular' %}<span class="tag popular">热门</span>{% endif %}
+        {{ badges_html(f) }}
+      </div>
+      <div class="friend-status" id="status-{{ f.id }}">
+        {% if is_active_restriction(f.banned_until) %}
+        <span style="color:#f5576c;">● 已封禁</span>
+        {% elif is_active_restriction(f.muted_until) %}
+        <span style="color:#f59e0b;">● 已禁言</span>
+        {% elif is_user_online(f) %}
+        <span style="color:#10b981;"><span class="online-dot"></span>在线</span>
+        {% else %}
+        <span style="color:#9ca3af;"><span class="online-dot offline"></span>离线</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="row" style="flex-direction:column;align-items:stretch;">
+      <a href="{{ url_for('private_chat', user_id=f.id) }}" class="btn sm">发消息</a>
+      <a href="{{ url_for('user_page', user_id=f.id) }}" class="btn sm ghost">主页</a>
+      <a href="{{ url_for('group_invite', user_id=f.id) }}" class="btn sm ghost">邀请入群</a>
+      <form method="post" action="{{ url_for('delete_friend', user_id=f.id) }}" onsubmit="return confirm(__('确定删除该好友？将解除双向好友关系。'));">
+        <button type="submit" class="btn sm ghost" style="color:#c0392b;border-color:#f0c0c0;">删除</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card center" style="padding:40px;">
+  <p class="muted">还没有好友，在群聊里点击别人的头像添加好友吧！</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function refreshFriendStatus() {
+  fetch('/api/friend-status').then(r => r.json()).then(data => {
+    if (!data || typeof data !== 'object') return;
+    for (const uid in data) {
+      const ava = document.getElementById('ava-' + uid);
+      const st = document.getElementById('status-' + uid);
+      if (!ava || !st) continue;
+      const online = data[uid];
+      ava.classList.toggle('online', online);
+      ava.classList.toggle('offline', !online);
+      st.innerHTML = online
+        ? '<span style="color:#10b981;"><span class="online-dot"></span>在线</span>'
+        : '<span style="color:#9ca3af;"><span class="online-dot offline"></span>离线</span>';
+    }
+  }).catch(() => {});
+}
+refreshFriendStatus();
+setInterval(refreshFriendStatus, 15000);
+</script>
+{% endblock %}

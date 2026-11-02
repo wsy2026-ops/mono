@@ -1,0 +1,68 @@
+{% extends "_admin_base.html" %}
+{% block title %}问卷结果 · 管理后台{% endblock %}
+{% block admin_icon %}📊{% endblock %}
+{% block admin_heading %}{{ s.title }}{% endblock %}
+{% block admin_desc %}共 {{ total }} 份答卷{% endblock %}
+
+{% block admin_content %}
+<style>
+  .sr-wrap{padding:14px;max-width:900px;}
+  .sr-back{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:12px;}
+  .sr-back:hover{color:var(--fg);}
+  .sr-q{border:1px solid var(--line);border-radius:10px;background:var(--card);
+    padding:14px 16px;margin-bottom:12px;}
+  .sr-qt{font-size:13.5px;font-weight:700;margin-bottom:10px;}
+  .sr-qt .ty{font-size:11px;font-weight:400;color:var(--muted);margin-left:8px;}
+  .sr-opt{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:13px;}
+  .sr-bar{flex:1;height:14px;border-radius:7px;background:rgba(128,128,128,.15);overflow:hidden;}
+  .sr-bar i{display:block;height:100%;background:var(--fg);border-radius:7px;}
+  .sr-num{width:70px;text-align:right;font-size:12px;color:var(--muted);
+    font-variant-numeric:tabular-nums;flex:none;}
+  .sr-label{width:150px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sr-txt{border-top:1px solid var(--line);padding:8px 0;font-size:12.5px;line-height:1.7;}
+  .sr-txt b{color:var(--muted);font-weight:400;margin-right:6px;}
+  .sr-empty{padding:24px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+
+<div class="sr-wrap">
+  <a class="sr-back" href="{{ url_for('admin_survey') }}">← 返回问卷列表</a>
+
+  {% if s.intro %}<div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">{{ s.intro }}</div>{% endif %}
+
+  {% for item in stats %}
+  {% set q = item.q %}
+  <div class="sr-q">
+    <div class="sr-qt">
+      {{ loop.index }}. {{ q.title }}
+      <span class="ty">
+        {% if q.qtype == 'single' %}单选{% elif q.qtype == 'multi' %}多选{% else %}填空{% endif %}
+        {% if q.required %}· 必答{% endif %}
+      </span>
+    </div>
+
+    {% if q.qtype == 'text' %}
+      {% if item.texts %}
+        {% for t in item.texts %}
+        <div class="sr-txt"><b>{{ t.user }}</b>{{ t.text }}</div>
+        {% endfor %}
+      {% else %}
+        <div class="sr-empty">还没有人填</div>
+      {% endif %}
+    {% else %}
+      {% set total_ans = item.counts.values() | sum if item.counts else 0 %}
+      {% for opt in q.options %}
+      {% set n = item.counts.get(opt, 0) %}
+      <div class="sr-opt">
+        <span class="sr-label">{{ opt }}</span>
+        <span class="sr-bar"><i style="width:{{ (n * 100 / total_ans) if total_ans else 0 }}%;"></i></span>
+        <span class="sr-num">{{ n }} · {{ ('%.0f' % (n * 100 / total_ans)) if total_ans else 0 }}%</span>
+      </div>
+      {% endfor %}
+      {% if not q.options %}
+      <div class="sr-empty">这道题没有选项</div>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

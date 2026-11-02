@@ -1,0 +1,614 @@
+{% extends "base.html" %}
+{% block title %}{{ g.name }} - 群组{% endblock %}
+{% set active = 'groups' %}
+{% block content %}
+<a href="{{ url_for('groups') }}" class="muted" style="font-size:13px;">{{ tr('group.back') }}</a>
+
+<div class="card" style="margin-top:12px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+    <div>
+      <h1 style="margin:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        {{ g.name }}
+        <span class="tag off">{{ '🌐 公开' if g.join_mode=='public' else ('🔏 审核' if g.join_mode=='audit' else '🔒 私密') }}</span>
+        <span class="tag off">{{ g.category }}</span>
+      </h1>
+      <div class="muted" style="font-size:13px;margin-top:6px;">
+        {{ tr('group.id_label') }} <b id="gno">{{ g.group_no or '—' }}</b>
+        <button type="button" class="btn ghost sm" onclick="copyGno()" style="margin-left:4px;padding:2px 6px;font-size:11px;">{{ tr('common.copy') }}</button>
+        · {{ g.member_count }} 名成员 · 创建于 {{ g.created_at|fmttime('%Y-%m-%d') }}
+      </div>
+      {% if g.intro %}<div style="margin-top:8px;">{{ g.intro }}</div>{% endif %}
+      {% if announcements %}
+      <div class="announce-banner" style="margin-top:12px;">
+        📢 {{ announcements[0].title }}：{{ announcements[0].content[:80] }}{% if announcements[0].content|length>80 %}…{% endif %}
+      </div>
+      {% elif g.announcement %}
+      <div class="announce-banner" style="margin-top:12px;">📢 {{ g.announcement }}</div>
+      {% endif %}
+    </div>
+    {% if not is_member %}
+    <div>
+      {% if g.join_mode == 'private' %}
+      <button class="btn sm" disabled title="{{ tr('group.private_hint') }}">{{ tr('group.invite_only') }}</button>
+      {% elif g.join_mode == 'audit' %}
+      <form method="post" action="{{ url_for('group_join', gid=g.id) }}" style="margin:0;display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <input type="text" name="message" placeholder="{{ tr('group.verify_ph') }}" maxlength="200" style="width:220px;padding:6px 10px;">
+        <button type="submit" class="btn sm">{{ tr('group.apply') }}</button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ url_for('group_join', gid=g.id) }}" style="margin:0;">
+        <button type="submit" class="btn sm">{{ tr('group.join') }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if is_member and banned %}
+<div class="card center" style="margin-top:16px;padding:40px;"><p style="color:#f5576c;">{{ tr('group.blocked') }}</p></div>
+{% endif %}
+
+{% if is_member and not banned %}
+<style>
+  .g-layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;margin-top:16px;align-items:start;}
+  .g-side-card{position:sticky;top:70px;max-height:84vh;overflow:auto;}
+  .g-chat-box{height:58vh;}
+  @media (max-width:900px){
+    .g-layout{grid-template-columns:minmax(0,1fr);}
+    .g-side-card{position:static;max-height:none;}
+    .g-chat-box{height:52vh;min-height:260px;}
+  }
+</style>
+<div class="g-layout">
+  <div class="drop-zone">
+    <div class="chat-box g-chat-box" id="groupChatBox">
+      {% for m in messages %}
+        {% if m.is_system %}
+        <div class="recall-tip" data-msg-id="{{ m.id }}">{{ m.content }}</div>
+        {% else %}
+        <div class="msg {% if m.user_id == current_user.id %}me{% endif %}" id="gmsg-{{ m.id }}" data-user="{{ m.username }}">
+          <img src="{{ get_avatar_url(get_user_by_id(m.user_id)) }}" class="avatar sm" alt="">
+          <div class="msg-content">
+            <div class="head"><span class="name">{{ m.username }}</span><span class="time">{{ m.created_at|fmttime('%m-%d %H:%M') }}</span></div>
+            <div class="body {% if m.is_deleted %}deleted{% endif %}">{{ m.content }}</div>
+            {% if m.file_url %}
+            <div class="file-attachment" style="margin-top:6px;">
+              {% if m.file_type=='image' %}
+              <img src="{{ img_src(m.file_url, row_get(m, 'img_meta', ''), 's') }}" style="max-width:min(240px,100%);max-height:160px;border-radius:6px;cursor:pointer;" onclick="window.open(this.dataset.full||this.src)" data-full="{{ m.file_url }}" loading="lazy" decoding="async"{% set _w, _h = img_size(row_get(m, 'img_meta', ''), 's') %}{% if _w %} width="{{ _w }}" height="{{ _h }}"{% endif %}>
+              {% elif m.file_type=='video' %}
+              <video src="{{ m.file_url }}" controls style="max-width:min(300px,100%);border-radius:6px;"></video>
+              {% else %}
+              <a href="{{ m.file_url }}" target="_blank" class="btn ghost sm">📎 {{ m.file_name or '文件' }}</a>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if not m.is_deleted and (can_manage or m.user_id == current_user.id) %}
+            <div class="msg-actions" style="margin-top:4px;font-size:12px;opacity:.7;">
+              {% if can_manage %}<button class="btn ghost sm" onclick="setEssence({{ m.id }})">⭐</button>{% endif %}
+              <button class="btn ghost sm" onclick="recallMsg({{ m.id }})">{{ tr('group.recall') }}</button>
+              <button class="btn ghost sm" data-name="{{ m.username }}" onclick="atUser(this.dataset.name)">@TA</button>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% else %}
+      <div class="empty" id="gEmpty">{{ tr('group.no_msgs') }}</div>
+      {% endfor %}
+    </div>
+    <div class="send-bar">
+      <div id="gConnStatus" class="g-conn">{{ tr('group.connecting') }}</div>
+      <div class="input-area">
+        <div class="file-preview" id="gFilePreview"></div>
+        <textarea id="groupInput" placeholder="{{ tr('group.msg_ph') }}" rows="1"></textarea>
+        <input type="file" id="gFileInput" accept="image/*,video/*" style="display:none;" {% if not g.allow_file %}disabled{% endif %}>
+      </div>
+      <div class="row" style="flex-wrap:wrap;">
+        <button class="btn ghost" id="gCodeBtn" title="{{ tr('group.insert_code') }}" onclick="insertCode('python','groupInput')">💻</button>
+        <button class="btn ghost" id="gFileBtn" {% if not g.allow_file %}disabled title="{{ tr('group.files_disabled') }}"{% endif %}>📎</button>
+        <button class="btn ghost" onclick="atAll()" title="{{ tr('group.mention_all') }}">{{ tr('group.at_all') }}</button>
+        <button class="btn" id="groupSendBtn">{{ tr('common.send') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card g-side-card">
+      <details open>
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;">📢 群公告 {% if unread_announcements %}<span style="color:#e74c3c;">●</span>{% endif %}</summary>
+        <div style="margin-top:10px;">
+          {% if announcements %}
+            {% for a in announcements[:3] %}
+            <div class="card" style="padding:10px;margin-bottom:8px;background:#f8f9fa;">
+              <div style="font-weight:600;font-size:13px;">{{ a.title }}</div>
+              <div style="font-size:12px;color:var(--fg-2);margin:4px 0;white-space:pre-wrap;">{{ a.content }}</div>
+              <div class="muted" style="font-size:11px;">{{ a.username }} · {{ a.created_at|timeago }} {% if a.require_read %}· 已读 {{ a.read_count }}/{{ g.member_count }}{% endif %}</div>
+              {% if loop.first %}
+              <form method="post" action="{{ url_for('group_announcement_read', gid=g.id, aid=a.id) }}" style="margin:6px 0 0;"><button class="btn sm ghost">{{ tr('group.mark_read') }}</button></form>
+              {% endif %}
+              {% if can_manage %}<form method="post" action="{{ url_for('group_announcement_delete', gid=g.id, aid=a.id) }}" style="margin:4px 0 0;"><button class="btn sm ghost" style="color:#c0392b;">{{ tr('common.delete') }}</button></form>{% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="muted" style="font-size:12px;">{{ tr('group.no_ann') }}</div>
+          {% endif %}
+          {% if can_manage %}<a href="{{ url_for('group_announcement_create', gid=g.id) }}" class="btn sm ghost block" style="margin-top:6px;">{{ tr('group.new_ann') }}</a>{% endif %}
+        </div>
+      </details>
+
+      <hr>
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;">{{ tr('group.files') }}</summary>
+        <div style="margin-top:10px;">
+          {% if files %}
+            {% for f in files %}
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:6px;gap:6px;">
+              <a href="{{ url_for('group_file_download', fid=f.id) }}" style="word-break:break-all;">{{ f.file_name }}</a>
+              {% if can_manage or f.user_id == current_user.id %}
+              <form method="post" action="{{ url_for('group_file_delete', fid=f.id) }}" style="margin:0;flex-shrink:0;"><button class="btn ghost sm" style="color:#c0392b;">{{ tr('common.del_short') }}</button></form>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="muted" style="font-size:12px;">{{ tr('group.no_files') }}</div>
+          {% endif %}
+          {% if g.allow_file or can_manage %}
+          <form method="post" action="{{ url_for('group_upload_file', gid=g.id) }}" enctype="multipart/form-data" style="margin-top:8px;">
+            <input type="file" name="file" required style="font-size:12px;">
+            <button type="submit" class="btn sm ghost block" style="margin-top:4px;">{{ tr('group.upload') }}</button>
+          </form>
+          {% endif %}
+        </div>
+      </details>
+
+      <hr>
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;">{{ tr('group.pinned_msgs') }}</summary>
+        <div style="margin-top:10px;">
+          {% if essence %}
+            {% for e in essence %}
+            <div class="card" style="padding:10px;margin-bottom:8px;background:#f8f9fa;font-size:12px;">
+              <div style="white-space:pre-wrap;word-break:break-all;">{{ e.content }}</div>
+              <div class="muted" style="margin-top:4px;">{{ e.username }} · {{ e.msg_at|timeago }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="muted" style="font-size:12px;">{{ tr('group.no_pinned') }}</div>
+          {% endif %}
+        </div>
+      </details>
+
+      <hr>
+      <h3 style="margin-top:0;font-size:14px;">成员（{{ g.member_count }}）</h3>
+      <div class="friend-list" style="grid-template-columns:minmax(0, 1fr);gap:8px;">
+        {% for mb in members %}
+        <div class="friend-card{% if can_manage and mb.role != 'owner' and mb.user_id != current_user.id %} has-admin{% endif %}" style="padding:10px;{% if mb.role=='black' %}opacity:.6;{% endif %}position:relative;">
+          <img src="{{ get_avatar_url(get_user_by_id(mb.user_id)) }}" class="avatar sm">
+          <div class="friend-info">
+            <div class="friend-name" style="font-size:14px;">
+              {{ mb.username }}
+              {% if mb.group_nickname %}（{{ mb.group_nickname }}）{% endif %}
+              {% if mb.role == 'owner' %}<span class="tag admin">{{ tr('group.owner') }}</span>
+              {% elif mb.role == 'admin' %}<span class="tag on">{{ tr('group.admin') }}</span>
+              {% elif mb.role == 'black' %}<span class="tag off">{{ tr('group.blocked_badge') }}</span>
+              {% endif %}
+              {% if is_active_restriction(mb.muted_until) %}<span style="color:#f59e0b;font-size:11px;">{{ tr('group.muted') }}</span>{% endif %}
+              {% if can_manage and mb.role != 'owner' and mb.user_id != current_user.id %}<span class="muted" style="font-size:11px;cursor:default;" title="{{ tr('group.hover_admin') }}">⋮</span>{% endif %}
+            </div>
+          </div>
+          {% if can_manage and mb.role != 'owner' and mb.user_id != current_user.id %}
+          <div class="grp-admin-panel" style="display:none;position:absolute;left:0;top:0;right:0;z-index:10;background:var(--bg,#fff);border:1px solid var(--line,#ddd);border-radius:12px;padding:12px;box-shadow:0 4px 20px rgba(0,0,0,.12);flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              {% if mb.role == 'member' %}
+              <form method="post" action="{{ url_for('group_member_action', gid=g.id, uid=mb.user_id, action='set_admin') }}" style="margin:0;"><button type="submit" class="btn sm ghost">{{ tr('group.make_admin') }}</button></form>
+              {% elif mb.role == 'admin' and role == 'owner' %}
+              <form method="post" action="{{ url_for('group_member_action', gid=g.id, uid=mb.user_id, action='set_member') }}" style="margin:0;"><button type="submit" class="btn sm ghost">{{ tr('group.unmake_admin') }}</button></form>
+              {% endif %}
+            </div>
+            <form method="post" action="{{ url_for('group_member_action', gid=g.id, uid=mb.user_id, action='mute') }}" style="margin:0;display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+              <div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap;white-space:nowrap;">
+                <input type="number" name="days" value="0" min="0" max="99" style="width:40px;padding:3px 4px;font-size:12px;text-align:center;border:1px solid var(--line,#ddd);border-radius:6px;"><span style="font-size:12px;color:var(--fg-2);">{{ tr('group.unit_day') }}</span>
+                <input type="number" name="hours" value="0" min="0" max="23" style="width:40px;padding:3px 4px;font-size:12px;text-align:center;border:1px solid var(--line,#ddd);border-radius:6px;"><span style="font-size:12px;color:var(--fg-2);">{{ tr('group.unit_hour') }}</span>
+                <input type="number" name="minutes" value="0" min="0" max="59" style="width:40px;padding:3px 4px;font-size:12px;text-align:center;border:1px solid var(--line,#ddd);border-radius:6px;"><span style="font-size:12px;color:var(--fg-2);">{{ tr('group.unit_min') }}</span>
+              </div>
+              <button type="submit" class="btn sm" style="background:#f59e0b;color:#fff;border-color:#f59e0b;">{{ tr('group.mute') }}</button>
+            </form>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <form method="post" action="{{ url_for('group_member_action', gid=g.id, uid=mb.user_id, action='kick') }}" style="margin:0;" onsubmit="return confirm(__('确定踢出该成员？'));"><button type="submit" class="btn sm ghost" style="color:#e74c3c;">{{ tr('group.kick') }}</button></form>
+              {% if mb.role != 'black' %}
+              <form method="post" action="{{ url_for('group_member_action', gid=g.id, uid=mb.user_id, action='ban') }}" style="margin:0;" onsubmit="return confirm(__('确定将该成员加入黑名单？'));"><button type="submit" class="btn sm ghost" style="color:#c0392b;">{{ tr('group.block') }}</button></form>
+              {% else %}
+              <form method="post" action="{{ url_for('group_member_action', gid=g.id, uid=mb.user_id, action='unban') }}" style="margin:0;"><button type="submit" class="btn sm ghost">{{ tr('group.unblock') }}</button></form>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if requests %}
+      <hr>
+      <h3 style="font-size:14px;">{{ tr('group.requests') }}</h3>
+      {% for r in requests %}
+      <div class="card" style="padding:10px;margin-bottom:8px;font-size:12px;background:#f8f9fa;">
+        <div><b>{{ r.username }}</b></div>
+        {% if r.message %}<div class="muted" style="margin:4px 0;">验证：{{ r.message }}</div>{% endif %}
+        <div class="row" style="gap:6px;margin-top:6px;">
+          <form method="post" action="{{ url_for('group_request_handle', gid=g.id, rid=r.id, action='approve') }}" style="margin:0;"><button class="btn sm">{{ tr('group.approve') }}</button></form>
+          <form method="post" action="{{ url_for('group_request_handle', gid=g.id, rid=r.id, action='reject') }}" style="margin:0;display:flex;gap:4px;">
+            <input type="text" name="reason" placeholder="{{ tr('group.reject_ph') }}" style="width:120px;padding:4px 6px;font-size:11px;">
+            <button type="submit" class="btn sm ghost">{{ tr('group.reject') }}</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if can_manage %}
+      <hr>
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;">{{ tr('group.settings') }}</summary>
+        <form method="post" action="{{ url_for('group_settings', gid=g.id) }}" style="margin-top:10px;">
+          <label>{{ tr('group.name') }}</label>
+          <input type="text" name="name" value="{{ g.name }}" maxlength="30">
+          <label>{{ tr('group.desc') }}</label>
+          <textarea name="intro" rows="2" style="min-height:auto;">{{ g.intro }}</textarea>
+          <label>{{ tr('group.join_mode') }}</label>
+          <select name="join_mode">
+            <option value="public" {% if g.join_mode=='public' %}selected{% endif %}>{{ tr('group.public') }}</option>
+            <option value="audit" {% if g.join_mode=='audit' %}selected{% endif %}>{{ tr('group.review') }}</option>
+            <option value="private" {% if g.join_mode=='private' %}selected{% endif %}>{{ tr('group.private') }}</option>
+          </select>
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="is_searchable" {% if g.is_searchable %}checked{% endif %}> {{ tr('group.allow_search') }}</label>
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="allow_file" {% if g.allow_file %}checked{% endif %}> {{ tr('group.allow_files') }}</label>
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="allow_invite" {% if g.allow_invite %}checked{% endif %}> {{ tr('group.allow_invite') }}</label>
+          <label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="all_muted" {% if g.all_muted %}checked{% endif %}> {{ tr('group.mute_all') }}</label>
+          {% if role == 'owner' %}
+          <label>{{ tr('group.transfer') }}</label>
+          <select name="transfer_to">
+            <option value="">{{ tr('group.no_transfer') }}</option>
+            {% for mb in members %}{% if mb.user_id != current_user.id and mb.role in ('admin','member') %}<option value="{{ mb.user_id }}">{{ mb.username }}</option>{% endif %}{% endfor %}
+          </select>
+          <label style="display:flex;gap:6px;align-items:center;color:#c0392b;"><input type="checkbox" name="dissolve"> {{ tr('group.disband') }}</label>
+          {% endif %}
+          <button type="submit" class="btn sm block">{{ tr('group.save') }}</button>
+        </form>
+      </details>
+      {% endif %}
+
+      <hr>
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <a href="{{ url_for('group_invite_link', gid=g.id) }}" class="btn sm ghost">{{ tr('group.invite_link') }}</a>
+        {% if role != 'owner' %}
+        <form method="post" action="{{ url_for('group_leave', gid=g.id) }}" style="margin:0;" onsubmit="return confirm(__('确定退出该群？'));"><button type="submit" class="btn sm ghost" style="color:#c0392b;width:100%;">{{ tr('group.leave') }}</button></form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if is_member and not banned %}
+<style>
+.g-conn{font-size:12px;color:var(--muted);padding:0 2px 6px;}
+.g-conn.ok{color:#10b981;} .g-conn.warn{color:#d97706;} .g-conn.err{color:#c0392b;}
+.msg.pending .msg-content,.msg.pending-wait .msg-content{opacity:.72;}
+.msg.pending-wait{outline:1px dashed #d97706;outline-offset:2px;border-radius:12px;}
+.msg.pending-fail{outline:1px dashed #c0392b;outline-offset:2px;border-radius:12px;}
+.pending-badge{font-size:11px;padding:1px 6px;border-radius:8px;background:#f1f1f1;color:var(--muted);margin-left:6px;white-space:nowrap;}
+.msg.pending-wait .pending-badge{background:#fef3c7;color:#b45309;}
+.msg.pending-fail .pending-badge{background:#fee2e2;color:#b91c1c;}
+.pending-retry{margin-left:8px;font-size:12px;padding:3px 10px;border:1px solid #c0392b;color:#c0392b;background:var(--bg-elev);border-radius:8px;cursor:pointer;}
+.pending-retry:hover{background:#c0392b;color:#fff;}
+.fp{display:inline-flex;align-items:center;gap:6px;}
+.fp .fp-x{cursor:pointer;color:#c0392b;padding:0 4px;}
+.fp.up{color:var(--fg-2);}
+.fp.up .fp-name{font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom;}
+.fp.up .up-pct{font-variant-numeric:tabular-nums;color:#2563eb;font-weight:600;min-width:38px;display:inline-block;text-align:right;}
+.fp.err{color:#b91c1c;}
+@media (max-width:900px){ .pending-retry{min-height:44px;padding:8px 14px;font-size:14px;} }
+</style>
+<script src="{{ cdn_url('js/socket.io.min.js') }}"></script>
+<script>
+const GID = {{ g.id }};
+const MY_NAME = {{ current_user['username']|tojson }};
+const MY_AVATAR = {{ get_avatar_url(current_user)|tojson }};
+const box = document.getElementById('groupChatBox');
+const input = document.getElementById('groupInput');
+function escapeHtml(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function jsAttr(s){
+  return escapeHtml(String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${'));
+}
+var _gScrollRaf = null;
+function scrollGroupBottomSoon(){
+  if (_gScrollRaf) return;
+  _gScrollRaf = requestAnimationFrame(function(){ _gScrollRaf = null; box.scrollTop = box.scrollHeight; });
+}
+function gNearBottom(slack){
+  return box.scrollTop + box.clientHeight > box.scrollHeight - (slack || 200);
+}
+function deferEnhance(fn){
+  if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 500 });
+  else setTimeout(fn, 60);
+}
+function enhanceCodeSoon(el){
+  if (!el.querySelector('pre')) return;
+  deferEnhance(function(){ try { enhanceCode(el); } catch(e){} });
+}
+function enhanceMarkdownSoon(el){
+  deferEnhance(function(){ try { enhanceMarkdown(el); } catch(e){} });
+}
+function appendGroupMsg(m){
+  const e = document.getElementById('gEmpty'); if (e) e.remove();
+  if (document.getElementById('gmsg-'+m.id)) return;
+  const el = document.createElement('div');
+  const ROLE_EFFECTS = ['admin','popular','rainbow'];
+  const effectOnBody = m.effect && ROLE_EFFECTS.indexOf(m.effect) >= 0;
+  el.className = 'msg' + (m.user_id == {{ current_user.id }} ? ' me' : '') + (effectOnBody ? ' effect-' + m.effect : '');
+  el.id = 'gmsg-'+m.id;
+  el.dataset.user = m.username;
+  const body = document.createElement('div');
+  const _bc = (m.bubble_style && m.bubble_style !== 'solid') ? ' bubble-' + m.bubble_style : '';
+  body.className = 'body' + _bc + ' md-content' + (m.is_deleted ? ' deleted' : '');
+  body.innerHTML = renderMarkdown(m.content || '');
+  enhanceMarkdownSoon(body);
+  let fileHtml = '';
+  if (m.file_url) {
+    if (m.file_type === 'image') fileHtml = `<div class="file-attachment" style="margin-top:6px;"><img src="${monoThumb(m.file_url, m.img_meta, 's')}" style="max-width:min(240px,100%);max-height:160px;border-radius:6px;cursor:pointer;" onclick="window.open(this.dataset.full||this.src)" data-full="${m.file_url}" loading="lazy" decoding="async"></div>`;
+    else if (m.file_type === 'video') fileHtml = `<div class="file-attachment" style="margin-top:6px;"><video src="${m.file_url}" controls style="max-width:min(300px,100%);border-radius:6px;"></video></div>`;
+    else fileHtml = `<div class="file-attachment" style="margin-top:6px;"><a href="${m.file_url}" target="_blank" class="btn ghost sm">📎 ${escapeHtml(m.file_name || '文件')}</a></div>`;
+  }
+  let actions = '';
+  const canManage = {{ 'true' if can_manage else 'false' }};
+  if (!m.is_deleted && (canManage || m.user_id == {{ current_user.id }})) {
+    actions = `<div class="msg-actions" style="margin-top:4px;font-size:12px;opacity:.7;">${canManage ? `<button class="btn ghost sm" onclick="setEssence(${m.id})">⭐</button>` : ''}<button class="btn ghost sm" onclick="recallMsg(${m.id})">{{ tr('group.recall') }}</button><button class="btn ghost sm" onclick="atUser('${jsAttr(m.username)}')">@TA</button></div>`;
+  }
+  const _t = m.created_at ? new Date(m.created_at * 1000) : new Date();
+  const _pad = n => (n < 10 ? '0' + n : '' + n);
+  const timeStr = `${_pad(_t.getMonth()+1)}-${_pad(_t.getDate())} ${_pad(_t.getHours())}:${_pad(_t.getMinutes())}`;
+  let tags = '';
+  if (m.is_admin) tags += '<span class="tag admin">管理员</span>';
+  /* 徽章顺序要和 app.py 的 get_user_badges() 一致：管理员牌子 → 商城头衔 → 商城徽章 */
+  if (m.badge_text && m.badge_effect) tags += `<span class="tag badge-${m.badge_effect}">${escapeHtml(m.badge_text)}</span>`;
+  if (m.mall_title) tags += `<span class="tag malltitle" style="background:${m.mall_title_color || '#b58a4a'};color:#fff;border-color:transparent;">${escapeHtml(m.mall_title)}</span>`;
+  if (m.mall_badge) { const _mb = String(m.mall_badge).split('|'); if (_mb[1]) tags += `<span class="tag badge-${_mb[0]||'gold'}">${escapeHtml(_mb[1])}</span>`; }
+  const avatarEffect = (m.effect && m.effect !== 'none') ? ` avatar-effect avatar-effect-${m.effect}` : '';
+  el.innerHTML = `<span class="avatar-wrap${avatarEffect}"><img src="${m.avatar || ''}" class="avatar sm" alt=""></span><div class="msg-content"><div class="head"><span class="name" ${m.name_color ? `style="color:${m.name_color}"` : ''}>${escapeHtml(m.username)} ${tags}</span><span class="time">${timeStr}</span></div></div>`;
+  const mc = el.querySelector('.msg-content');
+  mc.appendChild(body);
+  if (fileHtml) mc.insertAdjacentHTML('beforeend', fileHtml);
+  if (actions) mc.insertAdjacentHTML('beforeend', actions);
+  box.appendChild(el);
+  enhanceCodeSoon(el);
+  if (gNearBottom()) scrollGroupBottomSoon();
+}
+let offlineQueue = [];
+let pendingPayload = {};
+let tmpSeq = 0;
+
+function setGStatus(text, type){
+  const el = document.getElementById('gConnStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'g-conn' + (type ? ' ' + type : '');
+}
+function nowStr(){
+  const d = new Date(), p = n => (n < 10 ? '0' + n : '' + n);
+  return p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+function sendGroup(){
+  const v = input.value.trim(); if (!v) return;
+  const payload = {group_id: GID, content: v};
+  const tmpId = 'gtmp' + (++tmpSeq);
+  pendingPayload[tmpId] = payload;
+  renderPending(tmpId, payload);
+  input.value = '';
+  if (!socket || !socket.connected){
+    offlineQueue.push({tmpId: tmpId, payload: payload});
+    markPending(tmpId, 'wait', '未发送 · 联网后自动重发');
+    setGStatus('网络已断开 · ' + offlineQueue.length + ' 条消息待发送', 'err');
+    return;
+  }
+  emitWithAck(tmpId, payload);
+}
+
+function emitWithAck(tmpId, payload){
+  const p = {}; for (const k in payload) p[k] = payload[k];
+  let settled = false;
+  const timer = setTimeout(function(){
+    if (settled) return;
+    markPending(tmpId, 'wait', '网络较慢 · 仍在发送…');
+    if (!offlineQueue.some(function(x){ return x.tmpId === tmpId; })){
+      offlineQueue.push({tmpId: tmpId, payload: payload});
+    }
+  }, 20000);   // 20 秒：太短会在 ACK 慢到时误判重发，服务端可能已入库 → 重复消息
+  try {
+    socket.emit('group_send', p, function(res){
+      settled = true; clearTimeout(timer);
+      if (res && res.ok && res.msg){ replacePending(tmpId, res.msg); }
+      else { markPending(tmpId, 'fail', (res && res.error) || '发送失败'); }
+    });
+  } catch(e){ settled = true; clearTimeout(timer); markPending(tmpId, 'fail', '发送失败'); }
+}
+
+function flushOfflineQueue(){
+  if (!socket || !socket.connected) return;
+  const queued = offlineQueue; offlineQueue = [];
+  queued.forEach(function(it){
+    if (!document.getElementById('gmsg-' + it.tmpId)) return;
+    emitWithAck(it.tmpId, it.payload);
+  });
+  if (queued.length) setGStatus('在线', 'ok');
+}
+
+function renderPending(tmpId, payload){
+  const e = document.getElementById('gEmpty'); if (e) e.remove();
+  const el = document.createElement('div');
+  el.className = 'msg me pending';
+  el.id = 'gmsg-' + tmpId;
+  el.dataset.tmpId = tmpId;
+  el.innerHTML = '<span class="avatar-wrap"><img src="' + MY_AVATAR + '" class="avatar sm" alt=""></span>'
+    + '<div class="msg-content"><div class="head"><span class="name">' + escapeHtml(MY_NAME) + '</span>'
+    + '<span class="time">' + nowStr() + '</span><span class="pending-badge">发送中…</span></div></div>';
+  const body = document.createElement('div');
+  body.className = 'body md-content';
+  body.innerHTML = renderMarkdown(payload.content || '');
+  el.querySelector('.msg-content').appendChild(body);
+  enhanceMarkdownSoon(body);
+  box.appendChild(el);
+  scrollGroupBottomSoon();
+}
+
+function replacePending(tmpId, msg){
+  const pend = document.getElementById('gmsg-' + tmpId);
+  delete pendingPayload[tmpId];
+  if (document.getElementById('gmsg-' + msg.id)){ if (pend) pend.remove(); return; }
+  if (pend) pend.remove();
+  appendGroupMsg(msg);
+}
+
+function markPending(tmpId, state, text){
+  const el = document.getElementById('gmsg-' + tmpId);
+  if (!el) return;
+  el.classList.remove('pending','pending-wait','pending-fail');
+  el.classList.add(state === 'fail' ? 'pending-fail' : state === 'wait' ? 'pending-wait' : 'pending');
+  let badge = el.querySelector('.pending-badge');
+  if (!badge){
+    badge = document.createElement('span'); badge.className = 'pending-badge';
+    const h = el.querySelector('.head'); (h || el).appendChild(badge);
+  }
+  badge.textContent = text;
+  let rt = el.querySelector('.pending-retry');
+  if (state === 'fail'){
+    if (!rt){ rt = document.createElement('button'); rt.className = 'pending-retry'; rt.textContent = '重试'; el.appendChild(rt); }
+    rt.onclick = function(){
+      const payload = pendingPayload[tmpId]; if (!payload) return;
+      if (!socket || !socket.connected){ alert(__('网络仍未恢复，请稍后再试')); return; }
+      markPending(tmpId, 'sending', '发送中…');
+      emitWithAck(tmpId, payload);
+    };
+  } else if (rt){ rt.remove(); }
+}
+function atUser(name){ input.value += '@' + name + ' '; input.focus(); }
+function atAll(){ input.value += '@全体成员 '; input.focus(); }
+function recallMsg(mid){
+  if(!confirm(__('确定撤回这条消息？'))) return;
+  fetch(`/group/${GID}/message/${mid}/recall`, {method:'POST'}).then(r=>r.json()).then(d=>{
+    if(!d.ok) alert(d.error || '撤回失败');
+  });
+}
+function setEssence(mid){
+  fetch(`/group/${GID}/message/${mid}/essence`, {method:'POST'}).then(r=>r.json()).then(d=>{
+    if(d.ok){ alert(d.state==='added'?'已设为精华':'已取消精华'); location.reload(); }
+    else alert(d.error||'操作失败');
+  });
+}
+function copyGno(){ const n=document.getElementById('gno').innerText; navigator.clipboard.writeText(n).then(()=>alert(__('群号已复制'))); }
+input.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendGroup(); } });
+document.getElementById('groupSendBtn').onclick = sendGroup;
+document.getElementById('gFileBtn').onclick = () => document.getElementById('gFileInput').click();
+document.getElementById('gFileInput').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fp = document.getElementById('gFilePreview');
+  const fd = new FormData(); fd.append('file', f);
+  if (fp){
+    fp.innerHTML = '<span class="fp up">⌛ 上传中 <b class="fp-name">' + escapeHtml(f.name)
+      + '</b> <span class="up-pct">0%</span></span>';
+    fp.classList.add('show');
+  }
+  const fail = function(msg){
+    if (!fp){ alert(msg); return; }
+    fp.innerHTML = '<span class="fp err">⚠ ' + escapeHtml(msg)
+      + ' <span class="fp-x" onclick="clearGFile()">✕</span></span>';
+    fp.classList.add('show');
+  };
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/group/' + GID + '/upload-file');
+  xhr.upload.onprogress = function(ev){
+    if (!ev.lengthComputable) return;
+    const pct = Math.min(99, Math.round(ev.loaded / ev.total * 100));
+    const b = fp && fp.querySelector('.up-pct'); if (b) b.textContent = pct + '%';
+  };
+  xhr.onload = function(){
+    let u = null; try { u = JSON.parse(xhr.responseText); } catch(err){}
+    if (xhr.status >= 200 && xhr.status < 300 && u && u.ok){ location.reload(); }
+    else fail((u && u.error) || ('上传失败（HTTP ' + xhr.status + '）'));
+  };
+  xhr.onerror = function(){
+    fail(navigator.onLine === false ? '网络已断开，文件没有传上去' : '上传失败，请检查网络后重试');
+  };
+  xhr.ontimeout = function(){ fail('上传超时，请重试'); };
+  xhr.send(fd);
+};
+function clearGFile(){ const fp = document.getElementById('gFilePreview'); if (fp){ fp.innerHTML = ''; fp.classList.remove('show'); } }
+const socket = window.__monoSio();
+let gPollTimer = null;
+
+function pollGroup(){
+  fetch('/api/group/' + GID + '/messages?limit=50')
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(rows){
+      if (!rows || !Array.isArray(rows)) return;
+      rows.forEach(function(m){ appendGroupMsg(m); });
+    })
+    .catch(function(){
+      setGStatus(navigator.onLine === false
+        ? ('网络已断开' + (offlineQueue.length ? ' · ' + offlineQueue.length + ' 条消息待发送' : ' · 消息将暂存本地'))
+        : '消息同步失败', 'err');
+    });
+}
+function startGPoll(){
+  if (gPollTimer) return;
+  pollGroup();
+  gPollTimer = setInterval(pollGroup, 5000);
+}
+
+window.__monoSioReady(() => {
+  setGStatus('在线', 'ok');
+  socket.emit('join', {room:'group_'+GID});
+  pollGroup();
+  setTimeout(pollGroup, 2000);
+  flushOfflineQueue();
+  if (gPollTimer){ clearInterval(gPollTimer); gPollTimer = null; }
+});
+socket.on('disconnect', () => { setGStatus('已离线，正在重连…', 'warn'); startGPoll(); });
+socket.on('connect_error', () => { setGStatus('实时连接不可用，已启用轮询', 'err'); startGPoll(); });
+socket.on('group_new_message', m => appendGroupMsg(m));
+socket.on('group_message_recalled', d => {
+  const el = document.getElementById('gmsg-'+d.message_id);
+  if (el){ el.querySelector('.body').innerText = '消息已撤回'; el.querySelector('.body').classList.add('deleted'); }
+});
+socket.on('error', d => { if (d.msg && d.from !== 'group_send') alert('⚠ '+d.msg); });
+
+window.addEventListener('online', function(){
+  if (socket && !socket.connected){ try { socket.connect(); } catch(e){} }
+  pollGroup(); setTimeout(pollGroup, 2000);
+  setTimeout(flushOfflineQueue, 800);
+});
+window.addEventListener('offline', function(){
+  setGStatus(offlineQueue.length
+    ? ('网络已断开 · ' + offlineQueue.length + ' 条消息待发送')
+    : '网络已断开 · 消息将暂存本地', 'err');
+});
+
+(function(){
+  if (!box) return;
+  var jump = function(){ box.scrollTop = box.scrollHeight; };
+  requestAnimationFrame(jump);
+  setTimeout(jump, 120);
+  window.addEventListener('load', jump);
+})();
+</script>
+{% endif %}
+{% endblock %}

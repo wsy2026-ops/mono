@@ -1,0 +1,972 @@
+{% extends "base.html" %}
+{% block title %}{{ tr('nav.points') }} - {{ tr('brand') }}{% endblock %}
+{% block content %}
+<style>
+  .points-wrap{max-width:980px;margin:0 auto;}
+  .balance-hero{
+    position:relative;overflow:hidden;border-radius:20px;
+    background:linear-gradient(135deg,#1a1a1a 0%,#2b2b2b 55%,#3d3d3d 100%);
+    color:#fff;padding:26px 30px;display:flex;align-items:center;gap:22px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  .balance-hero::before{
+    content:'';position:absolute;top:-60%;right:-10%;width:340px;height:340px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.10),transparent 65%);pointer-events:none;
+  }
+  .balance-hero::after{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:5px;
+    background:linear-gradient(180deg,#111111,#555555,#111111);animation:breathe 2.5s ease-in-out infinite;
+  }
+  .balance-coin{font-size:52px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.3));animation:coinFloat 3s ease-in-out infinite;}
+  @keyframes coinFloat{0%,100%{transform:translateY(0) rotate(-4deg);}50%{transform:translateY(-6px) rotate(4deg);}}
+  .balance-info h1{margin:0;font-size:22px;font-weight:800;letter-spacing:1px;}
+  .balance-info .coins{font-size:40px;font-weight:900;color:#ffffff;text-shadow:0 0 22px rgba(0,0,0,.25);line-height:1.15;}
+  .balance-info .coins small{font-size:15px;color:#cfcfcf;font-weight:500;margin-left:6px;}
+  .balance-info .sub{font-size:12.5px;color:#b9b9b9;margin-top:4px;}
+  .balance-extra{margin-left:auto;text-align:right;font-size:12.5px;color:#d6d6d6;line-height:2;position:relative;z-index:1;}
+  .balance-extra b{color:#ffffff;}
+
+  .points-tabs{display:flex;gap:8px;margin:20px 0 16px;flex-wrap:wrap;}
+  .points-tabs button{
+    flex:1;min-width:150px;padding:12px 10px;border:1px solid var(--line,#e6e6e6);
+    background:var(--bg-elev);border-radius:12px;font-size:14px;cursor:pointer;font-weight:600;
+    transition:all .2s ease;color:var(--fg-2);
+  }
+  .points-tabs button:hover{border-color:#d4b96a;color:#333333;transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.07);}
+  .points-tabs button.active{
+    background:linear-gradient(135deg,#1a1a1a,#2c2c2c);color:#ffffff;border-color:#1a1a1a;
+    box-shadow:0 6px 18px rgba(0,0,0,.2);
+  }
+  .points-pane{display:none;animation:fadeUp .35s ease;}
+  .points-pane.active{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  .pane-title{font-size:18px;font-weight:800;margin:6px 0 14px;display:flex;align-items:center;gap:8px;}
+  .pane-title .tag{font-size:11px;font-weight:500;}
+
+  .sign-grid{display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);gap:16px;}
+  @media(max-width:760px){.sign-grid{grid-template-columns:minmax(0, 1fr);}}
+  .sign-card{border:1px solid var(--line);border-radius:16px;padding:20px;background:var(--bg-elev);box-shadow:0 2px 10px rgba(0,0,0,.05);}
+  .sign-stats{display:grid;grid-template-columns:repeat(3,minmax(0, 1fr));gap:10px;margin:14px 0;}
+  .sign-stat{text-align:center;background:var(--soft,#f5f5f5);border-radius:12px;padding:12px 6px;}
+  .sign-stat b{display:block;font-size:22px;color:#1a1a1a;}
+  .sign-stat span{font-size:11.5px;color:var(--muted,#8a8a8a);}
+  .sign-btn{
+    width:100%;padding:13px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;
+    background:linear-gradient(135deg,#111111,#444444);color:#ffffff;
+    box-shadow:0 6px 18px rgba(245,166,35,.4);transition:all .2s ease;
+  }
+  .sign-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.3);}
+  .sign-btn:disabled{background:#e4e4e4;color:var(--muted);box-shadow:none;cursor:default;}
+  .week-row{display:grid;grid-template-columns:repeat(7,minmax(0, 1fr));gap:6px;margin-top:14px;}
+  .week-cell{aspect-ratio:1;border-radius:10px;border:1px dashed #d8d8d8;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--muted);position:relative;}
+  .week-cell.signed{background:linear-gradient(135deg,#f5f5f5,#ffe9b3);border:1px solid #f5c542;color:#333333;font-weight:700;animation:popIn .4s ease;}
+  .week-cell.today{border-color:#111111;box-shadow:0 0 0 2px rgba(184,134,11,.25);}
+  .week-cell b{font-size:16px;line-height:1.2;}
+  .week-cell .dot{width:5px;height:5px;border-radius:50%;background:#333333;margin-top:3px;}
+  @keyframes popIn{0%{transform:scale(.6);opacity:0;}100%{transform:scale(1);opacity:1;}}
+  .fortune-box{margin-top:14px;border:1px solid #d9d9d9;border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#f7f7f7,#f5f5f5);}
+  .fortune-num{font-size:38px;font-weight:900;color:#111111;min-width:76px;text-align:center;position:relative;}
+  .fortune-num::after{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:0 0 16px rgba(184,134,11,.25);animation:breathe 2.4s ease-in-out infinite;}
+  .fortune-meta b{display:block;font-size:15px;color:#444444;}
+  .fortune-meta span{font-size:12px;color:#666666;}
+  .makeup-row{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .makeup-row select{flex:1;min-width:180px;padding:9px;border-radius:10px;border:1px solid var(--line);font-size:13px;}
+  .makeup-row button{padding:9px 16px;border-radius:10px;border:1px solid #111111;background:var(--bg-elev);color:#333333;font-weight:700;cursor:pointer;font-size:13px;transition:.15s;}
+  .makeup-row button:hover{background:#111111;color:#fff;}
+
+  .task-group{margin-bottom:18px;}
+  .task-group h3{font-size:15px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .task-group h3 .grp-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .task-item{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;background:var(--bg-elev);display:flex;align-items:center;gap:14px;transition:all .2s ease;}
+  .task-item:hover{box-shadow:0 6px 18px rgba(0,0,0,.08);transform:translateY(-2px);}
+  .task-ic{font-size:26px;width:48px;height:48px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .task-info{flex:1;min-width:0;}
+  .task-info b{font-size:14.5px;}
+  .task-info .desc{font-size:12px;color:var(--muted);margin-top:2px;}
+  .task-bar{height:7px;background:#eee;border-radius:6px;margin-top:8px;overflow:hidden;}
+  .task-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#111111,#444444);transition:width .5s ease;}
+  .task-info .prog{font-size:11.5px;color:var(--muted);margin-top:4px;}
+  .task-btn{padding:8px 18px;border-radius:10px;border:none;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;
+    background:linear-gradient(135deg,#111111,#444444);color:#ffffff;box-shadow:0 4px 12px rgba(0,0,0,.25);transition:.2s;}
+  .task-btn:hover:not(:disabled){transform:translateY(-1px);}
+  .task-btn:disabled{background:#e4e4e4;color:var(--muted);box-shadow:none;cursor:default;}
+  .task-btn.done{background:#e8e8e8;color:var(--muted);cursor:default;}
+
+  .mall-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+  .mall-cat{display:flex;gap:8px;flex-wrap:wrap;}
+  .mall-cat button{padding:7px 16px;border-radius:20px;border:1px solid var(--line);background:var(--bg-elev);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;color:var(--fg-2);}
+  .mall-cat button.active{background:#1a1a1a;color:#ffffff;border-color:#1a1a1a;}
+  .mall-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px;}
+  .mall-card{
+    border:1px solid var(--line,#e6e6e6);border-radius:18px;padding:18px;background:var(--bg-elev);display:flex;flex-direction:column;gap:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);transition:all .25s ease;position:relative;
+  }
+  .mall-card:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(0,0,0,.12);}
+  .mall-card .ic{font-size:34px;position:relative;transition:transform .25s;display:inline-block;width:fit-content;}
+  .mall-card:hover .ic{transform:scale(1.15) rotate(-6deg);}
+  .mall-card .nm{font-weight:800;font-size:15px;color:#1a1a1a;}
+  .mall-card .ty{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+  .mall-card .ds{font-size:12px;color:var(--muted);min-height:32px;line-height:1.5;}
+  .mall-card .ct{font-weight:900;color:#111111;font-size:15px;}
+  .mall-card .m-btn{
+    width:100%;padding:9px;border-radius:10px;border:1px solid #111111;background:transparent;color:#333333;
+    cursor:pointer;font-size:13px;font-weight:800;transition:.15s;margin-top:2px;
+  }
+  .mall-card .m-btn:hover{background:#111111;color:#fff;}
+  .mall-card .m-btn.equipped{background:linear-gradient(135deg,#111111,#444444);color:#fff;border-color:#111111;cursor:default;box-shadow:0 4px 12px rgba(184,134,11,.35);}
+  .mall-card .m-btn.unequip{border-color:var(--line,#ddd);color:var(--muted);background:var(--soft);}
+  .mall-card .m-btn.unequip:hover{border-color:#111111;color:#111111;background:transparent;}
+  .mall-card .m-btn:disabled{background:#eee;color:var(--muted);border-color:#ddd;cursor:not-allowed;}
+  .mall-card .lim-tag,.mall-card .role-tag{position:absolute;top:-7px;right:-8px;font-size:10px;font-weight:800;color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:1px;}
+  .mall-card .lim-tag{background:linear-gradient(135deg,#111111,#333333);box-shadow:0 3px 8px rgba(184,134,11,.4);}
+  .mall-card .role-tag{background:linear-gradient(135deg,#333333,#555555);}
+  .mall-card.limited{border-color:#d9d9d9;background:linear-gradient(180deg,#fafafa,#fafafa);}
+  .mall-card.limited.locked{filter:grayscale(1);opacity:.55;}
+  .mall-card .own-tag{position:absolute;top:-7px;left:-8px;font-size:10px;font-weight:800;color:#fff;background:linear-gradient(135deg,#333333,#555555);padding:2px 8px;border-radius:10px;}
+  .mall-note{margin-top:16px;font-size:12px;color:var(--muted);line-height:1.8;border-top:1px dashed var(--line);padding-top:12px;}
+
+  .gacha-stage{text-align:center;padding:20px 0;}
+  .gacha-egg{font-size:78px;cursor:pointer;display:inline-block;transition:transform .2s;filter:drop-shadow(0 8px 18px rgba(0,0,0,.2));position:relative;}
+  .gacha-egg:hover{transform:scale(1.1) rotate(-4deg);}
+  .gacha-egg.spinning{animation:gachaSpin .7s ease-in-out infinite alternate;}
+  @keyframes gachaSpin{from{transform:rotate(-14deg) scale(1.02);}to{transform:rotate(14deg) scale(1.08);}}
+  .gacha-cost{margin-top:10px;font-size:13px;color:var(--muted);}
+  .gacha-result{min-height:64px;display:flex;align-items:center;justify-content:center;flex-direction:column;margin-top:12px;}
+  .gacha-prize{
+    font-size:20px;font-weight:900;padding:11px 26px;border-radius:14px;animation:prizeIn .45s cubic-bezier(.2,1.4,.4,1);
+    box-shadow:0 8px 24px rgba(0,0,0,.15);
+  }
+  @keyframes prizeIn{0%{transform:scale(.4) rotate(-8deg);opacity:0;}100%{transform:scale(1) rotate(0);opacity:1;}}
+  .gacha-prize.common{background:var(--soft);color:var(--fg-2);}
+  .gacha-prize.uncommon{background:linear-gradient(135deg,#e8f5e9,#c8e6c9);color:#2e7d32;}
+  .gacha-prize.rare{background:linear-gradient(135deg,#e3f0ff,#bbd8f5);color:#1d5fa8;}
+  .gacha-prize.epic{background:linear-gradient(135deg,#f3e8fa,#e0e0e0);color:#7b3fa8;box-shadow:0 8px 24px rgba(123,63,168,.35);}
+  .gacha-prize.legendary{
+    background:linear-gradient(135deg,#111111,#444444,#777777,#111111);background-size:200% 200%;
+    color:#222222;animation:prizeIn .45s cubic-bezier(.2,1.4,.4,1),gradientShift 2s ease infinite;
+    box-shadow:0 10px 34px rgba(255,200,0,.55);
+  }
+  .gacha-pity{margin-top:14px;font-size:12.5px;color:var(--muted);}
+  .gacha-pity i{display:inline-block;font-style:normal;font-weight:800;color:#111111;}
+  .pity-bar{height:7px;background:#eee;border-radius:6px;margin-top:6px;overflow:hidden;max-width:420px;margin-left:auto;margin-right:auto;}
+  .pity-bar i,.pity-fill{display:block;height:100%;background:linear-gradient(90deg,#111111,#444444);transition:width .4s ease;border-radius:6px;}
+  .gacha-recent{max-width:520px;margin:16px auto 0;text-align:left;}
+  .gacha-recent .gr{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:10px;font-size:13px;background:var(--soft);margin-bottom:6px;}
+  .gacha-recent .gr .rar{font-size:11px;font-weight:800;padding:2px 8px;border-radius:8px;flex-shrink:0;}
+  .gacha-recent .gr .t{color:var(--muted);font-size:11.5px;margin-left:auto;}
+
+  .ledger-list{display:flex;flex-direction:column;gap:8px;}
+  .ledger-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;background:var(--bg-elev);border:1px solid var(--line);}
+  .ledger-item .ld{font-size:16px;width:34px;height:34px;border-radius:10px;background:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .ledger-item .src{font-size:13px;font-weight:700;}
+  .ledger-item .rsn{font-size:11.5px;color:var(--muted);}
+  .ledger-item .dt{font-size:11.5px;color:var(--muted);margin-left:auto;text-align:right;flex-shrink:0;}
+  .ledger-item .delta{font-weight:900;font-size:15px;min-width:58px;text-align:right;flex-shrink:0;}
+  .ledger-item .delta.plus{color:#16a34a;}
+  .ledger-item .delta.minus{color:#dc2626;}
+  .ledger-empty{text-align:center;color:var(--muted);padding:40px 0;font-size:14px;}
+  .ledger-more{display:block;margin:16px auto 0;padding:9px 26px;border-radius:20px;border:1px solid var(--line);background:var(--bg-elev);font-size:13px;font-weight:700;cursor:pointer;transition:.15s;color:var(--fg-2);}
+  .ledger-more:hover{border-color:#111111;color:#111111;}
+
+  .gacha-machine{
+    text-align:center;padding:32px 24px;
+    background:var(--bg-elev);
+    border:4px solid #000;
+    border-radius:28px;
+    box-shadow:6px 6px 0 rgba(0,0,0,.28);
+    position:relative;overflow:hidden;
+  }
+  .gacha-machine .bg-star{position:absolute;font-size:22px;opacity:.25;pointer-events:none;}
+  .machine{display:inline-flex;flex-direction:column;align-items:center;gap:0;position:relative;z-index:1;}
+  .machine-top{width:240px;height:210px;background:var(--bg-elev);border:4px solid #000;border-radius:26px 26px 12px 12px;padding:10px;position:relative;}
+  .glass{height:100%;width:100%;background:linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%);border:4px solid #000;border-radius:18px;position:relative;overflow:hidden;}
+  .glass::before{content:"";position:absolute;top:0;left:0;right:0;height:34%;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.15));pointer-events:none;}
+  .orb-phys{position:absolute;left:0;top:0;border-radius:50%;border:2px solid rgba(0,0,0,.35);box-shadow:inset -2px -2px 4px rgba(0,0,0,.35),inset 2px 2px 4px rgba(255,255,255,.55);pointer-events:none;will-change:transform;}
+  .orb-phys::after{content:"";position:absolute;top:3px;left:5px;width:30%;height:30%;border-radius:50%;background:rgba(255,255,255,.8);filter:blur(1px);}
+  .machine-mid{width:240px;background:var(--bg-elev);border-left:4px solid #000;border-right:4px solid #000;padding:16px 14px;display:flex;align-items:center;gap:12px;}
+  .chute{width:64px;height:64px;border-radius:50%;flex-shrink:0;background:var(--bg-elev);border:4px solid #000;box-shadow:inset 0 2px 6px rgba(0,0,0,.12);position:relative;}
+  .chute::before{content:"";position:absolute;width:56%;height:4px;background:#000;border-radius:2px;left:22%;top:50%;transform:translateY(-50%);}
+  .chute::after{content:"";position:absolute;width:4px;height:56%;background:#000;border-radius:2px;left:50%;top:22%;transform:translateX(-50%);}
+  .screen{flex:1;background:var(--bg-elev);color:#000;border:3px solid #000;border-radius:14px;padding:12px;text-align:center;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:inset 0 2px 6px rgba(0,0,0,.08);word-break:break-word;line-height:1.4;}
+  .screen.flash{animation:screenFlash .55s ease;}
+  @keyframes screenFlash{0%,100%{background:var(--bg-elev);}45%{background:#fff3bf;}}
+  .screen .screen-rare{font-size:15px;letter-spacing:1px;}
+  .screen .screen-rare.legendary{color:#ef4444;}
+  .screen .screen-rare.epic{color:#a855f7;}
+  .screen .screen-rare.rare{color:#3b82f6;}
+  .screen .screen-rare.uncommon{color:#10b981;}
+  .screen .screen-rare.common{color:#6b7280;}
+  .screen .screen-prize{font-size:12px;color:#111;font-weight:600;line-height:1.4;word-break:break-all;max-width:100%;}
+  .screen.idle{color:#9ca3af;font-size:13px;font-weight:500;}
+  .machine-base{width:240px;background:var(--bg-elev);border:4px solid #000;border-top:none;border-radius:0 0 20px 20px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;}
+  .brand-tag{display:flex;flex-direction:column;gap:2px;}
+  .brand-tag .big{font-weight:900;color:#000;font-size:20px;letter-spacing:1px;font-family:ui-rounded,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .brand-tag .small{font-size:11px;color:var(--fg-2);letter-spacing:1px;font-weight:600;}
+  .handle{width:70px;height:70px;border-radius:50%;background:var(--bg-elev);border:4px solid #000;box-shadow:3px 3px 0 rgba(0,0,0,.22);color:#000;font-weight:900;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:transform .15s;font-family:ui-rounded,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.15;user-select:none;position:relative;}
+  .handle::before{content:"";position:absolute;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#e8e8e8 0%,#333333 70%);border:3px solid #000;}
+  .handle span{position:relative;z-index:1;text-shadow:0 1px 0 #fff;}
+  .handle:hover{transform:scale(1.06) rotate(-6deg);}
+  .handle:active{transform:scale(.95) rotate(-16deg);}
+  .handle:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .handle.spinning{animation:handleSpin .6s ease;}
+  @keyframes handleSpin{0%{transform:rotate(0);}100%{transform:rotate(360deg);}}
+  .machine.shake{animation:mcShake .55s ease-in-out;}
+  @keyframes mcShake{
+    0%,100%{transform:translateX(0) rotate(0);}
+    15%{transform:translateX(-7px) rotate(-2.5deg);}
+    30%{transform:translateX(7px) rotate(2.5deg);}
+    45%{transform:translateX(-5px) rotate(-2deg);}
+    60%{transform:translateX(5px) rotate(2deg);}
+    75%{transform:translateX(-3px) rotate(-1deg);}
+    90%{transform:translateX(3px) rotate(1deg);}
+  }
+  .winner-ball{position:absolute;border-radius:50%;border:2px solid rgba(0,0,0,.4);box-shadow:inset -3px -3px 6px rgba(0,0,0,.3),inset 3px 3px 6px rgba(255,255,255,.6),0 4px 10px rgba(0,0,0,.35);pointer-events:none;z-index:999;}
+  .winner-ball::after{content:"";position:absolute;top:4px;left:6px;width:30%;height:30%;border-radius:50%;background:rgba(255,255,255,.8);filter:blur(1.5px);}
+  .rare-legendary{color:#ef4444;} .rare-epic{color:#a855f7;} .rare-rare{color:#3b82f6;}
+  .rare-uncommon{color:#10b981;} .rare-common{color:#6b7280;}
+  .log-row{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line,#eee);font-size:13px;}
+  .log-row:last-child{border-bottom:none;}
+  .pool-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line,#eee);font-size:13px;}
+
+  #points-toast{
+    position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:10000;
+    background:#1a1a1a;color:#fff;padding:13px 26px;border-radius:12px;font-size:14px;font-weight:600;
+    box-shadow:0 10px 34px rgba(0,0,0,.4);display:none;max-width:82vw;line-height:1.5;
+    border:1px solid rgba(255,215,0,.5);
+  }
+  #points-toast.show{animation:toastIn .3s ease;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-12px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
+  .item-modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9990;display:none;align-items:center;justify-content:center;
+  }
+  .item-modal-backdrop.show{display:flex;animation:fadeUp .25s ease;}
+  .item-modal{
+    background:var(--bg-elev);border-radius:18px;padding:24px;width:min(420px,92vw);
+    box-shadow:0 20px 60px rgba(0,0,0,.35);animation:prizeIn .3s cubic-bezier(.2,1.4,.4,1);
+  }
+  .item-modal h3{margin:0 0 14px;font-size:17px;}
+  .item-modal label{font-size:13px;color:var(--muted);display:block;margin:10px 0 6px;}
+  .item-modal input,.item-modal select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);font-size:14px;}
+  .item-modal .im-btns{display:flex;gap:10px;margin-top:18px;}
+  .item-modal .im-btns button{flex:1;padding:10px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;border:none;}
+  .item-modal .im-ok{background:linear-gradient(135deg,#111111,#444444);color:#ffffff;}
+  .item-modal .im-cancel{background:#eee;color:var(--fg-2);}
+</style>
+
+<div class="points-wrap">
+  <div class="balance-hero">
+    <div class="balance-coin">💰</div>
+    <div class="balance-info">
+      <h1>{{ tr('nav.points') }}</h1>
+      <div class="coins" id="balanceCoins">{% if current_user.is_super_admin %}∞<small>{{ tr('points.unlimited') }}</small>{% else %}{{ coins }}<small>{{ tr('points.coins') }}</small>{% endif %}</div>
+      <div class="sub">{{ tr('points.sub') }}</div>
+    </div>
+    <div class="balance-extra">
+      <div>{{ tr('points.streak') }} <b>{{ sign.streak }} 天</b></div>
+      <div>{{ tr('points.total_days') }} <b>{{ sign.total_days }} 天</b></div>
+      {% if sign.month_full and not sign.month_rewarded %}<div style="color:#ffffff;">🎉 本月满签 +{{ sign.month_reward }} 待领</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="points-tabs">
+    <button class="{% if tab=='sign' %}active{% endif %}" data-tab="sign">{{ tr('points.tab_checkin') }}</button>
+    <button class="{% if tab=='tasks' %}active{% endif %}" data-tab="tasks">{{ tr('points.tab_tasks') }}</button>
+    <button class="{% if tab=='mall' %}active{% endif %}" data-tab="mall">{{ tr('points.tab_shop') }}</button>
+    <button class="{% if tab=='gacha' %}active{% endif %}" data-tab="gacha">{{ tr('points.tab_gacha') }}</button>
+    <button class="{% if tab=='ledger' %}active{% endif %}" data-tab="ledger">{{ tr('points.tab_ledger') }}</button>
+  </div>
+
+  <div class="points-pane {% if tab=='sign' %}active{% endif %}" id="pane-sign">
+    <div class="sign-grid">
+      <div class="sign-card">
+        <div class="pane-title">{{ tr('points.tab_checkin') }}</div>
+        <div class="sign-stats">
+          <div class="sign-stat"><b>{{ sign.streak }}</b><span>{{ tr('points.streak_days') }}</span></div>
+          <div class="sign-stat"><b>{{ sign.total_days }}</b><span>{{ tr('points.total_days_label') }}</span></div>
+          <div class="sign-stat"><b>+{{ sign.next_reward }}</b><span>{{ tr('points.tomorrow') }}</span></div>
+        </div>
+        <span data-sign-done="{{ '1' if sign.signed_today else '0' }}" hidden></span>
+        <button class="sign-btn" id="signBtn" {% if sign.signed_today %}disabled{% endif %}>
+          {% if sign.signed_today %}✅ 今日已签到{% else %}✨ 立即签到{% endif %}
+        </button>
+        <div class="week-row" id="weekRow"></div>
+        <div class="makeup-row">
+          <select id="makeupDate">
+            {% for d in sign.makeup_available %}
+            <option value="{{ d }}">补签 {{ d }}</option>
+            {% endfor %}
+          </select>
+          <button id="makeupBtn" {% if not sign.makeup_available %}disabled style="opacity:.4;"{% endif %}>{{ tr('points.makeup') }}</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.7;">
+          规则：每天 {{ sign.daily_base|default(5) }} 积分起，连签第 2/3/4/5/6/7 天分别 +5/8/10/12/15/20（7 天一循环）；每次签到 5% 概率触发彩蛋额外 +10~30；月度满签 25 天额外 +100。补签可恢复连续天数。
+        </div>
+      </div>
+      <div class="sign-card">
+        <div class="pane-title">{{ tr('points.fortune') }}</div>
+        <div class="fortune-box">
+          <div class="fortune-num">{{ sign.fortune }}</div>
+          <div class="fortune-meta"><b>{{ sign.fortune_label }}</b><span>{{ tr('points.fortune_hint') }}</span></div>
+        </div>
+        {% if consumables.get('fortune_reroll') %}
+        <div style="margin-top:12px;font-size:12.5px;color:var(--muted);">
+          持有「运势重阅券」×{{ consumables.get('fortune_reroll') }}
+          <button class="makeup-row" style="margin-top:8px;" id="useFortuneBtn" onclick="openUseModal('fortune_reroll','运势重阅券')">{{ tr('points.reroll') }}</button>
+        </div>
+        {% endif %}
+        <div style="margin-top:16px;font-size:12.5px;color:var(--muted);line-height:1.8;">
+          {{ tr('points.tip') }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="points-pane {% if tab=='tasks' %}active{% endif %}" id="pane-tasks">
+    {% for g in ['daily','newbie','achieve'] %}
+    <div class="task-group">
+      <h3>
+        <span class="grp-dot" style="background:{{ {'daily':'#333333','newbie':'#22c55e','achieve':'#8b5cf6'}[g] }};"></span>
+        {{ {'daily':'日常任务（每天刷新）','newbie':'新手任务（一次性）','achieve':'成就任务（长期）'}[g] }}
+      </h3>
+      {% for t in tasks if t.group == g %}
+      <div class="task-item" id="task-{{ t.key }}">
+        <div class="task-ic">{{ {'daily_chat':'💬','daily_post':'📝','daily_comment':'💬','daily_like':'❤️','daily_dm':'✉️','daily_fav':'⭐','newbie_profile':'👤','newbie_first_post':'🚀','newbie_join_group':'👥','ach_sign_7':'📅','ach_sign_30':'📅','ach_sign_100':'👑','ach_post_10':'📚','ach_post_50':'🌊','ach_comment_50':'🗨️','ach_like_100':'🌟'}.get(t.key,'🎯') }}</div>
+        <div class="task-info">
+          <b>{{ t.name }}</b>
+          <div class="desc">{{ t.desc }} · 奖励 <b style="color:#111111;">+{{ t.reward }}</b> {{ tr('points.coins') }}</div>
+          <div class="task-bar"><i style="width:{{ (t.progress / t.target * 100) if t.target else 0 }}%"></i></div>
+          <div class="prog">{{ t.progress }} / {{ t.target }}</div>
+        </div>
+        <button class="task-btn" data-key="{{ t.key }}"
+          {% if t.claimed %}disabled>✅ 已领取{% elif t.progress >= t.target %}>🎁 领取奖励{% else %}disabled style="opacity:.55;">进行中{% endif %}</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="points-pane {% if tab=='mall' %}active{% endif %}" id="pane-mall">
+    <div class="mall-head">
+      <div class="pane-title" style="margin:0;">{{ tr('points.tab_shop') }}</div>
+      <div class="mall-cat">
+        <button class="active" data-cat="all">{{ tr('common.all') }}</button>
+        <button data-cat="title">{{ tr('points.cat_title') }}</button>
+        <button data-cat="badge">{{ tr('points.cat_badge') }}</button>
+        <button data-cat="bubble">{{ tr('points.cat_bubble') }}</button>
+        <button data-cat="effect">{{ tr('points.cat_effect') }}</button>
+        <button data-cat="consumable">{{ tr('points.cat_item') }}</button>
+      </div>
+    </div>
+    <div class="mall-grid" id="mallGrid">
+      {% for it in mall.goods %}
+      <div class="mall-card {% if it.limited %}limited{% endif %} {% if it.limited and not it.owned %}locked{% endif %}" data-type="{{ it.type }}">
+        {% if it.limited %}<span class="lim-tag">{{ tr('points.cat_limited') }}</span>{% endif %}
+        {% if it.type == 'bubble' and it.value in ('admin','super') %}<span class="role-tag">{{ tr('points.cat_admin') }}</span>{% endif %}
+        {% if it.owned and it.type != 'consumable' %}<span class="own-tag">{{ tr('points.owned') }}</span>{% endif %}
+        <span class="ic">{{ it.icon }}</span>
+        <div>
+          <span class="nm">{{ it.name }}</span>
+          <span class="ty">{{ {'title':'头衔','badge':'徽章','bubble':'气泡','effect':'特效','consumable':'道具'}[it.type] }}</span>
+        </div>
+        <div class="ds">{{ it.desc }}</div>
+        {% if it.type == 'consumable' %}
+          <div class="ct">💰 {{ it.cost }} 积分{% if it.gacha_only %} · 扭蛋限定{% endif %}</div>
+          <div style="font-size:11.5px;color:var(--muted);">{{ tr('points.held') }} <b style="color:#111111;">×{{ it.count }}</b></div>
+          {% if not it.gacha_only %}
+          <button class="m-btn" onclick="redeemItem({{ it.id }})">{{ tr('points.buy') }}</button>
+          {% endif %}
+          {% if it.count > 0 %}
+          <button class="m-btn" style="border-color:#22c55e;color:#16a34a;" data-value="{{ it.value }}" data-name="{{ it.name }}" onclick="openUseModal(this.dataset.value,this.dataset.name)">使用 ×{{ it.count }}</button>
+          {% endif %}
+        {% else %}
+          <div class="ct">💰 {{ it.cost }} 积分</div>
+          {% if it.limited and not it.owned and not current_user.is_super_admin %}
+            <button class="m-btn" disabled style="opacity:.5;">{{ tr('points.limited_no_buy') }}</button>
+          {% elif it.limited and not it.owned and current_user.is_super_admin %}
+            <button class="m-btn" onclick="redeemItem({{ it.id }})">{{ tr('points.super_unlock') }}</button>
+          {% elif it.owned and it.equipped %}
+            <button class="m-btn equipped">{{ tr('points.equipped') }}</button>
+            <button class="m-btn unequip" onclick="unequipItem({{ it.id }})">{{ tr('points.unequip') }}</button>
+          {% elif it.owned %}
+            <button class="m-btn" onclick="equipItem({{ it.id }})">{{ tr('points.equip') }}</button>
+          {% elif it.type == 'bubble' and it.value in ('admin','super') %}
+            {% if (it.value == 'admin' and current_user.is_admin) or (it.value == 'super' and current_user.is_super_admin) %}
+            <button class="m-btn" onclick="redeemItem({{ it.id }})">{{ tr('points.redeem') }}</button>
+            {% else %}
+            <button class="m-btn" disabled style="opacity:.5;">{{ tr('points.cat_admin') }}</button>
+            {% endif %}
+          {% else %}
+            <button class="m-btn" onclick="redeemItem({{ it.id }})">{{ tr('points.redeem') }}</button>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mall-note">
+      {{ tr('points.shop_note') }}
+    </div>
+  </div>
+
+  <div class="points-pane {% if tab=='gacha' %}active{% endif %}" id="pane-gacha">
+    <div class="gacha-machine">
+      <span class="bg-star" style="top:26px;left:6%;">⭐</span>
+      <span class="bg-star" style="top:60px;right:5%;">✨</span>
+      <span class="bg-star" style="bottom:110px;left:4%;">🎀</span>
+      <span class="bg-star" style="bottom:60px;right:4%;">⭐</span>
+      <div class="machine" id="machine">
+        <div class="machine-top">
+          <div class="glass" id="glass"></div>
+        </div>
+        <div class="machine-mid">
+          <div class="chute"></div>
+          <div class="screen idle" id="resultBox">
+            <span>{{ tr('points.gacha_hint') }}</span>
+          </div>
+        </div>
+        <div class="machine-base">
+          <div class="brand-tag">
+            <span class="big">🎰 MONO</span>
+            <span class="small">扭蛋 · {{ gacha['cost'] }} 积分</span>
+          </div>
+          <button class="handle" id="pullBtn" title="{{ tr('points.spin_title') }}" onclick="pull()">
+            <span>{{ tr('points.spin') }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div style="max-width:380px;margin:24px auto 0;text-align:left;">
+        <div class="muted" style="font-size:12px;display:flex;justify-content:space-between;">
+          <span>{{ tr('points.pity') }}</span>
+          <span id="pityTxt">{{ gacha['since_legend'] }} / {{ gacha['pity'] }}（还差 {{ gacha['pity'] - gacha['since_legend'] }} 抽必出）</span>
+        </div>
+        <div class="pity-bar"><div class="pity-fill" id="pityFill"
+          style="width:{{ (gacha['since_legend'] / gacha['pity'] * 100) if gacha['since_legend'] < gacha['pity'] else 100 }}%;"></div></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);gap:16px;margin-top:16px;">
+      <div class="card" style="border-radius:16px;padding:20px;">
+        <h3 style="margin:0 0 10px;">{{ tr('points.pool') }}</h3>
+        <div class="pool-row"><span class="rare-legendary">{{ tr('points.rarity_legendary') }}</span><span>1%</span></div>
+        <div class="pool-row"><span class="rare-epic">{{ tr('points.rarity_epic') }}</span><span>4%</span></div>
+        <div class="pool-row"><span class="rare-rare">{{ tr('points.rarity_rare') }}</span><span>10%</span></div>
+        <div class="pool-row"><span class="rare-uncommon">{{ tr('points.rarity_good') }}</span><span>25%</span></div>
+        <div class="pool-row" style="border-bottom:none;"><span class="rare-common">{{ tr('points.rarity_common') }}</span><span>60%</span></div>
+        <p class="muted" style="font-size:12px;margin-top:10px;color:var(--muted);">
+          保底机制：距上次抽出传说满 {{ gacha['pity'] }} 抽时，本次必定获得传说限定奖励。
+        </p>
+      </div>
+      <div class="card" style="border-radius:16px;padding:20px;">
+        <h3 style="margin:0 0 10px;">{{ tr('points.recent') }}</h3>
+        {% if gacha.recent %}
+          {% for r in gacha.recent %}
+          <div class="log-row">
+            <span class="rare-{{ r.rarity }}" style="width:52px;font-weight:600;flex-shrink:0;">{{ {'legendary':'传说','epic':'史诗','rare':'稀有','uncommon':'优良','common':'普通'}[r.rarity] }}</span>
+            <span title="{{ r.prize }}{% if r.detail %}（{{ r.detail }}）{% endif %}" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.prize }}{% if r.detail %}（{{ r.detail }}）{% endif %}</span>
+            <span class="muted" style="font-size:11px;flex-shrink:0;">{{ r.time }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted" style="padding:20px 0;text-align:center;color:var(--muted);">{{ tr('points.no_pulls') }}</p>
+        {% endif %}
+        <div id="logList" style="margin-top:6px;"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div class="points-pane {% if tab=='ledger' %}active{% endif %}" id="pane-ledger">
+    <div class="pane-title">{{ tr('points.tab_ledger') }}</div>
+    <div class="ledger-list" id="ledgerList">
+      {% for l in logs %}
+      <div class="ledger-item">
+        <div class="ld">{{ '➕' if l.delta >= 0 else '➖' }}</div>
+        <div><div class="src">{{ l.source }}</div><div class="rsn">{{ l.reason }}</div></div>
+        <div class="dt">{{ l.time }}</div>
+        <div class="delta {{ 'plus' if l.delta >= 0 else 'minus' }}">{{ ('+' if l.delta >= 0 else '') }}{{ l.delta }}</div>
+      </div>
+      {% else %}
+      <div class="ledger-empty">{{ tr('points.no_ledger') }}</div>
+      {% endfor %}
+    </div>
+    <button class="ledger-more" id="ledgerMore" {% if log_total <= 20 %}style="display:none;"{% endif %}>{{ tr('common.load_more') }}</button>
+  </div>
+</div>
+
+<div id="points-toast"></div>
+
+<div class="item-modal-backdrop" id="itemModalBackdrop">
+  <div class="item-modal">
+    <h3 id="itemModalTitle">{{ tr('points.use_item') }}</h3>
+    <div id="itemModalBody"></div>
+    <div class="im-btns">
+      <button class="im-cancel" onclick="closeUseModal()">{{ tr('common.cancel') }}</button>
+      <button class="im-ok" id="itemModalOk" onclick="confirmUseItem()">{{ tr('common.confirm') }}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const POINTS = {coins: {{ coins }}, cost: {{ gacha['cost'] }}, pity: {{ gacha['pity'] }}, sinceLegend: {{ gacha['since_legend'] }}};
+let _useKey = null;
+const _useConfig = {
+  makeup_card:   {title:'补签笺', html:`<label>选择补签日期（最近 7 天内）</label><select id="imDate"></select>`},
+  title_glow:    {title:'标题高亮笺', html:`<label>选择要高亮标题的帖子 ID</label><input id="imPostId" type="number" placeholder="帖子 ID" min="1">`},
+  pin_card:      {title:'置顶卡', html:`<label>选择要置顶的帖子 ID</label><input id="imPostId" type="number" placeholder="帖子 ID" min="1">`},
+  rename_card:   {title:'改名卡', html:`<label>新的昵称（2~12 字）</label><input id="imNewName" maxlength="12" placeholder="输入新昵称"><div style="font-size:12px;color:var(--muted);margin-top:8px;">只能用中文、字母、数字、下划线和短横线<br>历史发言里显示的旧昵称会一起更新</div>`},
+  horn:          {title:'全域传声筒', html:`<label>广播内容（≤100 字）</label><input id="imContent" maxlength="100" placeholder="要广播的内容"><label>跳转链接（选填）</label><input id="imLink" placeholder="https://...">`},
+  name_color_card:{title:'个性昵称色卡', html:`
+    <label style="display:block;font-size:13px;color:var(--muted);margin-bottom:6px;">从调色盘选色，或点下方预设色块</label>
+    <input type="color" id="imColor" value="#ff6b6b" style="width:100%;height:54px;border:2px solid var(--line);border-radius:10px;cursor:pointer;background:var(--bg-elev);">
+    <div id="imSwatches" style="display:grid;grid-template-columns:repeat(8,minmax(0, 1fr));gap:6px;margin-top:10px;"></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">当前选色 <span id="imColorText" style="font-family:monospace;font-weight:600;">#ff6b6b</span>，昵称会显示为你选的颜色</div>`},
+};
+const _useLabels = {
+  fortune_reroll:'运势重阅券', blindbox:'MONO 盲盒券', double_coins_card:'双倍积分卡',
+  exp_boost:'经验加速卡', shield_card:'护盾卡', recall_card:'无痕撤回卡', rename_card:'改名卡',
+};
+
+function showToast(msg){
+  const t = document.getElementById('points-toast');
+  t.textContent = msg; t.style.display = 'block'; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(showToast._h); showToast._h = setTimeout(()=>{ t.style.display='none'; }, 2400);
+}
+function syncNavCoins(){
+  /* 同步导航栏（MONO OJ 左边）那个 💰 数字。
+     以前只更新页面中间的大数字 —— 导航栏要刷新页面才变，
+     用户抽完扭蛋以为积分没到账。 */
+  var nav = document.querySelector('.nav-coins .coin-num');
+  if (!nav) return;
+  if ((nav.textContent || '').indexOf('∞') >= 0) return;   // 超管显示 ∞，别覆盖
+  nav.textContent = POINTS.coins;
+}
+function refreshBalance(delta){
+  POINTS.coins += delta;
+  const el = document.getElementById('balanceCoins');
+  if (el) el.innerHTML = `${POINTS.coins}<small>{{ tr('points.coins') }}</small>`;
+  syncNavCoins();
+}
+
+document.querySelectorAll('.points-tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.points-tabs button').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.points-pane').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  document.getElementById('pane-' + b.dataset.tab).classList.add('active');
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', b.dataset.tab);
+    history.replaceState(null, '', url);
+  } catch (e) {}
+}));
+
+(function initWeek(){
+  const row = document.getElementById('weekRow');
+  const now = new Date();
+  const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const signed = new Set({{ sign.sign_week|default([])|tojson }});
+  for (let i = 0; i < 7; i++){
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
+    const iso = d.toISOString().slice(0,10);
+    const isToday = iso === now.toISOString().slice(0,10);
+    const isSigned = signed.has(iso);
+    const cell = document.createElement('div');
+    cell.className = 'week-cell' + (isSigned ? ' signed' : '') + (isToday ? ' today' : '');
+    cell.innerHTML = `<b>${d.getDate()}</b><span>${['日','一','二','三','四','五','六'][d.getDay()]}</span>${isSigned ? '<span class="dot"></span>' : ''}`;
+    row.appendChild(cell);
+  }
+})();
+document.getElementById('signBtn').addEventListener('click', async () => {
+  const r = await fetch('/api/sign', {method:'POST'});
+  const j = await r.json();
+  showToast(j.msg);
+  if (j.ok){
+    document.getElementById('signBtn').disabled = true;
+    document.getElementById('signBtn').textContent = '✅ 今日已签到';
+    refreshBalance(j.state.total_days ? 0 : 0);
+    const st = j.state;
+    location.reload();
+  }
+});
+document.getElementById('makeupBtn').addEventListener('click', async () => {
+  const date = document.getElementById('makeupDate').value;
+  const r = await fetch('/api/sign/makeup', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'date=' + encodeURIComponent(date)});
+  const j = await r.json();
+  showToast(j.msg);
+  if (j.ok) location.reload();
+});
+
+document.querySelectorAll('.task-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const key = btn.dataset.key;
+    const r = await fetch('/api/tasks/claim/' + key, {method:'POST'});
+    const j = await r.json();
+    showToast(j.msg);
+    if (j.ok){
+      btn.disabled = true; btn.textContent = '✅ 已领取';
+      location.reload();
+    }
+  });
+});
+
+document.querySelectorAll('.mall-cat button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.mall-cat button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  const cat = b.dataset.cat;
+  document.querySelectorAll('#mallGrid .mall-card').forEach(c => {
+    c.style.display = (cat === 'all' || c.dataset.type === cat) ? '' : 'none';
+  });
+}));
+async function redeemItem(id){
+  if (!confirm(__('确定兑换该商品吗？'))) return;
+  const r = await fetch('/api/mall/redeem/' + id, {method:'POST'});
+  const j = await r.json();
+  showToast(j.msg);
+  if (j.ok) location.reload();
+}
+async function equipItem(id){
+  const r = await fetch('/api/mall/equip/' + id, {method:'POST'});
+  const j = await r.json();
+  showToast(j.msg);
+  if (j.ok) location.reload();
+}
+async function unequipItem(id){
+  const r = await fetch('/api/mall/unequip/' + id, {method:'POST'});
+  const j = await r.json();
+  showToast(j.msg);
+  if (j.ok) location.reload();
+}
+
+function openUseModal(key, name){
+  _useKey = key;
+  document.getElementById('itemModalTitle').textContent = '使用「' + (name || _useLabels[key] || key) + '」';
+  const body = document.getElementById('itemModalBody');
+  if (_useConfig[key]){
+    body.innerHTML = _useConfig[key].html;
+    if (key === 'name_color_card'){
+      const PRESETS = ['#000000','#ffffff','#ef4444','#f97316','#f59e0b','#eab308','#22c55e','#14b8a6',
+                       '#06b6d4','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d946ef','#ec4899','#64748b'];
+      const sw = document.getElementById('imSwatches');
+      const picker = document.getElementById('imColor');
+      const txt = document.getElementById('imColorText');
+      sw.innerHTML = PRESETS.map(c =>
+        `<div data-c="${c}" title="${c}" style="height:30px;border-radius:8px;background:${c};cursor:pointer;border:2px solid ${c === '#ffffff' ? '#ddd' : 'transparent'};"></div>`
+      ).join('');
+      sw.querySelectorAll('[data-c]').forEach(el => {
+        el.addEventListener('click', () => { picker.value = el.dataset.c; txt.textContent = el.dataset.c; });
+      });
+      picker.addEventListener('input', () => { txt.textContent = picker.value; });
+    }
+    if (key === 'makeup_card'){
+      const sel = document.getElementById('imDate');
+      const today = new Date();
+      for (let i = 1; i <= 7; i++){
+        const d = new Date(today); d.setDate(today.getDate() - i);
+        const iso = d.toISOString().slice(0,10);
+        const opt = document.createElement('option'); opt.value = iso; opt.textContent = iso;
+        sel.appendChild(opt);
+      }
+    }
+  } else {
+    body.innerHTML = `<div style="font-size:13.5px;color:var(--fg-2);">点击确认立即使用该道具。</div>`;
+  }
+  document.getElementById('itemModalBackdrop').classList.add('show');
+}
+function closeUseModal(){
+  document.getElementById('itemModalBackdrop').classList.remove('show');
+  _useKey = null;
+}
+async function confirmUseItem(){
+  const key = _useKey;
+  if (!key) return;
+  const data = new URLSearchParams();
+  if (key === 'makeup_card') data.set('date', document.getElementById('imDate').value);
+  if (key === 'title_glow' || key === 'pin_card') data.set('post_id', document.getElementById('imPostId').value);
+  if (key === 'horn'){ data.set('content', document.getElementById('imContent').value); data.set('link', document.getElementById('imLink').value); }
+  if (key === 'name_color_card') data.set('color', document.getElementById('imColor').value);
+  if (key === 'rename_card') data.set('newname', document.getElementById('imNewName').value);
+  const r = await fetch('/api/item/use/' + key, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:data.toString()});
+  const j = await r.json();
+  closeUseModal();
+  showToast(j.msg);
+  if (j.ok) location.reload();
+}
+document.getElementById('itemModalBackdrop').addEventListener('click', e => {
+  if (e.target.id === 'itemModalBackdrop') closeUseModal();
+});
+
+var RARE_CN = {legendary:'传说', epic:'史诗', rare:'稀有', uncommon:'优良', common:'普通'};
+var PITY = {{ gacha['pity'] }};
+var sinceLegend = {{ gacha['since_legend'] }};
+var IS_SUPER = {{ 'true' if current_user.is_super_admin else 'false' }};
+var ORB_COLORS = [
+  'radial-gradient(circle at 30% 30%,#e8e8e8 0%,#333333 100%)',
+  'radial-gradient(circle at 30% 30%,#c4b5fd 0%,#7c3aed 100%)',
+  'radial-gradient(circle at 30% 30%,#fbcfe8 0%,#ec4899 100%)',
+  'radial-gradient(circle at 30% 30%,#bae6fd 0%,#0284c7 100%)',
+  'radial-gradient(circle at 30% 30%,#bbf7d0 0%,#16a34a 100%)',
+  'radial-gradient(circle at 30% 30%,#fed7aa 0%,#ea580c 100%)',
+  'radial-gradient(circle at 30% 30%,#e9d5ff 0%,#a21caf 100%)',
+  'radial-gradient(circle at 30% 30%,#fecaca 0%,#dc2626 100%)'
+];
+var RARITY_BG = {
+  legendary: 'radial-gradient(circle at 30% 30%,#e8e8e8 0%,#ef4444 60%,#7f1d1d 100%)',
+  epic:      'radial-gradient(circle at 30% 30%,#e9d5ff 0%,#a855f7 60%,#581c87 100%)',
+  rare:      'radial-gradient(circle at 30% 30%,#bae6fd 0%,#3b82f6 60%,#1e3a8a 100%)',
+  uncommon:  'radial-gradient(circle at 30% 30%,#bbf7d0 0%,#10b981 60%,#064e3b 100%)',
+  common:    'radial-gradient(circle at 30% 30%,#e5e7eb 0%,#9ca3af 60%,#374151 100%)'
+};
+var world = null, rafId = null;
+var GRAV = 0.14, BOUNCE = 0.72, FRICTION = 0.998, MAX_V = 9;
+
+function PhysicsWorld(w, h, count){
+  this.W = w; this.H = h; this.balls = []; this.shake = 0; this.stirAcc = 0;
+  var cols = Math.min(count, 4), rows = Math.ceil(count / cols);
+  var cw = (w - 40) / cols, ch = (h - 40) / rows, idx = 0;
+  for (var r = 0; r < rows && idx < count; r++){
+    for (var c = 0; c < cols && idx < count; c++){
+      var radius = 16;
+      this.balls.push({
+        x: 20 + cw * c + radius + (Math.random() - 0.5) * 4,
+        y: 20 + ch * r + radius + (Math.random() - 0.5) * 4,
+        vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 5,
+        r: radius, color: ORB_COLORS[idx], el: null
+      });
+      idx++;
+    }
+  }
+}
+PhysicsWorld.prototype.step = function(){
+  var W = this.W, H = this.H, G = GRAV + this.shake, B = BOUNCE, F = FRICTION;
+  this.shake *= 0.92;
+  var balls = this.balls, maxV = MAX_V + this.stirAcc * 4;
+  this.stirAcc *= 0.985;
+  if (Math.random() < 0.06){
+    var b = balls[Math.floor(Math.random() * balls.length)];
+    b.vx += (Math.random() - 0.5) * 4; b.vy += (Math.random() - 0.5) * 4 - 1.5;
+  }
+  for (var i = 0; i < balls.length; i++){
+    var bb = balls[i];
+    bb.vy += G; bb.vx *= F; bb.vy *= F;
+    bb.x += bb.vx; bb.y += bb.vy;
+    if (bb.x < bb.r){ bb.x = bb.r; bb.vx = -bb.vx * B; }
+    if (bb.x > W - bb.r){ bb.x = W - bb.r; bb.vx = -bb.vx * B; }
+    if (bb.y < bb.r){ bb.y = bb.r; bb.vy = -bb.vy * B; }
+    if (bb.y > H - bb.r){ bb.y = H - bb.r; bb.vy = -bb.vy * B; }
+    if (bb.vx > maxV) bb.vx = maxV; if (bb.vx < -maxV) bb.vx = -maxV;
+    if (bb.vy > maxV) bb.vy = maxV; if (bb.vy < -maxV) bb.vy = -maxV;
+  }
+  for (var i = 0; i < balls.length; i++){
+    for (var j = i + 1; j < balls.length; j++){
+      var a = balls[i], c2 = balls[j];
+      var dx = c2.x - a.x, dy = c2.y - a.y;
+      var d = Math.sqrt(dx*dx + dy*dy), minD = a.r + c2.r;
+      if (d < minD && d > 0.001){
+        var nx = dx / d, ny = dy / d, overlap = (minD - d) / 2;
+        a.x -= nx * overlap; a.y -= ny * overlap;
+        c2.x += nx * overlap; c2.y += ny * overlap;
+        var va = a.vx * nx + a.vy * ny, vb = c2.vx * nx + c2.vy * ny, diff = (va - vb) * B;
+        a.vx -= diff * nx; a.vy -= diff * ny;
+        c2.vx += diff * nx; c2.vy += diff * ny;
+      }
+    }
+  }
+};
+PhysicsWorld.prototype.render = function(){
+  for (var i = 0; i < this.balls.length; i++){
+    var b = this.balls[i];
+    if (b.el) b.el.style.transform = 'translate(' + (b.x - b.r) + 'px,' + (b.y - b.r) + 'px)';
+  }
+};
+function initPhysics(){
+  var glass = document.getElementById('glass');
+  if (!glass) return;
+  var rect = glass.getBoundingClientRect();
+  var w = rect.width, h = rect.height;
+  if (w < 20 || h < 20){ requestAnimationFrame(initPhysics); return; }
+  if (rafId) cancelAnimationFrame(rafId);
+  world = new PhysicsWorld(w, h, 8);
+  glass.innerHTML = '';
+  for (var i = 0; i < world.balls.length; i++){
+    var b = world.balls[i], el = document.createElement('div');
+    el.className = 'orb-phys';
+    el.style.cssText = 'width:' + (b.r*2) + 'px;height:' + (b.r*2) + 'px;background:' + b.color + ';';
+    b.el = el; glass.appendChild(el);
+  }
+  function loop(){ if (world){ world.step(); world.render(); } rafId = requestAnimationFrame(loop); }
+  loop();
+}
+(function(){
+  var started = false;
+  function tryInit(){ if (!started && document.getElementById('glass')){ started = true; initPhysics(); } }
+  window.addEventListener('DOMContentLoaded', tryInit);
+  setTimeout(tryInit, 300);
+  window.addEventListener('resize', function(){ if (started) setTimeout(initPhysics, 200); });
+})();
+
+function spawnWinner(rarity, prizeName){
+  var screen = document.getElementById('resultBox');
+  var machine = document.getElementById('machine');
+  var machineRect = machine.getBoundingClientRect();
+  var scRect = screen.getBoundingClientRect();
+  var winner = document.createElement('div');
+  winner.className = 'winner-ball';
+  var size = 36;
+  var startX = scRect.left + scRect.width / 2 - size / 2;
+  var startY = machineRect.top + 6;
+  winner.style.width = size + 'px'; winner.style.height = size + 'px';
+  winner.style.left = '0'; winner.style.top = '0';
+  winner.style.background = RARITY_BG[rarity] || RARITY_BG.common;
+  document.body.appendChild(winner);
+  var drift = (Math.random() - 0.5) * 1.4;
+  var ball = {x: startX, y: startY, vx: drift, vy: 2.5, el: winner, landed: false, rot: 0};
+  function fall(){
+    ball.vy += 0.6; ball.vx *= 0.99;
+    ball.x += ball.vx; ball.y += ball.vy; ball.rot += 6;
+    ball.el.style.transform = 'translate(' + ball.x + 'px,' + ball.y + 'px) rotate(' + ball.rot + 'deg)';
+    var scRect = screen.getBoundingClientRect();
+    if (ball.y + size >= scRect.top + 14 && !ball.landed){
+      ball.landed = true;
+      ball.x = scRect.left + scRect.width/2 - size/2; ball.y = scRect.top + 14;
+      ball.vx = 0; ball.vy = 0;
+      ball.el.style.transition = 'transform .12s ease';
+      ball.el.style.transform = 'translate(' + ball.x + 'px,' + ball.y + 'px) rotate(0deg) scale(1.25)';
+      setTimeout(function(){
+        ball.el.style.transform = 'translate(' + ball.x + 'px,' + ball.y + 'px) rotate(0deg) scale(1)';
+      }, 120);
+      setTimeout(function(){
+        var cn = RARE_CN[rarity] || '普通';
+        screen.classList.remove('flash'); void screen.offsetWidth; screen.classList.add('flash');
+        screen.classList.remove('idle');
+        screen.innerHTML =
+          '<div class="screen-rare ' + rarity + '">【' + cn + '】</div>' +
+          '<div class="screen-prize">' + prizeName + '</div>';
+        setTimeout(function(){ screen.classList.remove('flash'); }, 600);
+        ball.el.style.transition = 'opacity .35s ease, transform .35s ease';
+        ball.el.style.opacity = '0';
+        ball.el.style.transform = 'translate(' + ball.x + 'px,' + (ball.y - 10) + 'px) rotate(0deg) scale(.35)';
+        setTimeout(function(){ if (ball.el.parentNode) ball.el.parentNode.removeChild(ball.el); }, 400);
+      }, 220);
+      return;
+    }
+    if (ball.y > window.innerHeight + 50){ if (ball.el.parentNode) ball.el.parentNode.removeChild(ball.el); return; }
+    requestAnimationFrame(fall);
+  }
+  requestAnimationFrame(fall);
+}
+
+var pulling = false;
+function gachaFetch(){
+  return fetch('/api/gacha/pull', {method:'POST'}).catch(function(err){
+    return new Promise(function(res, rej){
+      setTimeout(function(){
+        fetch('/api/gacha/pull', {method:'POST'})
+          .then(res)
+          .catch(function(){ 
+            setTimeout(function(){ res(fetch('/api/gacha/pull', {method:'POST'})); }, 600);
+          });
+      }, 500);
+    });
+  });
+}
+function pull(){
+  if (pulling) return;
+  pulling = true;
+  var btn = document.getElementById('pullBtn'),
+      machine = document.getElementById('machine'),
+      screen = document.getElementById('resultBox');
+  btn.disabled = true;
+  btn.classList.add('spinning');
+  machine.classList.add('shake');
+  if (world){ world.shake = 6.0; world.stirAcc = 8.0; }
+  screen.classList.remove('flash');
+  screen.innerHTML = '<span style="color:#9ca3af;">扭动中…</span>';
+  var _done = false;
+  var _timer = setTimeout(function(){
+    if (_done) return;
+    _done = true;
+    machine.classList.remove('shake'); btn.classList.remove('spinning');
+    btn.disabled = false; pulling = false;
+    screen.classList.add('idle');
+    screen.innerHTML = '<div style="color:#ef4444;line-height:1.7;">请求超时<br><a href="javascript:void(0)" onclick="pull()" style="color:#111111;text-decoration:underline;">点此重试</a></div>';
+  }, 8000);
+  gachaFetch()
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      _done = true; clearTimeout(_timer);
+      setTimeout(function(){
+        machine.classList.remove('shake');
+        btn.classList.remove('spinning');
+        if (!d.ok){
+          screen.innerHTML = '<div style="color:#ef4444;line-height:1.7;">' + escapeHtml(d.msg) +
+            '<br><a href="javascript:void(0)" onclick="pull()" style="color:#111111;text-decoration:underline;">点此重试</a></div>';
+          screen.classList.add('idle');
+          btn.disabled = false;
+          pulling = false;
+          return;
+        }
+        var rc = d.rarity || 'common';
+        spawnWinner(rc, d.prize);
+        if (!IS_SUPER && d.coins !== undefined) refreshBalance(d.coins - POINTS.coins);
+        else if (d.coins !== undefined){ POINTS.coins = d.coins; refreshBalance(0); }
+        sinceLegend = (rc === 'legendary') ? 0 : sinceLegend + 1;
+        document.getElementById('pityTxt').textContent =
+          sinceLegend + ' / ' + PITY + '（还差 ' + Math.max(0, PITY - sinceLegend) + ' 抽必出）';
+        var _pf = document.getElementById('pityFill');
+        if (_pf) _pf.style.width = Math.min(100, sinceLegend / PITY * 100) + '%';
+        var list = document.getElementById('logList');
+        if (list){
+          var row = document.createElement('div');
+          row.className = 'log-row';
+          row.innerHTML = '<span class="rare-' + rc + '" style="width:52px;font-weight:600;flex-shrink:0;">' + (RARE_CN[rc] || '普通') +
+                          '</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><span class="muted" style="font-size:11px;flex-shrink:0;">刚刚</span>';
+          row.children[1].textContent = d.prize;
+          list.insertBefore(row, list.firstChild);
+        }
+        setTimeout(function(){ btn.disabled = false; pulling = false; }, 1300);
+      }, 700);
+    })
+    .catch(function(err){
+      if (_done) return;
+      _done = true; clearTimeout(_timer);
+      machine.classList.remove('shake');
+      btn.classList.remove('spinning');
+      btn.disabled = false;
+      pulling = false;
+      var msg = (err && err.message) ? err.message : '网络异常';
+      screen.classList.add('idle');
+      screen.innerHTML = '<div style="color:#ef4444;line-height:1.7;">' + escapeHtml(msg) +
+        '<br><a href="javascript:void(0)" onclick="pull()" style="color:#111111;text-decoration:underline;">点此重试</a></div>';
+    });
+}
+
+let _ledgerPage = 1, _ledgerTotal = {{ log_total }};
+function appendLedgerItem(l){
+  const box = document.getElementById('ledgerList');
+  const d = document.createElement('div');
+  d.className = 'ledger-item';
+  const plus = l.delta >= 0;
+  d.innerHTML = `<div class="ld">${plus ? '➕' : '➖'}</div>
+    <div><div class="src">${escapeHtml(l.source)}</div><div class="rsn">${escapeHtml(l.reason)}</div></div>
+    <div class="dt">${l.time}</div>
+    <div class="delta ${plus ? 'plus' : 'minus'}">${plus ? '+' : ''}${l.delta}</div>`;
+  box.appendChild(d);
+}
+async function loadLedgerMore(){
+  const page = _ledgerPage + 1;
+  try {
+    const r = await fetch('/api/points/ledger?page=' + page);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (!j.logs.length){ showToast('没有更多记录了'); document.getElementById('ledgerMore').style.display = 'none'; return; }
+    j.logs.forEach(appendLedgerItem);
+    _ledgerPage = page;
+    const more = document.getElementById('ledgerMore');
+    more.style.display = (page * j.per < j.total) ? 'block' : 'none';
+  } catch (err) {
+    showToast('加载失败：' + (err.message || '网络异常'));
+  }
+}
+document.getElementById('ledgerMore').addEventListener('click', loadLedgerMore);
+</script>
+{% endblock %}

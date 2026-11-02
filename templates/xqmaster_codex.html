@@ -1,0 +1,1258 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}棋子图鉴{% endblock %}
+
+{% block xqm_content %}
+<div id="xqmCdxHome">
+  <div class="xqm-head">
+    <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="{{ url_for('xqmaster_page') }}">← 返回</a>
+    <h1>棋子图鉴</h1>
+    <span class="xqm-hsub" id="xqmLtBal">弈铢 0</span>
+  </div>
+  <div class="xqm-promo">
+    <div class="xqm-promo-tx">
+      <b>军资抽赏</b>
+      <span>以弈铢易碎片，强弱皆有所获</span>
+      <em id="xqmLtOdds"></em>
+    </div>
+    <a class="xqm-btn xqm-btn-g xqm-btn-sm" href="{{ url_for('xqmaster_lottery_page') }}">前往抽赏</a>
+  </div>
+  <div id="xqmCdxGrid"></div>
+</div>
+<div id="xqmCdxDetail" style="display:none">
+  <div class="xqm-head">
+    <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="#" id="xqmCdxBack">← 返回</a>
+    <h1>棋子详情</h1>
+  </div>
+  <div class="xqm-cdx">
+    <div class="xqm-cdx-main">
+      <div class="xqm-cdx-info" id="xqmCdxInfo"></div>
+      <div class="xqm-demo" id="xqmDemoPanel">
+        <div class="xqm-demo-tabs" id="xqmDemoTabs"></div>
+        <div id="xqmDemoA"></div>
+        <div id="xqmDemoB" style="display:none"></div>
+        <div id="xqmDemoC" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+
+  var CNT = {grain:2, lord:1, king:1, advisor:2, elephant:2, horse:2, chariot:2, cannon:2, pawn:5,
+    zu:8, min:6, shi:4, pai:4, tan:3, huo:3,
+    dun:2, gong:2, nu:2, mao:2, fu:2, chui:2, qi:2, gu:1, zhen:2, yao:2, chi:2, ci:2, jing:2,
+    hu:2, bao:2, ying:2, lang:2, yi:2, jiang:2, di:1, long:1,
+    yi2:2, wei:2, xu:2, biao:2, duan:2, can:1, bian:2, teng:2};
+  var TEAM_HP = 1940;
+
+  var SCENES = {
+    grain:{
+      a:{ win:{r0:5,r1:9,c0:2,c1:6}, ally:'red', focus:[7,4],
+          pieces:[['grain','red',7,4],['pawn','black',5,4]] },
+      b:{ win:{r0:5,r1:9,c0:2,c1:6}, ally:'red', static:true,
+          pieces:[['grain','red',7,4],['pawn','red',7,5,{hp:30}],['pawn','red',6,4,{hp:45}]],
+          aura:{'7,5':1,'6,4':1},
+          hint:'粮车随行，相邻友军每回合开局自行恢复三十点血。',
+          text:'补济不看谁在挨打，只看谁站在旁边。把粮塞在两个伤兵中间，等于每回合白送六十点血 —— 粮自己打不了人，它的价值全在站位上。' },
+      c:{ win:{r0:5,r1:9,c0:2,c1:6}, ally:'red',
+          pieces:[['grain','red',7,4,{g2:true}],['pawn','red',5,4],['horse','black',3,4]],
+          hint:'粮足则军心稳 —— 两格之内的友军皆得两成减伤。点一下小兵试试。',
+          targets:[[5,4,[3,4]]] }
+    },
+    lord:{
+      a:{ win:{r0:6,r1:9,c0:2,c1:6}, ally:'red', focus:[8,4],
+          pieces:[['lord','red',8,4],['pawn','black',7,4],['pawn','black',8,3]] },
+      b:{ win:{r0:5,r1:9,c0:1,c1:7}, ally:'red',
+          pieces:[['lord','red',8,4],['pawn','red',7,4],['horse','red',3,5],['horse','black',4,4]],
+          hint:'君临九宫，全军受到的伤害降低一成。点一下兵，再点一下马 —— 同样挨打，都在减伤之列。',
+          targets:[[7,4,[4,4]],[3,5,[4,4]]] },
+      c:{ win:{r0:5,r1:9,c0:2,c1:6}, ally:'red',
+          pieces:[['lord','red',9,4,{g2:true}],['pawn','red',8,3],['horse','black',4,4]],
+          hint:'己方每折损一子，全军攻势便涨八分，至多四成。点一下小兵试试。',
+          targets:[[8,3,[4,4]]] }
+    },
+    king:{
+      a:{ win:{r0:6,r1:9,c0:2,c1:6}, ally:'red', focus:[8,4],
+          pieces:[['king','red',8,4],['pawn','black',7,4]] },
+      b:{ win:{r0:5,r1:9,c0:1,c1:7}, ally:'red', aura:'palace',
+          pieces:[['king','red',8,4],['pawn','red',7,4],['horse','red',3,5],['horse','black',4,4]],
+          hint:'帅坐镇九宫。点一下宫里的兵，再点一下宫外的马 —— 同样挨打，宫内的减伤四成，宫外的全额受伤。',
+          targets:[[7,4,[4,4]],[3,5,[4,4]]] },
+      c:{ win:{r0:5,r1:9,c0:2,c1:6}, ally:'red',
+          pieces:[['king','red',9,4,{g2:true}],['king','black',1,4],
+                  ['chariot','black',5,4],['pawn','red',8,3]],
+          hint:'两帅隔线对望，中间无人遮拦 —— 御敌之威令黑方每一击都弱两成。点一下红方小兵试试。',
+          targets:[[8,3,[5,4]]] }
+    },
+    advisor:{
+      a:{ win:{r0:6,r1:9,c0:2,c1:6}, ally:'red', focus:[8,4],
+          pieces:[['advisor','red',8,4],['horse','black',7,3]] },
+      b:{ win:{r0:5,r1:9,c0:2,c1:6}, ally:'red',
+          pieces:[['king','red',8,4],['advisor','red',7,3],['chariot','black',5,4]],
+          hint:'点一下帅 —— 车打过来的时候，紧贴的仕会替他挡掉两成。',
+          targets:[[8,4,[5,4]]] },
+      c:{ win:{r0:5,r1:9,c0:2,c1:6}, ally:'red',
+          pieces:[['advisor','red',7,3,{g2:true,hp:30}],['chariot','black',5,1],
+                  ['king','red',8,4]],
+          hint:'残血的仕撑到了最后一刻。点一下他 —— 阵亡的瞬间，死卫之诅落在凶手身上。',
+          targets:[[7,3,[5,1]]] }
+    },
+    elephant:{
+      a:{ win:{r0:3,r1:8,c0:0,c1:5}, ally:'red', focus:[6,2],
+          pieces:[['elephant','red',6,2],['pawn','black',4,4]] },
+      b:{ win:{r0:2,r1:4,c0:2,c1:6}, ally:'red',
+          pieces:[['cannon','black',2,3],['pawn','black',3,3],['elephant','red',4,3],
+                  ['cannon','black',2,5],['pawn','black',3,5],['pawn','red',4,5]],
+          hint:'两门炮，一门打相、一门打兵。分别点一下 —— 相有守垒，吃炮的伤少一截。',
+          targets:[[4,3,[2,3]],[4,5,[2,5]]] },
+      c:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red',
+          pieces:[['horse','red',5,4],['elephant','black',5,5,{g2:true}],
+                  ['pawn','black',5,2],['pawn','black',4,4]],
+          hint:'黑相已渡河掠阵。点一下远处的兵，再点一下贴着相的兵 —— 贴身出手的马，力道弱了两成。',
+          targets:[[5,2,[5,4]],[4,4,[5,4]]] }
+    },
+    horse:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['horse','red',5,4],['pawn','black',3,3]] },
+      b:{ win:{r0:2,r1:7,c0:1,c1:6}, ally:'red', focus:[5,4], charge:true,
+          pieces:[['horse','red',5,4],['pawn','black',3,5],['chariot','black',5,2]],
+          hint:'先点马走到左边那格，再点马、然后打左下角的车 —— 本回合先移动后攻击，伤害多两成。也可以直接打右边的兵，对比一下。' },
+      c:{ win:{r0:3,r1:7,c0:1,c1:6}, ally:'red',
+          pieces:[['horse','red',5,4,{g2:true}],['pawn','black',4,3],
+                  ['pawn','black',6,5],['pawn','black',5,2]],
+          hint:'四面楚歌，八面威起。点一下马 —— 环伺的敌军越多，这一击就越重。',
+          targets:[[5,2,[5,4]]] }
+    },
+    chariot:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['chariot','red',5,4],['pawn','black',3,4],['horse','black',5,6]] },
+      b:{ win:{r0:0,r1:3,c0:2,c1:7}, ally:'red',
+          pieces:[['king','black',1,4],['advisor','black',2,3],['chariot','red',2,6]],
+          hint:'士在九宫里受坐镇庇护。点一下士，看车的破甲怎么把这层减伤削掉四分之一。',
+          targets:[[2,3,[2,6]]] },
+      c:{ win:{r0:3,r1:7,c0:1,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,2,{g2:true}],['pawn','black',5,4],
+                  ['horse','black',5,5]],
+          hint:'车锋所至，横扫连环。点一下敌兵 —— 它身后的马也要陪挨三成。',
+          targets:[[5,4,[5,2]]] }
+    },
+    cannon:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[7,4],
+          pieces:[['cannon','red',7,4],['pawn','black',5,4],['horse','black',3,4]] },
+      b:{ win:{r0:2,r1:7,c0:2,c1:6}, ally:'red',
+          pieces:[['cannon','red',7,4],['pawn','black',5,4],['horse','black',3,4],['chariot','black',2,4]],
+          hint:'炮隔着一个兵打马。点一下马，注意它身后的车也会被溅到。',
+          targets:[[3,4,[7,4]]] },
+      c:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red',
+          pieces:[['cannon','red',7,4,{g2:true}],['pawn','red',6,4],
+                  ['pawn','black',5,4]],
+          hint:'自家的兵甘当炮架。点一下黑兵 —— 隔山一发，威力加三成。',
+          targets:[[5,4,[7,4]]] }
+    },
+    pawn:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[4,4],
+          pieces:[['pawn','red',4,4],['horse','black',3,4],['pawn','black',4,5]] },
+      b:{ win:{r0:2,r1:6,c0:1,c1:7}, ally:'red',
+          pieces:[['pawn','red',5,2],['horse','black',4,2],['pawn','red',4,6],['horse','black',3,6]],
+          hint:'两个兵，一个没过河、一个过河了。分别点一下它们面前那匹马。',
+          targets:[[4,2,[5,2]],[3,6,[4,6]]] },
+      c:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,2],['pawn','black',5,4,{g2:true,hp:60}]],
+          hint:'过河的兵浴血而战。点一下他 —— 再重的拳，也只能砸掉四分之一的血。',
+          targets:[[5,4,[5,2]]] }
+    },
+    /* ══════════ 扩展第一批 · 普通 6 ══════════ */
+    zu:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['zu','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:2,r1:8,c0:2,c1:6}, ally:'red',
+          pieces:[['zu','red',4,4],['pawn','black',3,4],['zu','red',6,4],['pawn','black',7,4]],
+          hint:'上面那个卒已经过了河，下面那个还在自家半场。分别点一下它们面前的小兵。',
+          targets:[[3,4,[4,4]],[7,4,[6,4]]] },
+      c:{ win:{r0:3,r1:6,c0:2,c1:6}, ally:'red',
+          pieces:[['zu','red',4,4,{g2:true}],['pawn','black',3,4]],
+          hint:'过河的卒本就翻倍，二十级之后还要再添三成。点一下那个兵。',
+          targets:[[3,4,[4,4]]] }
+    },
+    min:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['min','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:7,c0:3,c1:6}, ally:'red', death:[5,4], near:15,
+          pieces:[['min','red',5,4,{hp:1}],['pawn','red',5,5,{hp:40}],['pawn','red',4,4,{hp:50}],
+                  ['chariot','black',5,2]],
+          hint:'点一下那个只剩一滴血的民 —— 他倒下的时候，身边两个友军各自回一口血。' },
+      c:{ win:{r0:4,r1:8,c0:3,c1:7}, ally:'red', death:[5,4], near:15, all:5, allv:5,
+          pieces:[['min','red',5,4,{hp:1,g2:true}],['pawn','red',5,5,{hp:40}],
+                  ['pawn','red',8,6,{hp:50}],['chariot','black',5,2]],
+          hint:'二十级的民一倒，连远处够不着的友军也跟着回一口。点一下他试试。' }
+    },
+    shi:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['shi','red',5,4],['pawn','black',3,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:8,c0:3,c1:6}, ally:'red',
+          pieces:[['shi','red',5,4],['shi','red',5,5],['pawn','black',3,4],
+                  ['shi','red',8,4],['pawn','black',6,4]],
+          hint:'上排两个矢并着肩，下排那个孤零零的。分别点一下它们各自瞄着的敌人。',
+          targets:[[3,4,[5,4]],[6,4,[8,4]]] },
+      c:{ win:{r0:3,r1:6,c0:2,c1:6}, ally:'red',
+          pieces:[['shi','red',5,4,{g2:true}],['pawn','black',3,4],
+                  ['pawn','black',3,3],['pawn','black',3,5]],
+          hint:'点一下正中那个兵 —— 一箭过去，它左右两边也各挨半下。',
+          targets:[[3,4,[5,4]]] }
+    },
+    pai:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['pai','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:7,c0:4,c1:8}, ally:'red',
+          pieces:[['cannon','red',7,4],['pawn','red',6,4],['pawn','black',5,4],['pawn','black',4,4],
+                  ['pai','black',4,5],
+                  ['cannon','red',7,8],['pawn','red',6,8],['pawn','black',5,8],['pawn','black',4,8]],
+          hint:'左边那串炮后面站着个牌。分别点一下两处的黑兵，看它们身后那个兵各挨多少。',
+          targets:[[5,4,[7,4]],[5,8,[7,8]]] },
+      c:{ win:{r0:4,r1:6,c0:4,c1:6}, ally:'red',
+          pieces:[['pawn','red',5,4],['pai','red',4,5,{g2:true}],['chariot','black',5,6]],
+          hint:'二十级的牌不再只管溅射，挨着它的友军什么伤都少挨一成。点一下那个兵。',
+          targets:[[5,4,[5,6]]] }
+    },
+    tan:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['tan','red',5,4],['pawn','black',3,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', static:true,
+          pieces:[['tan','red',5,4]],
+          hl:{'3,4':'rng','3,5':'rng','4,4':'rng','6,4':'rng','5,2':'rng','5,6':'rng'},
+          aura:{'4,4':1,'6,4':1,'5,3':1,'5,5':1},
+          hint:'绿格是它一步能走到的，金圈是两格 —— 探每回合能连着动两次。',
+          text:'探一个人就能吃掉两点行动点：走两格、再走两格，或者走完补一刀。全局行动点每回合还是 3 点，所以它跑得远，队伍整体却更慢了。' },
+      c:{ win:{r0:4,r1:8,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['tan','red',6,4,{g2:true}],['pawn','black',4,4]],
+          hl:{'4,4':'rng'},
+          hint:'二十级的探走完还能白打一下。',
+          text:'每回合第一次移动之后，它会获得一次免费的攻击机会 —— 这一刀不占行动次数，只占全局行动点。贴着敌人走，比直接冲上去更划算。' }
+    },
+    huo:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['huo','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:6,c0:2,c1:6}, ally:'red',
+          pieces:[['huo','red',5,4],['pawn','black',4,4],['pawn','black',4,5],['pawn','black',4,3]],
+          hint:'点一下正前方那个兵 —— 火烧起来不分敌我，连它旁边的两个也一起遭殃，纵火的人自己也烫掉五点血。',
+          targets:[[4,4,[5,4]]] },
+      c:{ win:{r0:3,r1:6,c0:2,c1:6}, ally:'red',
+          pieces:[['huo','red',5,4,{g2:true}],['pawn','black',4,4],['pawn','black',4,5],
+                  ['pawn','black',4,3]],
+          hint:'燎原之后，火星子溅得更远更狠。点一下那个兵。',
+          targets:[[4,4,[5,4]]] }
+    },
+    /* ══════════ 扩展第一批 · 卓越 13 ══════════ */
+    dun:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['dun','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['dun','red',5,4],['chariot','black',5,6],['pawn','red',4,4]],
+          hint:'点一下盾 —— 这一回合它挨的第一下车，伤害要先砍掉一半。同一回合再挨第二下就没这个便宜了。',
+          targets:[[5,4,[5,6]]] },
+      c:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['pawn','red',5,4],['dun','red',4,5,{g2:true}],['chariot','black',5,6]],
+          hint:'二十级的盾自己硬，也让贴着它的友军一起硬。点一下那个兵。',
+          targets:[[5,4,[5,6]]] }
+    },
+    gong:{
+      a:{ win:{r0:2,r1:7,c0:3,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['gong','red',5,4],['pawn','black',4,4],['pawn','black',5,6],['pawn','black',2,4]] },
+      b:{ win:{r0:2,r1:7,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['gong','red',5,4],['pawn','black',4,4],['pawn','black',5,6]],
+          hl:{'4,4':'mv','5,6':'rng'},
+          hint:'贴着弓的那个兵反而是安全的 —— 绿格表示只走得过去，打不着。',
+          text:'劲射的射程是三格，代价是打不到相邻的敌人。所以弓怕的不是远处的重甲，是贴脸的马和刺：一旦被挨上，它连还手都做不到。' },
+      c:{ win:{r0:3,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['gong','red',5,4,{g2:true}],['dun','black',3,4]],
+          hint:'一箭没射死，弦还没松 —— 第二支跟着就到。点一下那个盾。',
+          targets:[[3,4,[5,4]]] }
+    },
+    nu:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['nu','red',5,4],['pawn','black',4,4],['pawn','black',3,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['nu','red',5,4],['pawn','black',4,4],['pawn','black',3,4]],
+          hint:'点一下前排那个兵 —— 弩矢穿过去，它身后那个也躲不掉，只是力道弱一半。',
+          targets:[[4,4,[5,4]]] },
+      c:{ win:{r0:3,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['nu','red',5,4,{g2:true}],['pawn','black',4,4],['pawn','black',3,4]],
+          hint:'重弩的矢不泄力。点一下前排那个兵，看后排挨的是不是一样多。',
+          targets:[[4,4,[5,4]]] }
+    },
+    mao:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['mao','red',5,4],['pawn','black',3,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['mao','red',5,4],['chariot','black',5,6]],
+          hint:'点一下自己的矛 —— 车打过来，矛断之前先扎穿它自己。',
+          targets:[[5,4,[5,6]]] },
+      c:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['pawn','red',5,4],['mao','red',4,5,{g2:true}],['chariot','black',5,6]],
+          hint:'枪阵一列排开，挨打的友军也能借一半反伤。点一下那个兵。',
+          targets:[[5,4,[5,6]]] }
+    },
+    fu:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['fu','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:5,r1:7,c0:4,c1:7}, ally:'red',
+          pieces:[['fu','red',5,4],['dun','black',5,6],['zhen','black',5,7],
+                  ['chariot','red',7,4],['dun','black',7,6],['zhen','black',7,7]],
+          hint:'两边的盾都站在阵旁边。上面用斧劈，下面用车撞 —— 一个把减伤当空气，一个老老实实被削。',
+          targets:[[5,6,[5,4]],[7,6,[7,4]]] },
+      c:{ win:{r0:4,r1:6,c0:3,c1:7}, ally:'red',
+          pieces:[['fu','red',5,4,{g2:true}],['lord','black',5,6]],
+          hint:'点一下君 —— 除了照旧无视减伤，斧还要照着它当下血量的百分之十五再补一刀真实伤害。血越厚，这一下越疼。',
+          targets:[[5,6,[5,4]]] }
+    },
+    chui:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['chui','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['chui','red',5,4],['pawn','black',4,4]],
+          aura:{'4,4':1},
+          hint:'锤落下去，那个兵下个回合一步都挪不动。',
+          text:'震击只锁移动，不锁出手 —— 挨了锤的棋子照样能还手。它的价值在于钉住对面要跑的关键棋子：护着帅的仕、准备突进的马，一旦被钉在原地就废了一半。' },
+      c:{ win:{r0:3,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['chui','red',5,4,{g2:true}],['pawn','black',4,4],
+                  ['pawn','black',4,5],['pawn','black',3,4]],
+          aura:{'4,4':1,'4,5':1,'3,4':1},
+          hint:'碎地一出，连挨着它的敌人一起钉住。',
+          text:'二十级的锤是控场工具：一锤砸下去，目标周围一圈敌人下回合全都动不了。摆阵的时候，这一下能把对面的整条进攻线按死在原地。' }
+    },
+    qi:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['qi','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:5,r1:8,c0:4,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,4],['qi','red',4,5],['pawn','black',5,6],
+                  ['chariot','red',8,4],['pawn','black',8,6]],
+          hint:'上面那辆车背后插着旗，下面那辆没有。分别点一下它们面前的黑兵。',
+          targets:[[5,6,[5,4]],[8,6,[8,4]]] },
+      c:{ win:{r0:5,r1:9,c0:4,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,4],['pawn','black',5,6],['qi','red',9,6,{g2:true}]],
+          hint:'大纛一起，全军都沾光 —— 哪怕旗插在最角落。点一下那个兵。',
+          targets:[[5,6,[5,4]]] }
+    },
+    gu:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['gu','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['gu','red',5,4],['pawn','red',5,5],['pawn','red',4,4]],
+          aura:{'5,5':1,'4,4':1},
+          hint:'挨着鼓的两个友军，每回合都能多行动一次。',
+          text:'催战不给你额外的行动点 —— 全局每回合还是 3 点。它做的是把两次行动塞给同一个棋子：一个兵连着走两步，或者一个车连砍两刀。想清楚让谁多动，比让所有人多动更值钱。' },
+      c:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', static:true,
+          pieces:[['gu','red',5,4,{g2:true}],['pawn','red',5,5],['pawn','red',3,3]],
+          aura:{'5,5':1,'3,3':1},
+          hint:'战鼓一响，全军都能多行动一次。',
+          text:'二十级的鼓不再挑距离，整支队伍每回合都多出一次行动机会。代价是行动点还是那 3 点 —— 多出来的机会得靠更好的排序才能吃干榨净。' }
+    },
+    zhen:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['zhen','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:4,c1:6}, ally:'red',
+          pieces:[['pawn','red',5,4],['zhen','red',4,5],['chariot','black',5,6]],
+          hint:'点一下那个兵 —— 旁边立着阵，这一下就先卸掉一成二的力道。',
+          targets:[[5,4,[5,6]]] },
+      c:{ win:{r0:4,r1:6,c0:4,c1:7}, ally:'red',
+          pieces:[['pawn','red',5,4],['zhen','red',4,5,{g2:true}],['zhen','red',4,6,{g2:true}],
+                  ['chariot','black',5,7]],
+          hint:'两个二十级的阵并在一起，方圆生效，结阵翻倍。点一下那个兵。',
+          targets:[[5,4,[5,7]]] }
+    },
+    yao:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['yao','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['yao','red',5,4],['pawn','red',5,5,{hp:20}],['pawn','red',4,4,{hp:30}]],
+          aura:{'5,5':1,'4,4':1},
+          hint:'挨着药的两个友军，每回合开局先回十五点血。',
+          text:'施药不看谁在挨打，只看谁站在旁边 —— 所以摆位比什么都重要。把药塞在两个残血棋子中间，等于每回合白送三十点血；放错地方，它就只是个占格子的木桩。' },
+      c:{ win:{r0:4,r1:8,c0:3,c1:7}, ally:'red', static:true,
+          pieces:[['yao','red',5,4,{g2:true}],['pawn','red',8,6,{hp:20}]],
+          aura:{'8,6':1},
+          hint:'良方一起，全军每回合都回八点血 —— 哪怕隔着半张棋盘。',
+          text:'二十级的药变成全队光环：不挑距离，每个回合整支队伍各回八点。慢慢磨的局里，这一条比任何攻击光环都难缠。' }
+    },
+    chi:{
+      a:{ win:{r0:2,r1:7,c0:3,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['chi','red',5,4],['pawn','black',2,4],['pawn','black',5,6]] },
+      b:{ win:{r0:2,r1:7,c0:3,c1:6}, ally:'red', static:true, scout:true,
+          pieces:[['chi','red',5,4],['horse','black',2,5],['chariot','black',6,6],
+                  ['pawn','black',3,3]],
+          hint:'斥候一出，对面每个棋子的攻击范围都摊在明面上（金圈）。',
+          text:'侦察本身不造成任何伤害，它省下的是「猜」。对面哪些格子站着会挨打、哪个棋子下回合够得着你，一目了然 —— 慢棋里，知道对方能做什么比多打两点伤害更值钱。' },
+      c:{ win:{r0:4,r1:8,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['chi','red',5,4,{g2:true}],['pawn','red',6,5]],
+          hint:'先机：先手方首回合多出一点行动点。',
+          text:'红方先手，二十级的斥让开局从 3 点变 4 点。第一回合就能多做一件事 —— 抢先占住河界，或者把炮架摆好。先手优势被放大，所以红方开局更该主动。' }
+    },
+    ci:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['ci','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:8,c0:3,c1:5}, ally:'red',
+          pieces:[['ci','red',5,4],['pawn','black',4,4,{hp:28}],
+                  ['ci','red',8,4],['pawn','black',7,4]],
+          hint:'两个兵，上面那个已经残了。分别点一下 —— 对着气数将尽的敌人，刺下手是翻倍的。',
+          targets:[[4,4,[5,4]],[7,4,[8,4]]] },
+      c:{ win:{r0:4,r1:7,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['ci','red',5,4,{g2:true}],['pawn','black',4,4,{hp:28}]],
+          hl:{'4,4':'rng'},
+          hint:'一击得手之后，刺就隐入暗处了。',
+          text:'击杀之后的影袭，让它下个回合免疫掉第一次挨打。刺本身脆，这一层潜行是它敢贴脸换命的底气 —— 换掉一个关键棋子，还能全身而退。' }
+    },
+    jing:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['jing','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['jing','red',5,4],['chariot','black',5,6]],
+          hint:'点一下镜 —— 车这一刀砍下去，四分之一会弹回它自己身上。',
+          targets:[[5,4,[5,6]]] },
+      c:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red',
+          pieces:[['jing','red',5,4,{g2:true}],['chariot','black',5,6]],
+          hint:'明镜照得更狠，而且照着的是没被削过的原始伤害。点一下镜。',
+          targets:[[5,4,[5,6]]] }
+    },
+    /* ══════════ 扩展第二批 · 传说 6 ══════════ */
+    hu:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['hu','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', trigger:true, mode:'kill', target:[4,4],
+          pieces:[['hu','red',5,4],['pawn','black',4,4,{hp:1}]],
+          hint:'点一下那个只剩一滴血的兵，看它倒下之后会发生什么。',
+          text:'<span class="ln">猛扑：这一击<b>没有消耗</b>虎的行动次数，它本回合还能再扑一次。</span>'
+             + '<span class="ln">连着杀掉第二个、第三个，回合内就能一直扑下去 —— 但行动点还是要照付。</span>' },
+      c:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['hu','red',5,4,{g2:true,kb:2}],['pawn','black',4,4]],
+          hl:{'4,4':'rng'},
+          hint:'已经连杀两子的虎，爪风比刚上场时重得多。',
+          text:'百兽是越杀越凶：本回合每连续击杀一次，攻击再涨两成，没有上限。配合猛扑，一只虎理论上能在同一回合里把加成堆到很高 —— 所以它的上限取决于对面还有多少残兵可以喂。' }
+    },
+    bao:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['bao','red',5,4],['pawn','black',4,4],['pawn','black',5,6]] },
+      b:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', static:true,
+          pieces:[['bao','red',5,4]],
+          hl:{'3,4':'mv','4,4':'mv','3,3':'mv','3,5':'mv'},
+          aura:{'4,3':1,'4,5':1},
+          hint:'绿格是一步能到的，绿圈是斜走 —— 豹每回合能连着动两次。',
+          text:'疾行让豹的移动预算变成两次。它不像探那样只跑得远，而是能在同一回合里先绕开挡路的棋子、再切进后排。全局行动点仍是 3 点，所以它一个人就吃掉两点。' },
+      c:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['bao','red',5,4,{g2:true}],['chariot','black',5,6]],
+          aura:{'5,4':1},
+          hint:'动过的豹身上留着一层残影。',
+          text:'残影是豹贴脸换命的底气：移动之后，对手这一轮打它的第一下直接落空。先动再打，等于白送一次免伤；原地不动就没有这层保护 —— 所以豹永远该是「动起来的那一个」。' }
+    },
+    ying:{
+      a:{ win:{r0:2,r1:6,c0:3,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['ying','red',5,4],['pawn','red',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:2,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['ying','red',5,4],['pawn','red',4,4],['pawn','red',3,4]],
+          hl:{'2,4':'mv'},
+          aura:{'4,4':1,'3,4':1},
+          hint:'前面堵着两个自己人，鹰照样能落到最上面那格。',
+          text:'翱翔让鹰完全无视路径上的棋子 —— 堵在它面前的任何东西都只是摆设。代价是它的攻击范围只有相邻 1 格：飞得进去，却只能打贴身的那一个。所以鹰是「钻进去的刺客」，不是远程输出。' },
+      c:{ win:{r0:4,r1:6,c0:4,c1:6}, ally:'red',
+          pieces:[['ying','red',5,4,{g2:true}],['dun','black',5,6,{hp:999}],
+                  ['zhen','black',4,6]],
+          hint:'点一下那个盾 —— 鹰眼之下，减伤被削掉两成。',
+          targets:[[5,6,[5,4]]] }
+    },
+    lang:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['lang','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:8,c0:3,c1:6}, ally:'red',
+          pieces:[['lang','red',5,4],['pawn','red',5,5],['pawn','red',4,5],
+                  ['pawn','black',4,4],
+                  ['lang','red',8,4],['pawn','black',7,4]],
+          hint:'上面那只狼身边站着两个友军，下面那只孤零零的。分别点一下它们面前的黑兵。',
+          targets:[[4,4,[5,4]],[7,4,[8,4]]] },
+      c:{ win:{r0:4,r1:6,c0:4,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,4],['lang','red',4,5,{g2:true}],['chariot','black',5,6]],
+          hint:'头狼把身边的友军也带起来了。点一下那辆黑车。',
+          targets:[[5,6,[5,4]]] }
+    },
+    yi:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['yi','red',5,4],['pawn','red',5,5,{hp:20}],['pawn','black',4,4]],
+          hint:'选中医，它旁边那个残血的小兵会被绿圈圈住 —— 点它就能治。' },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', trigger:true, mode:'heal', src:[5,4], target:[5,5],
+          pieces:[['yi','red',5,4],['pawn','red',5,5,{hp:20}]],
+          hint:'点一下那个只剩二十点血的兵。',
+          text:'回春是「花一次行动换血」：回复目标生命上限的四分之一。它不看自己有多少血，只看对面缺多少 —— 所以用在残血的重甲身上最划算。' },
+      c:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', trigger:true, mode:'heal', src:[5,4], target:[5,5],
+          pieces:[['yi','red',5,4,{g2:true}],['pawn','red',5,5,{hp:75}]],
+          hint:'这个兵只差五点血就满了，点一下看看溢出的部分去哪了。',
+          text:'妙手把治不进去的那部分留成护盾，先替他挨伤害。所以二十级的医可以提前给满血的核心棋子「预充」一层护盾 —— 上限是那个棋子的生命上限。' }
+    },
+    jiang:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['jiang','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:8,c0:4,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,4],['jiang','red',4,5],['chariot','black',5,6],
+                  ['chariot','red',8,4],['chariot','black',8,6]],
+          hint:'上面那辆车身边有匠，下面那辆没有。分别点一下它们各自面前的黑车。',
+          targets:[[5,6,[5,4]],[8,6,[8,4]]] },
+      c:{ win:{r0:5,r1:9,c0:0,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,4],['chariot','black',5,6],['jiang','red',9,0,{g2:true}]],
+          hint:'神工一起，全军都沾光 —— 哪怕匠在棋盘另一头。点一下那辆黑车。',
+          targets:[[5,6,[5,4]]] }
+    },
+    /* ══════════ 扩展第二批 · 神话 2 ══════════ */
+    di:{
+      a:{ win:{r0:6,r1:9,c0:2,c1:6}, ally:'red', focus:[8,4],
+          pieces:[['di','red',8,4],['pawn','black',7,4],['pawn','black',8,3]] },
+      b:{ win:{r0:6,r1:9,c0:2,c1:6}, ally:'red', static:true,
+          pieces:[['di','red',8,4],['pawn','red',7,4],['pawn','red',7,3]],
+          aura:{'8,4':1},
+          hint:'帝一上场，全军的行动点就从 3 变成 4。',
+          text:'御驾是规则级的：每回合多出一点行动点，等于整局的节奏都往前推一格。它跟帅、君三选一 —— 换掉坐镇四成的宫防，换来的是一整局的先手。' },
+      c:{ win:{r0:5,r1:9,c0:3,c1:6}, ally:'red',
+          pieces:[['chariot','red',5,4],['pawn','black',5,6],['di','red',9,4,{g2:true}]],
+          hint:'二十级的帝在场，己方每一击都重一成半。点一下那个兵。',
+          targets:[[5,6,[5,4]]] }
+    },
+    long:{
+      a:{ win:{r0:2,r1:6,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['long','red',5,4],['pawn','black',3,4],['pawn','black',2,4]] },
+      b:{ win:{r0:4,r1:8,c0:4,c1:7}, ally:'red',
+          pieces:[['long','red',5,4],['lord','black',5,6],['zhen','black',4,6,{g2:true}],
+                  ['zhen','black',4,7,{g2:true}],
+                  ['chariot','red',8,4],['lord','black',8,6],['zhen','black',7,6,{g2:true}],
+                  ['zhen','black',7,7,{g2:true}]],
+          hint:'两边的君都躲在两个阵后面。上面用龙打，下面用车撞 —— 一个把减伤当纸，一个老老实实被削。',
+          targets:[[5,6,[5,4]],[8,6,[8,4]]] },
+      c:{ win:{r0:2,r1:6,c0:3,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['long','red',5,4,{g2:true,cl:1}],['pawn','red',4,4],['pawn','red',3,4],
+                  ['pawn','black',5,5]],
+          hint:'选中龙 —— 前面堵着两个自己人，腾云能让它一步跨过去。' }
+    },
+    /* ══════════ 扩展第三批 · 优良 8 ══════════ */
+    yi2:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['yi2','red',5,4],['pawn','red',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:7,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['yi2','red',5,4],['pawn','red',4,4,{hp:20}],['chariot','black',3,4]],
+          aura:{'4,4':1},
+          hint:'残兵被堵在后面出不来。绿圈是移能换位的对象。',
+          text:'移是唯一能「调整阵型」的棋子：残兵卡在后面打不到人，用移把前面的顶上去、后面的换回来。它自己不能攻击，但一次换位往往比一次攻击值钱 —— 换出来的是整条输出线。' },
+      c:{ win:{r0:3,r1:8,c0:2,c1:6}, ally:'red', static:true,
+          pieces:[['yi2','red',5,4,{g2:true}],['pawn','red',7,4,{hp:20}],
+                  ['chariot','black',3,4]],
+          aura:{'7,4':1},
+          hint:'二十级的挪移够得到两格外的友军。',
+          text:'挪移把换位距离放到 2 格，能救的人多了一圈 —— 后排的炮、两格外的医，都能一把换到安全位置或者送上前线。' }
+    },
+    wei:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['wei','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:7,c0:3,c1:7}, ally:'red', trigger:true, mode:'strike',
+          src:[5,6], target:[5,4], lethal:true,
+          pieces:[['wei','red',4,5],['pawn','red',5,4,{hp:10}],['chariot','black',5,6]],
+          hint:'那个兵只剩十点血，这一下必死。点它 —— 看谁挨的。',
+          text:'<span class="ln">卫是「给核心买一条命」：站在谁旁边，谁的第一条命就由它来付。代价是一场只能替一次，而且替完它自己也残了。</span>' },
+      c:{ win:{r0:3,r1:7,c0:3,c1:7}, ally:'red', trigger:true, mode:'strike',
+          src:[5,6], target:[5,4], lethal:true,
+          pieces:[['wei','red',4,5,{g2:true}],['pawn','red',5,4,{hp:10}],['chariot','black',5,6]],
+          hint:'二十级的死士，替完还能自己站起来一点。',
+          text:'<span class="ln">代受之后回复三成生命 —— 卫不再是一次性的，一场里能扛住两轮集火。</span>' }
+    },
+    xu:{
+      a:{ win:{r0:3,r1:8,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['xu','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:8,c0:3,c1:6}, ally:'red',
+          pieces:[['xu','red',5,4,{ch:1}],['pawn','black',4,4],
+                  ['xu','red',8,4],['pawn','black',7,4]],
+          hint:'上面那个蓄已经攒了一回合，下面那个没有。分别点一下它们面前的兵。',
+          targets:[[4,4,[5,4]],[7,4,[8,4]]] },
+      c:{ win:{r0:4,r1:8,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['xu','red',5,4,{g2:true}],['pawn','black',4,4]],
+          aura:{'5,4':1},
+          hint:'满弓之后，蓄出来的那一击不会被闪避。',
+          text:'蓄是唯一「放弃一回合换爆发」的棋子：这个回合不动手，下回合的攻击翻倍。对面看得见你攒了没有 —— 于是它得猜：你是要放，还是继续憋？二十级之后连残影和影袭都躲不掉这一箭。' }
+    },
+    biao:{
+      a:{ win:{r0:3,r1:8,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['biao','red',5,4],['pawn','black',3,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:8,c0:3,c1:6}, ally:'red',
+          pieces:[['pawn','red',5,4],['pawn','black',4,4,{mk:99,mks:'red'}],
+                  ['pawn','red',8,4],['pawn','black',7,4]],
+          hint:'上面那个兵身上带着标，下面那个没有。分别点一下它们各自挨的那一下。',
+          targets:[[4,4,[5,4]],[7,4,[8,4]]] },
+      c:{ win:{r0:4,r1:8,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['biao','red',5,4,{g2:true}],['pawn','black',4,4,{mk:99,mks:'red'}]],
+          aura:{'4,4':1},
+          hint:'军令之下，标一次能挂两个回合。',
+          text:'标把「打谁」从一个人的决定变成全军的决定：被标中的敌人，队友打它也多吃一成半。二十级之后标记多留一回合 —— 等于给全队指了两轮靶子。' }
+    },
+    duan:{
+      a:{ win:{r0:3,r1:8,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['duan','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:8,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['duan','red',5,4],['grain','black',4,4,{hp:60}],['pawn','black',4,5]],
+          aura:{'4,4':1},
+          hint:'粮车被断了粮道，下回合补不回来。',
+          text:'断是专门拆对面续航的：它不打伤害，打的是「你补不回来」。粮、药、医这一整套在它面前都会哑火一回合 —— 对面本来能拖的局，被它一断就拖不动了。' },
+      c:{ win:{r0:3,r1:8,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['duan','red',5,4,{g2:true}],['zhen','black',4,4],['pawn','black',4,5]],
+          aura:{'4,4':1},
+          hint:'断援更狠：减伤光环也一并失效。',
+          text:'二十级的断援连增益一起断。阵、盾、牌堆起来的那层减伤壳，被断的那一回合直接归零 —— 铁壁流最怕的就是这个。' }
+    },
+    can:{
+      a:{ win:{r0:3,r1:8,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['can','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:7,c0:3,c1:7}, ally:'red', trigger:true, mode:'strike',
+          src:[5,4], target:[5,6], lethal:true,
+          pieces:[['chariot','red',5,4],['can','black',5,6,{hp:5}]],
+          hint:'那个残只剩五滴血。点它 —— 看它是不是真的死了。',
+          text:'<span class="ln">残兵：倒下一次还能站起来一次，以三成生命。所以想收掉它，得准备好第二刀。</span>' },
+      c:{ win:{r0:4,r1:7,c0:3,c1:7}, ally:'red', trigger:true, mode:'strike',
+          src:[5,4], target:[5,6], lethal:true,
+          pieces:[['chariot','red',5,4],['can','black',5,6,{hp:5,g2:true}]],
+          hint:'二十级的不屈，站起来的时候血更厚。',
+          text:'<span class="ln">复活时五成生命 —— 对面想补刀的成本翻了一倍。</span>' }
+    },
+    bian:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['bian','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:3,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['bian','red',5,4],['chariot','black',4,4]],
+          aura:{'4,4':1},
+          hint:'被鞭缠住的车，下回合走不了那么远了。',
+          text:'鞭是「软控」：它不像锤那样直接把人钉死，而是让对面下回合的活动半径小一圈。车和炮被缠住之后最多只能走三格，原本能绕后的一步现在够不着了 —— 差的就是这一格。' },
+      c:{ win:{r0:3,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['bian','red',5,4,{g2:true}],['chariot','black',4,4]],
+          aura:{'4,4':1},
+          hint:'铁鞭还额外抽掉一成攻击。',
+          text:'二十级的鞭在缠住的同时还压低了对手的攻击力 —— 对高攻的车炮来说，这一下等于同时废掉了它的位移和输出，是这一档里最划算的控制手段之一。' }
+    },
+    teng:{
+      a:{ win:{r0:3,r1:7,c0:2,c1:6}, ally:'red', focus:[5,4],
+          pieces:[['teng','red',5,4],['pawn','black',4,4],['pawn','black',5,5]] },
+      b:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['teng','red',5,4],['pawn','black',4,4],['pawn','black',4,5],
+                  ['pawn','black',5,5]],
+          aura:{'4,4':1,'4,5':1,'5,5':1},
+          hint:'挨着藤的敌人，己方每回合结束时各掉六点血。',
+          text:'藤是「地形压制」：它不靠攻击吃饭，靠的是逼对面别把棋子摆在它旁边。持续掉血不看护甲也不触发反伤 —— 摆在关键路口上，对面要么绕路，要么每回合白白流血。' },
+      c:{ win:{r0:4,r1:6,c0:3,c1:6}, ally:'red', static:true,
+          pieces:[['teng','red',5,4,{g2:true}],['pawn','black',4,4],['pawn','black',4,5],
+                  ['pawn','black',5,5]],
+          aura:{'4,4':1,'4,5':1,'5,5':1},
+          hint:'荆棘之后，一圈敌人每回合掉十二点。',
+          text:'二十级的藤把掉血翻倍。三只敌人贴着它站，等于每回合白送三十六点伤害 —— 而且这份伤害既不吃护甲也不触发反伤，对面越挤，亏得越多。' }
+    }
+  };
+
+  var homeEl = document.getElementById('xqmCdxHome');
+  var detEl = document.getElementById('xqmCdxDetail');
+  var cur = null;
+  var GROW = null;
+  var LT_BAL = 0, LT_COST = 10;
+
+  function ltRender(){
+    var bal = document.getElementById('xqmLtBal');
+    if(bal) bal.textContent = '弈铢 ' + LT_BAL;
+  }
+
+  function ltOdds(r){
+    var el = document.getElementById('xqmLtOdds');
+    if(!el || !r || !r.lottery) return;
+    var g = r.lottery.grades.map(function(x){ return X.GRADE[x.grade].zh + ' ' + x.weight + '%'; }).join(' · ');
+    var a = r.lottery.amounts.map(function(x){ return x.count + '枚 ' + x.weight + '%'; }).join(' · ');
+    el.textContent = g + ' ｜ 数量：' + a;
+  }
+
+  X.api('/api/xqm/grow').then(function(r){
+    if(r && r.ok){
+      GROW = {};
+      r.pieces.forEach(function(p){ GROW[p.type] = p; });
+      GROW.max = r.max_level;
+      LT_BAL = r.balance || 0;
+      LT_COST = r.cost || 10;
+      ltOdds(r);
+      ltRender();
+      renderGrid();
+      if(cur) fillDetail(cur);
+    }
+  }).catch(function(){});
+
+  function blank(){
+    var b = [];
+    for(var r=0;r<10;r++){ var row=[]; for(var c=0;c<9;c++) row.push(null); b.push(row); }
+    return b;
+  }
+  function mk(board,t,s,r,c,ov){
+    var d = X.PD[t];
+    ov = ov || {};
+    var p = {t:t, s:s, hp:ov.hp || d.hp, mh:d.hp, atk:d.atk,
+             id:t+'-'+s+'-'+r+'-'+c, mv:false, g2:!!ov.g2};
+    if(ov.mv) p.mv = true;              /* 骑·冲阵：演示「本回合移动过」 */
+    if(ov.cl) p.cl = 1;                 /* 龙·腾云 */
+    if(ov.sh) p.sh = ov.sh;             /* 医·妙手的护盾 */
+    if(ov.kb) p.kb = ov.kb;             /* 虎·百兽的连杀层数 */
+    if(ov.ch) p.ch = 1;                 /* 蓄·蓄势：演示「已蓄力」 */
+    if(ov.sd) p.sd = 1;                 /* 卫·替死：演示「已经替过一次」 */
+    if(ov.rev) p.rev = 1;               /* 残·残兵：演示「已经复活过」 */
+    if(ov.mk !== undefined){            /* 标·标记 */
+      p.mk = ov.mk; p.mks = ov.mks;
+    }
+    if(ov.dbf !== undefined){           /* 仕·死卫 / 鞭·铁鞭的降攻 */
+      p.dbf = ov.dbf; p.dbfv = ov.dbfv; p.dbfn = ov.dbfn;
+    }
+    board[r][c] = p;
+  }
+  function fill(board, list){
+    list.forEach(function(q){ mk(board, q[0], q[1], q[2], q[3], q[4]); });
+    return board;
+  }
+  function nm(p){ return X.GLYPH[p.t][p.s==='red'?0:1]; }
+
+  var GRADE_ORDER = ['mythic', 'legend', 'epic', 'rare', 'common'];
+
+  /* 棋子状态分类（图鉴排序 + 角标共用）
+     0 可解锁 · 1 可升级 · 2 已有 · 3 未拥有 */
+  var CAT_NAME = ['可解锁', '可升级', '已有', '未拥有'];
+  function catOf(t){
+    var g = GROW ? GROW[t] : null;
+    if(!g) return 3;
+    var locked = !!g.locked, maxed = !!g.maxed;
+    var have = g.shards || 0, need = locked ? (g.unlock_cost || 30) : (g.cost || 0);
+    if(locked) return have >= need ? 0 : 3;
+    if(maxed)  return 2;
+    return have >= need ? 1 : 2;
+  }
+
+  function cardHTML(t){
+    var d = X.PD[t], g = GROW ? GROW[t] : null;
+    var hp = g ? g.hp : d.hp, atk = g ? g.atk : d.atk;
+    var gd = X.GRADE[d.grade] || {};
+    var locked = g ? !!g.locked : false;
+    var sh = '', pb = '';
+    if(g){
+      var need = locked ? (g.unlock_cost || 30) : g.cost;
+      var have = g.shards || 0;
+      var pct  = need > 0 ? Math.min(100, Math.round(have / need * 100)) : 100;
+      if(locked && have >= need)      pct = 100;
+      if(!locked && g.maxed)          pct = 100;
+      if(locked) sh = '<span class="sh lk">需 ' + need + ' 碎片解锁 · 现有 ' + have + '</span>';
+      else if(g.maxed) sh = '<span class="sh">Lv '+g.level+' · 已满级</span>';
+      else sh = '<span class="sh">Lv '+g.level+' · 碎片 '+have+'/'+need+'</span>';
+      // 进度条：未解锁显示解锁进度，已拥有显示升级进度
+      pb = '<span class="pb'+(pct>=100?' full':'')+'"><i style="width:'+pct+'%"></i></span>'
+         + '<span class="pbt">'+(locked ? '解锁进度 ' : (g.maxed ? '已满级 ' : '升级进度 '))
+         + have + '/' + need + ' · ' + pct + '%</span>';
+    }
+    return '<button class="xqm-cdx-card' + (locked ? ' lk' : '') + '" data-t="'+t+'"'
+      + ' style="--gc:'+gd.c+';--gc-bg:'+gd.c+'14;--gc-bd:'+gd.c+'55">'
+      + '<span class="badge" style="color:'+gd.c+';border-color:'+gd.c+'66;background:'+gd.c+'22">'+(gd.zh||'')+'</span>'
+      + (locked ? '<span class="lock" title="未解锁">🔒</span>' : '')
+      + '<span class="tagcat c' + catOf(t) + '">' + CAT_NAME[catOf(t)] + '</span>'
+      + X.pcHTML({t:t, s:'red', hp:hp, mh:hp, id:'cdxg-'+t, lv:g?g.level:1}, {})
+      + '<span class="nm">'+d.name+'</span>'
+      + '<span class="st">生命 '+hp+' · 攻击 '+atk+'</span>'
+      + sh
+      + pb
+      + '</button>';
+  }
+
+  function renderGrid(){
+    var host = document.getElementById('xqmCdxGrid');
+    /* 排序规则：先按「能不能马上操作」分类，类内按**品质**降序。
+       ⚠️ 这里的「等级」指的是品质（神话 > 传说 > 卓越 > 优良 > 普通），
+       不是棋子的 Lv 1~20 —— 品质相同才再比 Lv。 */
+    var all = X.ORDER.slice().sort(function(a, b){
+      var ca = catOf(a), cb = catOf(b);
+      if(ca !== cb) return ca - cb;
+      var ga = GRADE_ORDER.indexOf(X.PD[a].grade);
+      var gb = GRADE_ORDER.indexOf(X.PD[b].grade);
+      if(ga !== gb) return ga - gb;      // GRADE_ORDER 本身就是从高到低
+      var la = (GROW && GROW[a] && GROW[a].level) || 0;
+      var lb = (GROW && GROW[b] && GROW[b].level) || 0;
+      if(la !== lb) return lb - la;      // 同品质再按棋子等级降序
+      return X.ORDER.indexOf(a) - X.ORDER.indexOf(b);
+    });
+    host.innerHTML = all.length
+      ? '<div class="xqm-cdx-grid">' + all.map(cardHTML).join('') + '</div>'
+      : '<div class="xqm-cdx-empty">敬请期待 · 后续养成版本开放</div>';
+  }
+
+  function mbHTML(win, board, opt){
+    opt = opt || {};
+    var rows = win.r1-win.r0+1, cols = win.c1-win.c0+1;
+    var h = '<div class="xqm-mb"><div class="xqm-mb-grid" style="grid-template-columns:repeat('+cols+',auto)">';
+    for(var r=win.r0;r<=win.r1;r++){
+      for(var c=win.c0;c<=win.c1;c++){
+        var cls = 'xqm-cell'+(r===win.r1?' nc':'')+(c===win.c1?' nr':'');
+        h += '<div class="'+cls+'" data-r="'+r+'" data-c="'+c+'">';
+        var p = board[r][c];
+        if(p) h += X.pcHTML(p, {sel: opt.sel===p.id});
+        if(opt.hl && opt.hl[r+','+c]) h += '<div class="xqm-hl '+opt.hl[r+','+c]+'"></div>';
+        if(opt.aura && opt.aura[r+','+c]) h += '<div class="xqm-hl aura"></div>';
+        if(opt.hot && opt.hot[r+','+c]) h += '<div class="xqm-hot"></div>';
+        if(opt.nums) for(var i=0;i<opt.nums.length;i++){
+          var n = opt.nums[i];
+          if(n.r===r && n.c===c){
+            h += (opt.plus || n.plus)
+              ? '<div class="xqm-mbdmg" style="color:#3B9A5F">+'+n.v+'</div>'
+              : '<div class="xqm-mbdmg">-'+n.v+'</div>';
+          }
+        }
+        h += '</div>';
+      }
+    }
+    return h + '</div></div>';
+  }
+
+  function auraOf(board, r, c, side){
+    var o = {};
+    for(var dr=-1;dr<=1;dr++) for(var dc=-1;dc<=1;dc++){
+      if(!dr && !dc) continue;
+      var q = X.at(board, r+dr, c+dc);
+      if(q && q.s===side) o[(r+dr)+','+(c+dc)] = 1;
+    }
+    return o;
+  }
+
+  function moveEngine(host, scene){
+    var board, sel=null, hl={}, nums=[], msg='';
+
+    function reset(){
+      board = fill(blank(), scene.pieces);
+      sel=null; hl={}; nums=[]; msg=''; paint();
+    }
+    function paint(){
+      var hot = {};
+      if(!sel) hot[scene.focus[0]+','+scene.focus[1]] = 1;
+      var hint = scene.hint || '点一下棋盘上闪着的棋子，绿格可行，金格可击。';
+      if(sel){
+        var canHeal = false;
+        for(var hk in hl){ if(hl[hk] === 'heal'){ canHeal = true; break; } }
+        hint += canHeal ? '　绿色格走过去，金色格打一下，绿圈圈住的是可以治疗的友军。'
+                        : '　绿色格走过去，金色格打一下。';
+      }
+      host.innerHTML =
+        '<div class="hint">' + hint + '</div>'
+        + '<div class="body">' + mbHTML(scene.win, board, {
+            sel: sel ? board[sel[0]][sel[1]].id : '', hl: hl, hot: hot, nums: nums })
+        + '<div class="res">' + (msg || '<span class="dim">尚未出手</span>') + '</div></div>'
+        + '<div class="tools"><button class="tool" data-reset="1">重置</button></div>';
+    }
+    function hitText(res){
+      return '<div class="big">-' + res.hits[0].v + '</div>'
+        + res.notes.map(function(n){ return '<span class="note">' + n + '</span>'; }).join('')
+        + res.hits.map(function(h){
+            return '<span class="ln">' + nm(h.who) + ' 掉 <b>' + h.v + '</b></span>';
+          }).join('');
+    }
+
+    host.onclick = function(e){
+      if(e.target.closest('[data-reset]')){ reset(); return; }
+      var cell = e.target.closest('.xqm-cell');
+      if(!cell) return;
+      var r = +cell.dataset.r, c = +cell.dataset.c, p = board[r][c];
+
+      /* 已经选中了医，点相邻友军 = 治疗 */
+      if(sel && hl[r+','+c] === 'heal' && p){
+        var healer = board[sel[0]][sel[1]];
+        var hp = X.healPreview(healer, p);
+        p.hp += hp.heal;
+        if(hp.shield) p.sh = (p.sh || 0) + hp.shield;
+        nums = [{r:r, c:c, v:hp.heal, plus:true}];
+        if(hp.shield) nums.push({r:r, c:c, v:hp.shield, plus:true});
+        msg = '<div class="big">+' + hp.heal + '</div>'
+          + '<span class="note">回春 · 回复 ' + hp.heal + ' 点</span>'
+          + (hp.shield ? '<span class="ln">妙手 · 溢出的 <b>' + hp.shield + '</b> 点转为护盾</span>' : '');
+        sel = null; hl = {}; paint(); return;
+      }
+
+      if(p && p.s===scene.ally){
+        sel = [r,c]; nums = []; msg = '';
+        var tg = X.targetsOf(board, r, c);
+        hl = {};
+        for(var k in tg.mv) hl[k] = 'mv';
+        for(var k in tg.rng) hl[k] = hl[k] ? 'both' : 'rng';
+        for(var k2 in tg.heal) hl[k2] = 'heal';
+        paint(); return;
+      }
+      if(sel && hl[r+','+c]){
+        var a = board[sel[0]][sel[1]];
+        if(p && p.s!==scene.ally){
+          var res = X.resolveAttack(board, sel[0], sel[1], r, c);
+          nums = res.hits.slice();
+          res.hits.forEach(function(h){
+            var q = board[h.r][h.c];
+            if(!q) return;
+            q.hp = Math.max(0, q.hp - h.v);
+            if(q.hp<=0) board[h.r][h.c] = null;
+          });
+          msg = hitText(res);
+          a.mv = false;
+        } else {
+          board[r][c] = a; board[sel[0]][sel[1]] = null; a.mv = true;
+          nums = [];
+          msg = '走到 (' + r + ',' + c + ')' + (scene.charge
+            ? ' —— 本回合已经移动过，接下来打人会多两成伤害' : '');
+        }
+        sel = null; hl = {}; paint(); return;
+      }
+      sel = null; hl = {}; paint();
+    };
+    reset();
+  }
+
+  function traitEngine(host, cfg){
+    var board, msg='', nums=[], hot={}, aura={};
+
+    function reset(){
+      board = fill(blank(), cfg.pieces);
+      msg=''; nums=[]; hot={}; aura={};
+      cfg.targets.forEach(function(t){ hot[t[0]+','+t[1]] = 1; });
+      if(cfg.aura === 'palace'){
+        for(var r=7;r<=9;r++) for(var c=3;c<=5;c++) aura[r+','+c] = 1;
+      } else if(cfg.aura) aura = auraOf(board, cfg.aura[0], cfg.aura[1], 'red');
+      paint();
+    }
+    function paint(){
+      host.innerHTML =
+        '<div class="hint">' + cfg.hint + '</div>'
+        + '<div class="body">' + mbHTML(cfg.win, board, {hl:{}, hot:hot, aura:aura, nums:nums})
+        + '<div class="res">' + (msg || '<span class="dim">点闪着的棋子看伤害</span>') + '</div></div>'
+        + '<div class="tools"><button class="tool" data-reset="1">重置</button></div>';
+    }
+
+    host.onclick = function(e){
+      if(e.target.closest('[data-reset]')){ reset(); return; }
+      var cell = e.target.closest('.xqm-cell');
+      if(!cell) return;
+      var r = +cell.dataset.r, c = +cell.dataset.c, spec = null;
+      cfg.targets.forEach(function(t){ if(t[0]===r && t[1]===c) spec = t; });
+      if(!spec){ X.toast(__('点闪着的棋子')); return; }
+      var res = X.resolveAttack(board, spec[2][0], spec[2][1], r, c);
+      if(!res) return;
+      nums = res.hits.slice();
+      msg = '<div class="big">-' + res.hits[0].v + '</div>'
+        + res.notes.map(function(n){ return '<span class="note">' + n + '</span>'; }).join('')
+        + res.hits.map(function(h){
+            return '<span class="ln">' + nm(h.who) + ' 掉 <b>' + h.v + '</b></span>';
+          }).join('');
+      paint();
+    };
+    reset();
+  }
+
+  /* 静态标注板：光环 / 被动 / 回合末这类没有「出手」的特性，用高亮 + 说明讲清楚 */
+  function staticScene(host, cfg){
+    var board = fill(blank(), cfg.pieces);
+    var hl = cfg.hl || {}, aura = cfg.aura || {};
+    if(cfg.scout){          /* 斥的侦察：把敌方所有攻击范围标出来 */
+      for(var r=0;r<10;r++) for(var c=0;c<9;c++){
+        var p = board[r][c];
+        if(!p || p.s === cfg.ally) continue;
+        var tg = X.targetsOf(board, r, c);
+        for(var k in tg.rng) hl[k] = 'rng';
+      }
+    }
+    host.innerHTML =
+      '<div class="hint">' + cfg.hint + '</div>'
+      + '<div class="body">' + mbHTML(cfg.win, board, {hl:hl, aura:aura})
+      + '<div class="res">' + (cfg.text || '<span class="dim">看图即可</span>') + '</div></div>'
+      + '<div class="tools"><button class="tool" data-reset="1">重置</button></div>';
+    host.onclick = function(){};
+  }
+
+  /* 阵亡触发：点一下那个棋子，让它倒下，看友军回复多少 */
+  function deathScene(host, cfg){
+    var board, msg='', nums=[], done=false;
+    function hot(){
+      var o = {};
+      if(!done) o[cfg.death[0]+','+cfg.death[1]] = 1;
+      return o;
+    }
+    function reset(){
+      board = fill(blank(), cfg.pieces);
+      msg=''; nums=[]; done=false; paint();
+    }
+    function paint(){
+      host.innerHTML =
+        '<div class="hint">' + cfg.hint + '</div>'
+        + '<div class="body">' + mbHTML(cfg.win, board, {hot:hot(), nums:nums, plus:true})
+        + '<div class="res">' + (msg || '<span class="dim">点闪着的棋子看触发</span>') + '</div></div>'
+        + '<div class="tools"><button class="tool" data-reset="1">重置</button></div>';
+    }
+    host.onclick = function(e){
+      if(e.target.closest('[data-reset]')){ reset(); return; }
+      var cell = e.target.closest('.xqm-cell');
+      if(!cell) return;
+      var r = +cell.dataset.r, c = +cell.dataset.c;
+      if(done || r !== cfg.death[0] || c !== cfg.death[1]){ X.toast(__('点闪着的棋子')); return; }
+      var me = board[r][c];
+      if(!me) return;
+      done = true;
+      board[r][c] = null;
+      var healed = [];
+      X.A8.forEach(function(o){
+        var q = X.at(board, r+o[0], c+o[1]);
+        if(q && q.s === me.s && q.hp < q.mh){
+          var v = Math.min(cfg.near, q.mh - q.hp);
+          if(v > 0){ q.hp += v; healed.push({r:r+o[0], c:c+o[1], v:v}); }
+        }
+      });
+      if(cfg.all){
+        for(var rr=0;rr<10;rr++) for(var cc=0;cc<9;cc++){
+          var q2 = board[rr][cc];
+          if(q2 && q2.s === me.s && q2.hp < q2.mh){
+            var v2 = Math.min(cfg.allv, q2.mh - q2.hp);
+            if(v2 > 0){ q2.hp += v2; healed.push({r:rr, c:cc, v:v2}); }
+          }
+        }
+      }
+      nums = healed;
+      msg = '<div class="big">' + X.GLYPH[me.t][0] + ' 阵亡</div>'
+        + (healed.length
+            ? healed.map(function(h){
+                return '<span class="ln">' + X.GLYPH[me.t][0] + ' 的友军回复 <b>+' + h.v + '</b></span>';
+              }).join('')
+            : '<span class="ln">周围没有受伤的友军</span>');
+      paint();
+    };
+    reset();
+  }
+
+  /* 通用触发演示：点一下目标，看「击杀之后 / 治疗之后」会发生什么 */
+  function triggerScene(host, cfg){
+    var board, msg='', nums=[], done=false;
+    function hot(){
+      var o = {};
+      if(!done) o[cfg.target[0]+','+cfg.target[1]] = 1;
+      return o;
+    }
+    function reset(){ board = fill(blank(), cfg.pieces); msg=''; nums=[]; done=false; paint(); }
+    function paint(){
+      host.innerHTML =
+        '<div class="hint">' + cfg.hint + '</div>'
+        + '<div class="body">' + mbHTML(cfg.win, board, {hot:hot(), nums:nums, plus:cfg.mode==='heal'})
+        + '<div class="res">' + (msg || '<span class="dim">点闪着的棋子</span>') + '</div></div>'
+        + '<div class="tools"><button class="tool" data-reset="1">重置</button></div>';
+    }
+    host.onclick = function(e){
+      if(e.target.closest('[data-reset]')){ reset(); return; }
+      var cell = e.target.closest('.xqm-cell');
+      if(!cell) return;
+      var r = +cell.dataset.r, c = +cell.dataset.c;
+      if(done || r !== cfg.target[0] || c !== cfg.target[1]){ X.toast(__('点闪着的棋子')); return; }
+      var q = board[r][c];
+      if(!q) return;
+      if(cfg.mode === 'kill'){
+        done = true;
+        board[r][c] = null;
+        msg = '<div class="big">' + X.GLYPH[q.t][0] + ' 阵亡</div>' + cfg.text;
+      } else if(cfg.mode === 'strike'){
+        /* 真打一下：算伤害 → 护盾 → 替死 → 复活/阵亡。用来演示「打完之后」。 */
+        done = true;
+        var sa = board[cfg.src[0]][cfg.src[1]];
+        var res = X.resolveAttack(board, cfg.src[0], cfg.src[1], r, c);
+        var h0 = (res && res.hits.length) ? res.hits[0] : null;
+        var lines = [];
+        if(h0 && h0.v > 0){
+          var hr = h0.r, hc = h0.c, hq = board[hr][hc];
+          nums.push({r:hr, c:hc, v:h0.v});
+          if(hr !== r || hc !== c){
+            lines.push('<span class="ln">' + X.GLYPH[hq.t][0] + ' 替死，替 '
+              + X.GLYPH[q.t][0] + ' 挨了 <b>' + h0.v + '</b> 点</span>');
+          } else {
+            lines.push('<span class="ln">造成 <b>' + h0.v + '</b> 点伤害</span>');
+          }
+          if(cfg.lethal || h0.v >= hq.hp){
+            if(hq.t === 'can' && !hq.rev){
+              /* 残·残兵：一场一次，倒下时站起来 */
+              hq.rev = 1;
+              hq.hp = Math.max(1, Math.round(hq.mh * (hq.g2 ? 0.50 : 0.30)));
+              lines.push('<span class="ln">残兵 · 以 <b>' + hq.hp + '</b> 点生命复活</span>');
+            } else {
+              board[hr][hc] = null;
+              if(hq !== q) lines.push('<span class="ln">' + X.GLYPH[hq.t][0] + ' 阵亡</span>');
+            }
+          } else {
+            hq.hp -= h0.v;
+          }
+        }
+        msg = '<div class="big">' + X.GLYPH[q.t][0] + ' 挨打</div>'
+            + lines.join('') + (cfg.text || '');
+      } else {
+        done = true;
+        var src = board[cfg.src[0]][cfg.src[1]];
+        var hp = X.healPreview(src, q);
+        q.hp += hp.heal;
+        if(hp.shield) q.sh = (q.sh || 0) + hp.shield;
+        nums = [{r:r, c:c, v:hp.heal, plus:true}];
+        if(hp.shield) nums.push({r:r, c:c, v:hp.shield, plus:true});
+        msg = '<div class="big">+' + hp.heal + '</div>'
+          + '<span class="note">回春 · 回复 ' + hp.heal + ' 点</span>'
+          + (hp.shield ? '<span class="ln">妙手 · 溢出的 <b>' + hp.shield + '</b> 点转为护盾</span>' : '')
+          + (cfg.text ? '<span class="ln">' + cfg.text + '</span>' : '');
+      }
+      paint();
+    };
+    reset();
+  }
+
+  function infoHTML(t){
+    var d = X.PD[t], g = GROW ? GROW[t] : null;
+    var hp = g ? g.hp : d.hp, atk = g ? g.atk : d.atk;
+    var hpEm = g && g.hp > d.hp ? ' <em>+' + Math.round((g.hp/d.hp - 1)*100) + '%</em>' : '';
+    var atkEm = g && g.atk > d.atk ? ' <em>+' + Math.round((g.atk/d.atk - 1)*100) + '%</em>' : '';
+    return '<div class="xqm-cdx-head">'
+      + X.pcHTML({t:t, s:'red', hp:hp, mh:hp, id:'cdx-'+t, lv:g?g.level:1}, {})
+      + '<div><div class="nm">' + d.name + ' ' + X.gradeHTML(d.grade) + '</div>'
+      + '<div class="sub">' + d.lore + '</div></div></div>'
+      + '<div class="xqm-cdx-nums" style="grid-template-columns:repeat(2,1fr)">'
+      + '<div class="s"><div class="k">生命</div><div class="v">' + hp + hpEm + '</div></div>'
+      + '<div class="s"><div class="k">攻击</div><div class="v">' + atk + atkEm + '</div></div>'
+      + '</div>'
+      + growHTML(t)
+      + '<div class="xqm-cdx-rows">'
+      + '<div class="r"><span class="lb">移动</span><span class="vl">' + X.MV_DESC[t] + '</span></div>'
+      + '<div class="r"><span class="lb">攻击</span><span class="vl">' + X.RNG_DESC[t] + '</span></div>'
+      + '</div>';
+  }
+
+  function growHTML(t){
+    if(!GROW || !GROW[t]) return '';
+    var g = GROW[t];
+    var pct = g.maxed ? 100 : Math.min(100, Math.round(g.shards / g.cost * 100));
+    var h = '<div class="xqm-grow">'
+      + '<div class="gh"><span>沙场磨砺 · 对局掉落碎片</span>'
+      + '<span class="lv">Lv ' + g.level + '<span style="color:var(--muted);font-size:11px;font-weight:400"> / ' + GROW.max + '</span></span></div>'
+      + '<div class="bar"><i style="width:' + pct + '%"></i></div>'
+      + '<div class="gs">' + (g.maxed ? '碎片 ' + g.shards + ' · 已满级，坐镇全场'
+        : '碎片 ' + g.shards + ' / ' + g.cost + '　·　下级：'
+        + (g.level % 5 === 0 ? '特性增强' : (Math.floor((g.level-1)/2) % 2 === 0 ? '生命提升' : '攻击提升'))) + '</div>'
+      + (g.locked
+        ? '<button class="xqm-btn xqm-btn-p xqm-btn-sm up" data-up="'+t+'">解锁 · 消耗 '
+          + (g.unlock_cost || 30) + ' 碎片</button>'
+        : (g.maxed ? '<button class="xqm-btn xqm-btn-p xqm-btn-sm up" disabled>已满级</button>'
+          : '<button class="xqm-btn xqm-btn-p xqm-btn-sm up" data-up="'+t+'">升级 · 消耗 ' + g.cost + ' 碎片</button>'))
+      + '<div class="grows">'
+      + '<div class="r"><span>生命</span><span>' + g.hp + '<em>+' + Math.round((g.hp/g.base_hp - 1)*100) + '%</em></span></div>'
+      + '<div class="r"><span>攻击</span><span>' + g.atk + '<em>+' + Math.round((g.atk/g.base_atk - 1)*100) + '%</em></span></div>'
+      + '<div class="r"><span>特性增强</span><span>' + (g.trait_bonus ? '+' + g.trait_bonus + '%' : '尚未开始') + '</span></div>'
+      + '</div>'
+      + '<div class="nt' + (g.lv20 ? '' : ' lock') + '"><b>Lv20 新特性 · ' + X.PD[t].nt.name + '</b> —— ' + X.PD[t].nt.desc
+      + (g.lv20 ? '' : '（未解锁）') + '</div>'
+      + '</div>';
+    return h;
+  }
+
+  function showDemo(which){
+    ['a','b','c'].forEach(function(k){
+      document.getElementById('xqmDemo' + k.toUpperCase()).style.display = (k === which) ? '' : 'none';
+    });
+    var tabs = document.getElementById('xqmDemoTabs').children;
+    for(var i=0;i<tabs.length;i++){
+      tabs[i].classList.toggle('on', tabs[i].dataset.d === which);
+    }
+  }
+
+  /* 一个场景该用哪个演示引擎：静态标注 > 阵亡触发 > 点一下触发 > 伤害结算 > 走子演示 */
+  function mountScene(el, s){
+    if(!s){ el.innerHTML = '<div class="hint">这个棋子还没有配演示</div>'; el.onclick = null; return; }
+    if(s.static) staticScene(el, s);
+    else if(s.death) deathScene(el, s);
+    else if(s.trigger) triggerScene(el, s);
+    else if(s.targets) traitEngine(el, s);
+    else moveEngine(el, s);
+  }
+
+  function fillDetail(t){
+    document.getElementById('xqmCdxInfo').innerHTML = infoHTML(t);
+    var s = SCENES[t];
+    if(!s){ X.toast(__('这个棋子的演示还在补')); return; }
+    mountScene(document.getElementById('xqmDemoA'), s.a);
+    mountScene(document.getElementById('xqmDemoB'), s.b);
+    mountScene(document.getElementById('xqmDemoC'), s.c);
+    document.getElementById('xqmDemoTabs').innerHTML =
+      '<button class="xqm-demo-tab" data-d="a">移动 / 攻击</button>'
+      + '<button class="xqm-demo-tab" data-d="b">特性 · ' + X.PD[t].trait + '</button>'
+      + '<button class="xqm-demo-tab" data-d="c">特性 · ' + X.PD[t].nt.name + '</button>';
+    showDemo('a');
+  }
+
+  function openDetail(t, push){
+    cur = t;
+    fillDetail(t);
+    homeEl.style.display = 'none';
+    detEl.style.display = '';
+    if(push !== false) location.hash = t;
+    window.scrollTo(0, 0);
+  }
+
+  function openHome(push){
+    cur = null;
+    homeEl.style.display = '';
+    detEl.style.display = 'none';
+    if(push !== false) history.pushState('', '', location.pathname + location.search);
+    window.scrollTo(0, 0);
+  }
+
+  function fromHash(){
+    var m = location.hash.match(/^#([a-z]+)$/);
+    return (m && X.ORDER.indexOf(m[1]) >= 0) ? m[1] : null;
+  }
+
+  document.getElementById('xqmCdxGrid').onclick = function(e){
+    var card = e.target.closest('.xqm-cdx-card');
+    if(!card) return;
+    openDetail(card.dataset.t);
+  };
+
+  document.getElementById('xqmCdxInfo').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-up]');
+    if(!btn || btn.disabled) return;
+    var t = btn.dataset.up;
+    btn.disabled = true;
+    X.api('/api/xqm/grow/upgrade', {method:'POST', body:{type:t}}).then(function(r){
+      if(!r || !r.ok){
+        X.toast((r && r.msg) || __('升级失败'));
+        if(GROW && GROW[t]) fillDetail(cur);
+        return;
+      }
+      GROW[t].level = r.level; GROW[t].shards = r.shards;
+      GROW[t].locked = false;
+      if(r.next_cost !== null && r.next_cost !== undefined) GROW[t].cost = r.next_cost;
+      GROW[t].maxed = r.next_cost === null || r.next_cost === undefined;
+      fillDetail(cur); renderGrid();
+      if(r.unlocked) X.toast((r.msg || __('已解锁')) + __('，可以上阵了'));
+      else if(r.just20) X.toast(__('Lv20！解锁新特性：') + r.nt_name);
+      else X.toast(__('升级成功，Lv ') + r.level);
+    }).catch(function(){ btn.disabled = false; X.toast(__('网络异常')); });
+  });
+
+  document.getElementById('xqmCdxBack').onclick = function(e){
+    e.preventDefault();
+    openHome();
+  };
+
+  document.getElementById('xqmDemoTabs').onclick = function(e){
+    var tab = e.target.closest('.xqm-demo-tab');
+    if(!tab) return;
+    showDemo(tab.dataset.d);
+  };
+
+  window.addEventListener('hashchange', function(){
+    var t = fromHash();
+    if(t){ if(t !== cur) openDetail(t, false); }
+    else if(cur !== null) openHome(false);
+  });
+
+  renderGrid();
+  var t0 = fromHash();
+  if(t0) openDetail(t0, false);
+})();
+</script>
+{% endblock %}

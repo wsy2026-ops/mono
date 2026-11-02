@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}赛题管理 · {{ contest.title }}{% endblock %}
+
+{% block content %}
+<style>
+  .ojp-wrap{max-width:920px;margin:0 auto;padding:22px 16px 60px;font-size:14px;color:#1a1a1a;}
+  .ojp-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+  .ojp-head h1{margin:0;font-size:19px;font-weight:700;}
+  .ojp-head .sub{font-size:13px;color:#9aa0a6;}
+  .ojp-head a{margin-left:auto;font-size:13px;color:#2563eb;text-decoration:none;}
+  .ojp-head a:hover{text-decoration:underline;}
+
+  .ojp-card{background:#fff;border:1px solid #e6e8eb;border-radius:10px;padding:18px;margin-bottom:16px;}
+  .ojp-card h2{margin:0 0 4px;font-size:14px;font-weight:600;color:#374151;}
+  .ojp-card .hint{font-size:12px;color:#9aa0a6;margin-bottom:12px;}
+
+  .ojp-row{display:flex;align-items:center;gap:12px;padding:11px 13px;
+           border:1px solid #eef0f2;border-radius:8px;margin-bottom:8px;background:#fcfcfd;}
+  .ojp-row:last-child{margin-bottom:0;}
+  .ojp-id{font-size:12px;color:#a0a5aa;font-variant-numeric:tabular-nums;min-width:34px;}
+  .ojp-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+  .ojp-diff{font-size:12px;color:#8b9096;white-space:nowrap;}
+  .ojp-btn{padding:6px 16px;border:none;border-radius:6px;font-size:12.5px;font-weight:500;
+           cursor:pointer;transition:background .12s;white-space:nowrap;}
+  .ojp-btn.add{background:#2563eb;color:#fff;}
+  .ojp-btn.add:hover{background:#1d4ed8;}
+  .ojp-btn.del{background:#fee2e2;color:#b91c1c;}
+  .ojp-btn.del:hover{background:#fecaca;}
+
+  .ojp-empty{padding:28px 16px;text-align:center;color:#9aa0a6;font-size:13px;}
+  .ojp-empty a{color:#2563eb;text-decoration:none;}
+
+  .ojp-tip{padding:11px 14px;background:#fff7e6;color:#92400e;border-radius:8px;
+           font-size:12.5px;line-height:1.7;margin-bottom:16px;}
+</style>
+
+<div class="ojp-wrap">
+  <div class="ojp-head">
+    <h1>赛题管理</h1>
+    <span class="sub">{{ contest.title }}</span>
+    <a href="{{ url_for('oj_contest', cid=contest.id) }}">← 返回比赛</a>
+  </div>
+
+  <div class="ojp-tip">
+    「比赛赛题」是标记为 <b>比赛专用</b> 的题目 —— 平时在题库里看不到，
+    只有挂到某场比赛之后，比赛期间选手才能看到。<br>
+    如果某道题还没建，先去 <a href="{{ url_for('oj_problem_new') }}" style="color:#92400e;text-decoration:underline;">出题页</a>
+    创建并把「题目类型」选成「比赛赛题」。
+  </div>
+
+  {# ══════ 已加入本场比赛 ══════ #}
+  <div class="ojp-card">
+    <h2>已加入本场（{{ attached|length }} 道）</h2>
+    <div class="hint">这些题会在比赛期间对参赛者显示。</div>
+
+    {% if attached %}
+      {% for p in attached %}
+      <div class="ojp-row">
+        <span class="ojp-id">#{{ p.id }}</span>
+        <span class="ojp-name">{{ p.title }}</span>
+        <span class="ojp-diff">{{ p.difficulty or '未标注' }}</span>
+        <form method="post" action="{{ url_for('oj_contest_detach', cid=contest.id) }}"
+              onsubmit="return confirm(__('从本场比赛移除这道题？'));">
+          <input type="hidden" name="pid" value="{{ p.id }}">
+          <button class="ojp-btn del" type="submit">移出</button>
+        </form>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="ojp-empty">还没有赛题。从下面「可加入的题目」里挑。</div>
+    {% endif %}
+  </div>
+
+  {# ══════ 可加入的题目池 ══════ #}
+  <div class="ojp-card">
+    <h2>可加入的题目（{{ pool|length }} 道）</h2>
+    <div class="hint">只显示「比赛专用 + 已审核 + 还没挂到任何比赛」的题。</div>
+
+    {% if pool %}
+      {% for p in pool %}
+      <div class="ojp-row">
+        <span class="ojp-id">#{{ p.id }}</span>
+        <span class="ojp-name">{{ p.title }}</span>
+        <span class="ojp-diff">{{ p.difficulty or '未标注' }}</span>
+        <form method="post" action="{{ url_for('oj_contest_attach', cid=contest.id) }}">
+          <input type="hidden" name="pid" value="{{ p.id }}">
+          <button class="ojp-btn add" type="submit">加入本场</button>
+        </form>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="ojp-empty">
+        没有可用的比赛专用题。<br>
+        <a href="{{ url_for('oj_problem_new') }}">去创建一道 →</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

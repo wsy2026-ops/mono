@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+{% block title %}关于我们 - MONO 社区{% endblock %}
+{% set active = 'about' %}
+
+{% block content %}
+<style>
+  .ab-wrap{max-width:960px;margin:0 auto;}
+
+  .ab-hero{
+    border:1px solid var(--line);border-radius:16px;padding:44px 40px 40px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);
+    position:relative;overflow:hidden;
+  }
+  .ab-hero::after{
+    content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;
+    border-radius:50%;background:radial-gradient(circle,#efefef 0%,rgba(255,255,255,0) 70%);
+  }
+  .ab-badge{
+    display:inline-block;font-size:11.5px;letter-spacing:1.6px;font-weight:600;
+    color:var(--fg-2);border:1px solid var(--line);background:var(--bg-elev);
+    padding:4px 12px;border-radius:20px;margin-bottom:18px;
+  }
+  .ab-hero h1{font-size:31px;line-height:1.35;margin:0 0 16px;font-weight:700;letter-spacing:-0.4px;}
+  .ab-lead{color:var(--fg-2);font-size:15px;line-height:1.85;margin:0 0 26px;max-width:640px;}
+  .ab-actions{display:flex;gap:12px;flex-wrap:wrap;}
+
+  .ab-sec{margin-top:38px;}
+  .ab-sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;}
+  .ab-sec-head h2{font-size:19px;margin:0;font-weight:700;letter-spacing:-0.2px;}
+  .ab-sec-head .ab-idx{
+    font-size:11px;color:var(--fg-3);font-weight:600;letter-spacing:1px;
+    border:1px solid var(--line);border-radius:6px;padding:1px 7px;
+  }
+  .ab-sec-desc{color:var(--muted);font-size:13.5px;margin:0 0 18px;line-height:1.8;}
+
+  .ab-prose{
+    border:1px solid var(--line);border-radius:14px;padding:24px 26px;background:var(--bg-elev);
+  }
+  .ab-prose p{margin:0 0 14px;font-size:14.5px;line-height:1.9;color:var(--fg-2);}
+  .ab-prose p:last-child{margin-bottom:0;}
+  .ab-prose b{font-weight:600;}
+
+  .ab-feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;}
+  .ab-feat{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--bg-elev);}
+  .ab-feat-t{font-size:14px;font-weight:600;margin-bottom:6px;}
+  .ab-feat-d{font-size:12.8px;color:var(--muted);line-height:1.75;}
+
+  .ab-team{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  @media (max-width:1100px){ .ab-team{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:600px){ .ab-team{grid-template-columns:1fr;} }
+  .ab-member{
+    border:1px solid var(--line);border-radius:14px;padding:22px 20px;
+    background:var(--bg-elev);display:flex;flex-direction:column;align-items:center;text-align:center;
+    transition:border-color .18s, box-shadow .18s, transform .18s;
+  }
+  .ab-member:hover{
+    border-color:#c9c9c9;box-shadow:0 6px 22px rgba(0,0,0,.06);transform:translateY(-2px);
+  }
+  .ab-photo{
+    width:96px;height:96px;border-radius:50%;overflow:hidden;
+    border:1px solid var(--line);background:var(--soft);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .ab-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .ab-photo-ph{font-size:36px;line-height:1;opacity:.55;}
+  .ab-photo-txt{
+    font-size:10.5px;line-height:1.55;font-weight:500;
+    color:var(--fg);padding:0 11px;text-align:center;
+    letter-spacing:.2px;
+  }
+  .ab-m-name{font-size:16px;font-weight:700;margin:14px 0 3px;}
+  .ab-m-role{
+    font-size:11.5px;color:var(--fg-2);border:1px solid var(--line);background:var(--soft);
+    padding:2px 10px;border-radius:20px;display:inline-block;
+  }
+  .ab-m-bio{font-size:12.8px;color:var(--muted);line-height:1.8;margin:12px 0 0;}
+  .ab-tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:14px;}
+  .ab-tag{
+    font-size:11px;color:var(--fg-2);background:var(--soft);
+    border-radius:6px;padding:2px 8px;white-space:nowrap;
+  }
+
+  .ab-scale{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;}
+  .ab-scale-card{
+    border:1px solid var(--line);border-radius:12px;padding:20px 16px;
+    background:var(--bg-elev);text-align:center;
+  }
+  .ab-scale-num{
+    font-size:25px;font-weight:700;line-height:1.15;letter-spacing:-0.6px;
+    font-variant-numeric:tabular-nums;
+  }
+  .ab-scale-label{font-size:12px;color:var(--muted);margin-top:7px;}
+  .ab-scale-delta{
+    font-size:11px;color:#10b981;margin-top:5px;
+    font-variant-numeric:tabular-nums;font-weight:600;
+  }
+  .ab-langs{
+    margin-top:12px;border:1px solid var(--line);border-radius:12px;
+    padding:18px 20px;background:var(--bg-elev);
+  }
+  .ab-lang{margin-bottom:13px;}
+  .ab-lang:last-child{margin-bottom:0;}
+  .ab-lang-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:12.5px;margin-bottom:6px;
+  }
+  .ab-lang-head b{font-weight:600;}
+  .ab-lang-head span{color:var(--muted);font-variant-numeric:tabular-nums;}
+  .ab-lang-bar{height:7px;border-radius:4px;background:var(--soft);overflow:hidden;}
+  .ab-lang-bar i{display:block;height:100%;background:#111;border-radius:4px;}
+  .ab-scale-note{
+    font-size:11.5px;color:var(--muted);margin-top:12px;text-align:center;line-height:1.7;
+  }
+
+  .ab-type{
+    margin-top:12px;border:1px solid var(--line);border-radius:12px;
+    padding:18px 20px;background:var(--bg-elev);
+  }
+  .ab-type-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    gap:10px;flex-wrap:wrap;margin-bottom:12px;
+  }
+  .ab-type-head h3{margin:0;font-size:14.5px;font-weight:700;}
+  .ab-type-hint{font-size:12px;color:var(--muted);}
+  .ab-type-text{
+    font-size:15.5px;line-height:2;background:var(--soft);border-radius:10px;
+    padding:14px 16px;word-break:break-all;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+  }
+  .ab-type-text .ok{color:#10b981;}
+  .ab-type-text .bad{color:#c0392b;background:#fee2e2;border-radius:3px;}
+  .ab-type-text .cur{background:#111;color:#fff;border-radius:3px;}
+  .ab-type-text .todo{color:#9a9a9a;}
+  .ab-type-input{
+    width:100%;margin-top:12px;padding:12px 14px;font-size:16px;line-height:1.7;
+    border:1px solid var(--line);border-radius:10px;box-sizing:border-box;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+  }
+  .ab-type-input:focus{outline:none;border-color:#111;}
+  .ab-type-input:disabled{background:var(--soft);color:var(--muted);}
+  .ab-type-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px;}
+  .ab-type-stat{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .ab-type-result{
+    margin-top:14px;border-radius:12px;padding:16px 18px;background:var(--dark);color:var(--dark-fg);
+    display:none;
+  }
+  .ab-type-result.on{display:block;}
+  .ab-type-result .big{font-size:18px;font-weight:700;letter-spacing:-.2px;line-height:1.6;}
+  .ab-type-result .sub{font-size:12.8px;color:#b9b9b9;margin-top:8px;line-height:1.8;}
+
+  .ab-timeline{
+    border:1px solid var(--line);border-radius:14px;
+    background:var(--bg-elev);padding:8px 22px 14px;
+  }
+  .ab-tl-item{
+    display:flex;gap:14px;align-items:baseline;
+    padding:9px 0;border-top:1px solid var(--soft);
+  }
+  .ab-tl-item:first-child{border-top:0;}
+  .ab-tl-date{
+    flex:0 0 86px;font-size:12.5px;color:var(--muted);
+    font-variant-numeric:tabular-nums;letter-spacing:.2px;
+  }
+  .ab-tl-text{flex:1;min-width:0;font-size:13.5px;line-height:1.75;color:var(--fg);}
+  .ab-tl-new{
+    display:inline-block;margin-left:8px;font-size:10.5px;font-weight:600;
+    color:var(--accent-fg);background:var(--accent);
+    border-radius:20px;padding:2px 9px;letter-spacing:.6px;vertical-align:1px;
+  }
+  .ab-tl-mark{
+    text-align:center;font-size:12px;color:var(--muted);
+    letter-spacing:2px;padding:20px 0 10px;
+  }
+  .ab-tl-mark::before,.ab-tl-mark::after{
+    content:"";display:inline-block;width:46px;height:1px;
+    background:var(--line);vertical-align:middle;margin:0 12px;
+  }
+  @media (max-width:640px){
+    .ab-timeline{padding:6px 15px 12px;}
+    .ab-tl-item{flex-direction:column;gap:2px;padding:11px 0;}
+    .ab-tl-date{flex:none;font-size:12px;font-weight:600;color:var(--fg-2);}
+  }
+
+  .ab-cl-hint{
+    margin:18px 0 0;font-size:13.5px;color:var(--muted);line-height:1.8;
+  }
+  .ab-cl-hint a{
+    color:var(--fg);font-weight:600;text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .ab-cl-hint a:hover{color:var(--accent);}
+
+  .ab-join{
+    margin-top:38px;border-radius:16px;padding:34px 32px;
+    background:var(--dark);color:var(--dark-fg);text-align:center;
+  }
+  .ab-join h2{font-size:21px;margin:0 0 12px;font-weight:700;letter-spacing:-0.2px;}
+  .ab-join p{color:#b9b9b9;font-size:14px;line-height:1.85;margin:0 auto 22px;max-width:560px;}
+  .ab-join .btn{background:var(--bg-elev);color:#111;border-color:#fff;}
+  .ab-join .btn:hover{background:#e8e8e8;border-color:#e8e8e8;}
+  .ab-join-tip{font-size:12px;color:#8f8f8f;margin-top:14px;}
+
+  @media (max-width:640px){
+    .ab-hero{padding:32px 22px 30px;}
+    .ab-hero h1{font-size:24px;}
+    .ab-prose{padding:20px 18px;}
+    .ab-join{padding:28px 20px;}
+  }
+</style>
+
+<div class="ab-wrap">
+
+  <div class="ab-hero">
+    <div class="ab-badge">{{ blocks.hero_badge }}</div>
+    <h1>{{ blocks.hero_title }}</h1>
+    <p class="ab-lead">{{ blocks.hero_lead }}</p>
+    <div class="ab-actions">
+      <a class="btn" href="{{ join_url }}" target="_blank" rel="noopener">加入我们 →</a>
+      <a class="btn ghost" href="{{ url_for('changelog_page') }}">更新日志</a>
+    </div>
+    <p class="ab-cl-hint">
+      {{ blocks.hero_hint }}
+      <a href="{{ url_for('changelog_page') }}">{{ blocks.hero_hint_link }}</a>
+    </p>
+  </div>
+
+  <div class="ab-sec">
+    <div class="ab-sec-head"><span class="ab-idx">01</span><h2>我们是谁</h2></div>
+    <p class="ab-sec-desc">{{ blocks.who_desc }}</p>
+    <div class="ab-prose">
+      <p>{{ blocks.who_p1 }}</p>
+      <p>{{ blocks.who_p2 }}</p>
+      <p>{{ blocks.who_p3 }}</p>
+    </div>
+  </div>
+
+  <div class="ab-sec">
+    <div class="ab-sec-head"><span class="ab-idx">02</span><h2>我们在做什么</h2></div>
+    <p class="ab-sec-desc">{{ blocks.doing_desc }}</p>
+    <div class="ab-feats">
+      <div class="ab-feat">
+        <div class="ab-feat-t">{{ blocks.feat1_t }}</div>
+        <div class="ab-feat-d">{{ blocks.feat1_d }}</div>
+      </div>
+      <div class="ab-feat">
+        <div class="ab-feat-t">{{ blocks.feat2_t }}</div>
+        <div class="ab-feat-d">{{ blocks.feat2_d }}</div>
+      </div>
+      <div class="ab-feat">
+        <div class="ab-feat-t">{{ blocks.feat3_t }}</div>
+        <div class="ab-feat-d">{{ blocks.feat3_d }}</div>
+      </div>
+      <div class="ab-feat">
+        <div class="ab-feat-t">{{ blocks.feat4_t }}</div>
+        <div class="ab-feat-d">{{ blocks.feat4_d }}</div>
+      </div>
+      <div class="ab-feat">
+        <div class="ab-feat-t">{{ blocks.feat5_t }}</div>
+        <div class="ab-feat-d">{{ blocks.feat5_d }}</div>
+      </div>
+      <div class="ab-feat">
+        <div class="ab-feat-t">{{ blocks.feat6_t }}</div>
+        <div class="ab-feat-d">{{ blocks.feat6_d }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ab-sec">
+    <div class="ab-sec-head"><span class="ab-idx">03</span><h2>团队成员</h2></div>
+    <p class="ab-sec-desc">{{ blocks.team_desc }}</p>
+    <div class="ab-team">
+      {% for m in members %}
+      <div class="ab-member">
+        <div class="ab-photo">
+          {% if m.photo %}
+            <img src="{{ m.photo }}" alt="{{ m.name }}" loading="lazy">
+          {% elif m.no_photo_text %}
+            <span class="ab-photo-txt">{{ m.no_photo_text }}</span>
+          {% else %}
+            <span class="ab-photo-ph">{{ m.emoji }}</span>
+          {% endif %}
+        </div>
+        <div class="ab-m-name">{{ m.emoji }} {{ m.name }}</div>
+        <div class="ab-m-role">{{ m.role }}</div>
+        <p class="ab-m-bio">{{ m.bio }}</p>
+        {% if m.tags %}
+        <div class="ab-tags">
+          {% for t in m.tags %}<span class="ab-tag">{{ t }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if scale %}
+  <div class="ab-sec">
+    <div class="ab-sec-head"><span class="ab-idx">04</span><h2>我们的规模</h2></div>
+    <p class="ab-sec-desc">{{ blocks.scale_desc }}</p>
+
+    <div class="ab-scale">
+      <div class="ab-scale-card">
+        <div class="ab-scale-num">{{ scale.code_lines_str }}</div>
+        <div class="ab-scale-label">代码总行数</div>
+        {% if scale.delta_lines %}
+        <div class="ab-scale-delta" title="与 {{ scale.delta_at_str }} 相比">较上次 +{{ scale.delta_lines }} 行</div>
+        {% endif %}
+      </div>
+      <div class="ab-scale-card">
+        <div class="ab-scale-num">{{ scale.code_chars_str }}</div>
+        <div class="ab-scale-label">代码总字符数</div>
+      </div>
+      <div class="ab-scale-card">
+        <div class="ab-scale-num">{{ scale.code_files_str }}</div>
+        <div class="ab-scale-label">源文件数</div>
+      </div>
+      <div class="ab-scale-card">
+        <div class="ab-scale-num">{{ scale.code_size_str }}</div>
+        <div class="ab-scale-label">代码体积</div>
+      </div>
+      <div class="ab-scale-card">
+        <div class="ab-scale-num">{{ scale.total_size_str }}</div>
+        <div class="ab-scale-label">整站体积</div>
+      </div>
+    </div>
+
+    <div class="ab-langs">
+      {% for l in scale.langs %}
+      <div class="ab-lang">
+        <div class="ab-lang-head">
+          <b>{{ l.lang }}</b>
+          <span>{{ l.lines_str }} 行 · {{ l.pct }}%</span>
+        </div>
+        <div class="ab-lang-bar"><i style="width:{{ l.pct }}%"></i></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="ab-type" id="typeChallenge">
+      <div class="ab-type-head">
+        <h3>⌨️ 你能多快敲完这些代码？</h3>
+        <span class="ab-type-hint">照着敲一遍，看看手速 · 标点中英文都算对</span>
+      </div>
+      <div class="ab-type-text" id="typeTarget"></div>
+      <input class="ab-type-input" id="typeInput" type="text" autocomplete="off"
+             autocorrect="off" autocapitalize="off" spellcheck="false"
+             placeholder="在这里照着敲……（敲完自动出结果）">
+      <div class="ab-type-bar">
+        <button class="btn ghost" type="button" id="typeReset">换一句 / 重来</button>
+        <span class="ab-type-stat" id="typeStat">还没开始</span>
+      </div>
+      <div class="ab-type-result" id="typeResult">
+        <div class="big" id="typeBig"></div>
+        <div class="sub" id="typeSub"></div>
+      </div>
+    </div>
+
+    <div class="ab-scale-note">
+      {{ blocks.scale_note }}
+      {% if scale.updated_str %}<br>代码最近一次改动：{{ scale.updated_str }}{% endif %}
+      {% if scale.at_str %}· 本页数字统计于 {{ scale.at_str }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="ab-join">
+    <h2>{{ blocks.join_title }}</h2>
+    <p>{{ blocks.join_text }}</p>
+    <a class="btn" href="{{ join_url }}" target="_blank" rel="noopener">加入陆柒工作室 →</a>
+    <div class="ab-join-tip">{{ blocks.join_tip }}</div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var targetEl = document.getElementById('typeTarget');
+  var inputEl  = document.getElementById('typeInput');
+  var statEl   = document.getElementById('typeStat');
+  var resEl    = document.getElementById('typeResult');
+  var bigEl    = document.getElementById('typeBig');
+  var subEl    = document.getElementById('typeSub');
+  var resetBtn = document.getElementById('typeReset');
+  if (!targetEl || !inputEl) return;
+
+  var CODE_CHARS = {{ (scale.code_chars if scale else 0) or 0 }};
+
+  function pick(a){ return a[Math.floor(Math.random() * a.length)]; }
+
+  var TEMPLATES = [
+    function(){
+      return 'We built this ' + pick(['website','project','community','little site'])
+           + ' after school, one ' + pick(['bug','page','feature','line']) + ' at a time.';
+    },
+    function(){
+      return 'Coding ' + pick(['at night','after class','on weekends'])
+           + ' is hard, but seeing it ' + pick(['work','run','go live']) + ' is worth it.';
+    },
+    function(){
+      return 'We are just ' + pick(['students','a few students','three students'])
+           + ' who wanted to build ' + pick(['something real','something useful','a real site']) + '.';
+    },
+    function(){
+      return pick(['Every bug','Every error','Every mistake'])
+           + ' we fixed taught us something ' + pick(['new and useful','no class ever did']) + '.';
+    },
+    function(){
+      return 'The best part of ' + pick(['coding','building this','making a site'])
+           + ' is watching your idea ' + pick(['come alive','actually work','go online']) + '.';
+    },
+    function(){
+      return 'No ' + pick(['teacher','budget','guide']) + ', no '
+           + pick(['team','plan','shortcut']) + ', just a laptop and a lot of curiosity.';
+    },
+    function(){
+      return 'We started with ' + pick(['one small page','a single page','one idea'])
+           + ' and kept ' + pick(['adding more','building on it','shipping new things']) + '.';
+    },
+    function(){
+      return 'It took many ' + pick(['late nights','long weekends','tries'])
+           + ' to make this site ' + pick(['work','run smoothly','go live']) + '.';
+    }
+  ];
+
+  var sentence = '', chars = [], startedAt = 0, finished = false, timer = null;
+
+  function esc(ch){ return ch === '<' ? '&lt;' : (ch === '&' ? '&amp;' : ch); }
+
+  var PUNCT = {',':'，', '.':'。', '!':'！', '?':'？', ':':'：', ';':'；',
+               '(':'（', ')':'）', '<':'《', '>':'》'};
+  function same(a, b){ return a === b || PUNCT[a] === b || PUNCT[b] === a; }
+
+  function wordCount(s){ return String(s).trim().split(/\s+/).filter(Boolean).length; }
+
+  var userEngaged = false;
+  inputEl.addEventListener('focus', function(){ userEngaged = true; });
+  inputEl.addEventListener('click', function(){ userEngaged = true; });
+
+  function newSentence(focusIt){
+    var guard = 0, wc = 0;
+    do {
+      sentence = pick(TEMPLATES)();
+      wc = wordCount(sentence);
+    } while ((wc < 9 || wc > 13) && guard++ < 40);
+    chars = Array.from(sentence);
+    startedAt = 0; finished = false;
+    if (timer){ clearInterval(timer); timer = null; }
+    inputEl.value = ''; inputEl.disabled = false;
+    resEl.classList.remove('on');
+    statEl.textContent = '还没开始 · 这句话共 ' + chars.length + ' 个字符';
+    renderWithTyped('');
+    if (focusIt && userEngaged){
+      try { inputEl.focus({ preventScroll: true }); }
+      catch(e){ inputEl.focus(); }
+    }
+  }
+
+  function renderWithTyped(typed){
+    var t = Array.from(typed);
+    var html = '', i;
+    for (i = 0; i < chars.length; i++){
+      if (i < t.length){
+        html += '<span class="' + (same(t[i], chars[i]) ? 'ok' : 'bad') + '">' + esc(chars[i]) + '</span>';
+      } else if (i === t.length){
+        html += '<span class="cur">' + esc(chars[i]) + '</span>';
+      } else {
+        html += '<span class="todo">' + esc(chars[i]) + '</span>';
+      }
+    }
+    targetEl.innerHTML = html;
+  }
+
+  function isComplete(typed){
+    var t = Array.from(typed);
+    if (t.length !== chars.length) return false;
+    for (var i = 0; i < chars.length; i++){ if (!same(t[i], chars[i])) return false; }
+    return true;
+  }
+
+  function fmtDuration(mins){
+    mins = Math.max(0, Math.round(mins));
+    var d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+    var out = '';
+    if (d > 0) out += d + ' 天 ';
+    if (h > 0 || d > 0) out += h + ' 小时 ';
+    return (out + m + ' 分钟').trim();
+  }
+
+  function tick(){
+    if (!startedAt || finished) return;
+    var s = (Date.now() - startedAt) / 1000;
+    var n = Array.from(inputEl.value).length;
+    var cpm = n > 0 ? Math.round(n * 60 / Math.max(0.5, s)) : 0;
+    statEl.textContent = '已敲 ' + n + '/' + chars.length + ' 个字符 · 用时 ' + s.toFixed(1) + ' 秒'
+      + (cpm > 0 ? ' · 当前 ' + cpm + ' 字符/分钟' : '');
+  }
+
+  function finish(){
+    if (finished) return;
+    finished = true;
+    if (timer){ clearInterval(timer); timer = null; }
+    inputEl.disabled = true;
+
+    var secs = Math.max(0.5, (Date.now() - startedAt) / 1000);
+    var n = chars.length;
+    var cpm = Math.round(n * 60 / secs);
+    var totalMins = CODE_CHARS > 0 ? (CODE_CHARS / Math.max(1, cpm)) : 0;
+
+    bigEl.textContent = '您的打字速度为 ' + cpm + ' 字符/分钟';
+    subEl.innerHTML = '用时 ' + secs.toFixed(1) + ' 秒 · 共 ' + n + ' 个字符'
+      + (CODE_CHARS > 0
+          ? '<br>全部敲完这些代码（' + CODE_CHARS.toLocaleString() + ' 个字符）大概需要 <b>'
+            + fmtDuration(totalMins) + '</b>'
+          : '');
+    resEl.classList.add('on');
+    statEl.textContent = '完成！';
+  }
+
+  inputEl.addEventListener('input', function(){
+    if (finished) return;
+    var typed = inputEl.value;
+    if (!startedAt){ startedAt = Date.now(); timer = setInterval(tick, 200); }
+    var t = Array.from(typed);
+    if (t.length > chars.length){ typed = t.slice(0, chars.length).join(''); inputEl.value = typed; }
+    renderWithTyped(typed);
+    tick();
+    if (isComplete(typed)) finish();
+  });
+
+  inputEl.addEventListener('paste', function(e){ e.preventDefault(); });
+  if (resetBtn) resetBtn.addEventListener('click', function(){ newSentence(true); });
+
+  newSentence();
+})();
+</script>
+{% endblock %}

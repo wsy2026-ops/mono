@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}创建群组 - MONO 社区{% endblock %}
+{% set active = 'groups' %}
+{% block content %}
+<div class="card narrow" style="margin:24px auto;">
+  <h2>创建群组</h2>
+  <p class="sub">群主可转让、解散、任免管理员、全员禁言、踢人、设入群规则</p>
+  <form method="post">
+    <label>群名称（1-30 字）</label>
+    <input type="text" name="name" maxlength="30" required>
+    <label>群分类</label>
+    <select name="category">
+      <option value="技术群">技术群</option>
+      <option value="游戏群">游戏群</option>
+      <option value="闲聊群" selected>闲聊群</option>
+    </select>
+    <label>入群模式</label>
+    <select name="join_mode">
+      <option value="public">公开群（直接加入）</option>
+      <option value="audit" selected>审核群（需审核）</option>
+      <option value="private">私密群（仅邀请）</option>
+    </select>
+    <label>群简介</label>
+    <textarea name="intro" maxlength="200" placeholder="介绍一下这个群～"></textarea>
+    <label style="display:flex;gap:6px;align-items:center;">
+      <input type="checkbox" name="is_searchable" checked> 允许被搜索
+    </label>
+    <button type="submit" class="btn block">创建群组</button>
+  </form>
+</div>
+{% endblock %}

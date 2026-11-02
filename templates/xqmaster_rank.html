@@ -1,0 +1,75 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}巅峰榜{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-head">
+  <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="{{ url_for('xqmaster_page') }}">← 返回</a>
+  <h1>巅峰榜</h1>
+  <span class="xqm-hsub">两个月一赛季</span>
+</div>
+
+<div class="xqm-szn" id="xqmSzn" style="display:none">
+  <div class="szn-top">
+    <div class="szn-name" id="xqmSznName">—</div>
+    <div class="szn-left" id="xqmSznLeft">—</div>
+  </div>
+  <div class="szn-bar"><i id="xqmSznBar" style="width:0%"></i></div>
+  <div class="szn-note" id="xqmSznNote">赛季结束后积分清零，所有人重新起跑</div>
+</div>
+
+<div class="xqm-stats" id="xqmStats"></div>
+<div class="xqm-tbl" id="xqmRankTbl">
+  <div class="xqm-skel xqm-skel-row"></div>
+  <div class="xqm-skel xqm-skel-row"></div>
+  <div class="xqm-skel xqm-skel-row"></div>
+  <div class="xqm-skel xqm-skel-row"></div>
+</div>
+<div class="xqm-szn-hist" id="xqmSznHist" style="display:none"></div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  X.loadMe();
+
+  X.api('/api/xqm/season').then(function(r){
+    if(!r || !r.ok) return;
+    var s = r.season;
+    document.getElementById('xqmSzn').style.display = '';
+    document.getElementById('xqmSznName').textContent = s.name;
+    document.getElementById('xqmSznLeft').textContent = s.days_left > 0
+      ? ('还剩 ' + s.days_left + ' 天')
+      : '今天结算';
+    document.getElementById('xqmSznBar').style.width = s.progress + '%';
+    document.getElementById('xqmSznNote').textContent =
+      '共 ' + s.days_total + ' 天，已过 ' + s.progress + '%　·　赛季结束后积分清零到 ' + s.reset + '，所有人重新起跑';
+
+    var tbl = document.getElementById('xqmRankTbl');
+    if(!r.list.length){
+      tbl.innerHTML = '<div class="xqm-empty">本赛季还没有人打过，快去抢第一</div>';
+    } else {
+      tbl.innerHTML = r.list.map(function(x){
+        return '<div class="xqm-trow' + (x.me ? ' me' : '') + '">'
+          + '<div class="rk' + (x.rank <= 3 ? ' top' : '') + '">' + x.rank + '</div>'
+          + '<div class="nm">' + x.name + (x.me ? '（你）' : '') + '</div>'
+          + '<div class="wl">' + x.wins + '胜 ' + x.losses + '负 ' + x.draws + '和</div>'
+          + '<div class="rt">' + x.rating + '</div></div>';
+      }).join('');
+    }
+
+    if(r.hist && r.hist.length){
+      var h = document.getElementById('xqmSznHist');
+      h.style.display = '';
+      h.innerHTML = '<h4>历届冠军</h4>' + r.hist.map(function(x){
+        return '<div class="h"><span class="s">' + x.season + '</span>'
+          + '<span class="n">' + x.name + '</span>'
+          + '<span class="r">' + x.rating + '</span></div>';
+      }).join('');
+    }
+  }).catch(function(){
+    document.getElementById('xqmRankTbl').innerHTML = '<div class="xqm-empty">加载失败</div>';
+  });
+})();
+</script>
+{% endblock %}

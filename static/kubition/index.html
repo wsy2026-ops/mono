@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <base href="/static/kubition/">
+        <title>超苦逼冒险者v0.32</title>
+        <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+        <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <link rel="stylesheet" href="./build/bootstrap.min.css?v=20261030r">
+        <link rel= "stylesheet" href="./index.css?v=20261030r">
+        <script type="text/javascript" src="./build/fastclick.js?v=20261030r"></script>
+        
+        
+        <!--...
+
+-->
+        <!-- 本地依赖（原 CDN 全部移除，国内访问稳定） -->
+        <script type="text/javascript" src="./build/jquery.js?v=20261030r"></script>
+        <script type="text/javascript" src="./build/react-with-addons.js?v=20261030r"></script>
+        <script type="text/javascript">
+          // ★ React 0.14 的 react-with-addons 是全家桶，但 UMD 只导出 window.React。
+          //   它内部已经带 ReactDOM 的渲染器（React.render / unmountComponentAtNode / findDOMNode），
+          //   这里给 window.ReactDOM 垫一个，避免 "ReactDOM is not defined"。
+          (function () {
+            if (typeof window.ReactDOM !== 'undefined') return;
+            if (typeof window.React === 'undefined') return;
+            window.ReactDOM = {
+              render: window.React.render,
+              unmountComponentAtNode: window.React.unmountComponentAtNode,
+              findDOMNode: window.React.findDOMNode
+            };
+          })();
+        </script>
+        <script type="text/javascript" src="./build/browser.min.js?v=20261030r"></script>
+    
+    <!-- ★ 手机端适配：按屏宽等比缩放（原版固定 960px，手机上会溢出） -->
+    <script>
+      (function () {
+        var BASE = 960;   // 必须等于设计宽度，否则内容会超出屏幕
+        function fit() {
+          var w = document.documentElement.clientWidth || window.innerWidth;
+          var h = document.documentElement.clientHeight || window.innerHeight;
+          var z = 1;
+          // 窄屏（<=900）走 CSS 重排，不缩放；只有 900~960 这档才等比缩一下防溢出
+          if (w > 900 && w < BASE) {
+            z = w / BASE;
+          }
+          document.documentElement.style.zoom = z;
+          document.documentElement.style.setProperty('--kubi-zoom', z);
+        }
+        fit();
+        window.addEventListener('resize', fit);
+        window.addEventListener('orientationchange', function () { setTimeout(fit, 120); });
+        document.addEventListener('DOMContentLoaded', fit);
+      })();
+    </script>
+</head>
+    <body>
+        <div class="background">
+            <div class="outer clearFix">
+                <div id = "game"></div>
+            </div>
+        </div>
+    </body>
+    <audio id='effect_pick' src='./res/pick.ogg'></audio>
+    <audio id='effect_eat' src='./res/eat.ogg'></audio>
+    <audio id='effect_door' src='./res/door.ogg'></audio>
+    <audio id='effect_door_closed' src='./res/door_closed.ogg'></audio>
+    <audio id='effect_exchange' src='./res/exchange.ogg'></audio>
+    <audio id='effect_build' src='./res/build.ogg'></audio>
+    <audio id='effect_drink' src='./res/drink.ogg'></audio>
+    <audio id='effect_bell' src='./res/bell.ogg'></audio>
+    <audio id='effect_wear' src='./res/wear.ogg'></audio>
+    <audio id='effect_all_in' src='./res/all_in.ogg'></audio>
+    <audio id='effect_scroll' src='./res/scroll.ogg'></audio>
+    <audio id='effect_open' src='./res/open.ogg'></audio>
+    <audio id='effect_pickall' src='./res/pickall.ogg'></audio>
+
+
+    <script type="text/javascript" src = "./src/lib.js?v=20261030r"></script>
+    <script type="text/javascript" src = "./src/data_item.js?v=20261030r"></script>
+    <script type="text/javascript" src = "./src/data_studio.js?v=20261030r"></script>
+    <script type="text/javascript" src = "./src/data_event.js?v=20261030r"></script>
+    <script type="text/javascript" src = "./src/data_place.js?v=20261030r"></script>
+    <script type="text/javascript" src = "./src/data_mst.js?v=20261030r"></script>
+    <script type="text/javascript" src = "./src/data_dungeon.js?v=20261030r"></script>
+    <script type="text/javascript" src = "./src/data.js?v=20261030r"></script>
+    <script type="text/babel" src = "./src/main.js?v=20261030r"></script>
+    
+    <!--
+<script type="text/javascript">
+      alert("欢迎光临！\n该游戏的重制版已在steam平台进行测试，你可以加入QQ群1101648632，向我索要测试激活码。——maou。")
+</script>-->
+    
+</html>

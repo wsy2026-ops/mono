@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}我的收藏夹 - MONO 社区{% endblock %}
+{% set active = 'profile' %}
+
+{% block content %}
+<style>
+  .fv-wrap{max-width:860px;margin:0 auto;}
+  .fv-head{border:1px solid var(--line);border-radius:16px;padding:22px 28px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);margin-bottom:20px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .fv-head h1{font-size:22px;margin:0;font-weight:700;}
+  .fv-head p{margin:0;font-size:12.5px;color:var(--muted);}
+  .fv-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .fv-tab{padding:6px 16px;border:1px solid var(--line);border-radius:99px;font-size:13px;
+    color:var(--fg-2);cursor:pointer;background:var(--card);}
+  .fv-tab.on{background:#111;color:#fff;border-color:#111;}
+  .fv-sec{display:none;}
+  .fv-sec.on{display:block;}
+  .fv-row{display:flex;gap:12px;align-items:center;border:1px solid var(--line);
+    border-radius:12px;padding:11px 16px;background:var(--card);margin-bottom:8px;font-size:13.5px;}
+  .fv-row .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+  .fv-row .t a{color:inherit;text-decoration:none;}
+  .fv-ops{margin-left:auto;display:flex;gap:6px;flex:none;}
+  .fv-pub{font-size:11.5px;border:1px solid var(--line);border-radius:99px;padding:3px 10px;
+    background:var(--bg-elev);color:var(--muted);cursor:pointer;}
+  .fv-pub.on{background:rgba(201,162,39,.15);color:#8a6d12;border-color:rgba(201,162,39,.5);}
+  .fv-empty{padding:34px;text-align:center;color:var(--muted);font-size:13px;
+    border:1px dashed var(--line);border-radius:14px;}
+</style>
+
+<div class="fv-wrap">
+  <div class="fv-head">
+    <div>
+      <h1>⭐ 我的收藏夹</h1>
+      <p>收藏三类对象：帖子 / 用户 / 游戏。点亮「公开」后会出现在你的分享页。</p>
+    </div>
+    <a href="{{ url_for('user_page', user_id=current_user.id, tab='favorites') }}"
+       class="btn sm ghost" style="margin-left:auto;">主页收藏视图</a>
+  </div>
+
+  <div class="fv-tabs">
+    {% for g in groups %}
+    <span class="fv-tab {{ 'on' if loop.first else '' }}" data-sec="{{ g.type }}">
+      {{ g.name }}（{{ g.rows|length }}）</span>
+    {% endfor %}
+  </div>
+
+  {% for g in groups %}
+  <div class="fv-sec {{ 'on' if loop.first else '' }}" id="fv-{{ g.type }}">
+    {% if g.rows %}
+    {% for r in g.rows %}
+    <div class="fv-row">
+      <span class="t">
+        {% if g.type == 'post' %}
+        <a href="{{ url_for('view_post', post_id=r.pid) }}">{{ r.title }}</a>
+        {% elif g.type == 'user' %}
+        <a href="{{ url_for('user_page', user_id=r.pid) }}">👤 {{ r.title }}</a>
+        {% else %}
+        <a href="{{ url_for('games_center') }}">🎮 {{ r.title }}</a>
+        {% endif %}
+      </span>
+      <span class="fv-ops">
+        <button class="fv-pub {{ 'on' if r.is_public else '' }}" data-fid="{{ r.fid }}"
+                onclick="togglePub(this)">
+          {{ '🌐 公开' if r.is_public else '🔒 私有' }}</button>
+        <button class="fv-pub" onclick="unfav(this, '{{ g.type }}', {{ r.pid }})">取消收藏</button>
+      </span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="fv-empty">还没有收藏{{ g.name }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+document.querySelectorAll('.fv-tab').forEach(function(tab){
+  tab.addEventListener('click', function(){
+    document.querySelectorAll('.fv-tab').forEach(function(t){ t.classList.remove('on'); });
+    document.querySelectorAll('.fv-sec').forEach(function(s){ s.classList.remove('on'); });
+    tab.classList.add('on');
+    document.getElementById('fv-' + tab.dataset.sec).classList.add('on');
+  });
+});
+function togglePub(btn){
+  fetch('/api/fav-visibility/' + btn.dataset.fid, {method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) return;
+      btn.classList.toggle('on', !!j.is_public);
+      btn.textContent = j.is_public ? '🌐 公开' : '🔒 私有';
+    }).catch(function(){});
+}
+function unfav(btn, type, id){
+  fetch('/api/fav/' + type + '/' + id, {method:'POST'})
+    .then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) return;
+      location.reload();
+    }).catch(function(){});
+}
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+# ---- 用户数据（绝不进仓库：含聊天/账号等隐私 + 会天天变导致仓库膨胀）----
+# *.db 一律不进仓库。探测脚本、快照脚本随手建的库（mono.db / promo.db 等）
+# 都不该被提交。真要放行某个库必须显式写 !库名。
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+data.db
+# 数据库的任何派生文件（合并/备份产物），一律不进仓库
+data.db.*
+data.db-*
+*.db.bak*
+*.db.merged*
+*.db.just-before-swap
+.secret_key
+uploads/
+static/avatars/
+# 反馈里上传的截图（用户数据，不进仓库）
+static/feedback/
+_old_guns/
+_trash_wip/
+# 音乐台用户上传的音频（与 uploads 同级，属用户数据，绝不进仓库）
+music/
+data_backups/
+backups/
+logs/
+
+# ---- 云端快照连接串（含数据库密码，绝不进仓库）----
+neon_dsn.txt
+neon_dsn
+*.snap
+
+# 「我们的规模」上一次统计的快照（运行时产物，天天变；进仓库会导致仓库膨胀）
+scale_history.json
+
+# ---- 临时 / 日志 ----
+__pycache__/
+*.pyc
+*.log
+get-pip.py
+_sqlite_fix.zip
+install_error.log
+_sqlite_err.log
+server_run.log
+_write_test.tmp
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# 用户云盘文件（不进代码库）
+drive/
+
+# OJ 出题的测试点数据（用户上传的，属用户数据，绝不进仓库）
+oj_data/
+_shots/
+
+# AI API keys（2026-11-01 起 key 不再进源码）
+.ai_keys.local
+ai_keys.env
+
+# ---- 开源版新增 ----
+# 棋类引擎（体积大、且是第三方软件，用 scripts/download_engines.sh 自己装）
+pikafish/
+katago/
+stockfish/
+rapfi/
+egaroucid/
+gnugo/
+_cold_hf/
+
+# 构建产物（APK 里还烤死了域名）
+static/*.apk
+static/*.apk.*
+
+# 团队成员真实照片
+static/team/
+
+# 管理员通行证（用 admin_secret.py --gen 生成后写环境变量，别落盘）
+admin_passcode*

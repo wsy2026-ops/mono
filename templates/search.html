@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}搜索 - MONO 社区{% endblock %}
+{% set active = 'search' %}
+{% block content %}
+<style>
+  @media (max-width:900px){
+    .search-page-title,.search-page-sub{display:none;}
+    .search-bar{margin-top:0 !important;margin-bottom:16px !important;}
+    .search-bar input{font-size:16px !important;}   /* 防 iOS 聚焦放大 */
+  }
+</style>
+<h2 class="search-page-title">🔍 站内搜索</h2>
+<p class="sub search-page-sub">聚合搜索用户、论坛帖子、群组与公开动态</p>
+
+<form class="search-bar" action="{{ url_for('search') }}" method="get" style="display:flex;gap:10px;margin-bottom:24px;">
+  <input type="text" name="q" value="{{ q }}" placeholder="输入关键词，回车搜索…" autofocus
+         style="flex:1;height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:15px;outline:none;">
+  <button type="submit" class="btn" style="height:44px;padding:0 24px;">搜索</button>
+</form>
+
+{% if not q %}
+<div class="card center" style="padding:48px;">
+  <p class="muted">输入关键词开始搜索</p>
+</div>
+{% else %}
+  {% set total = results.users|length + results.posts|length + results.groups|length
+                 + results.dynamics|length + results.messages|length
+                 + results.group_msgs|length + results.files|length %}
+  <p class="muted" style="margin-bottom:18px;">“{{ q }}” 共找到 <b>{{ total }}</b> 条结果</p>
+
+  {% if results.users %}
+  <section class="search-section">
+    <h3 class="search-h">👤 用户（{{ results.users|length }}）</h3>
+    <div class="card" style="padding:8px 4px;">
+      {% for u in results.users %}
+      <a class="search-row" href="{{ url_for('user_page', user_id=u.id) }}">
+        <img class="search-ava" src="{{ get_avatar_url(u) }}" alt="">
+        <div class="search-main">
+          <div class="search-title">{{ u.username }}{% if u.user_no %} <span class="search-no">#{{ u.user_no }}</span>{% endif %}{% if u.is_admin %} <span class="tag-admin">管理</span>{% endif %}</div>
+          <div class="search-sub">{{ u.signature or '这个人很懒，什么都没写' }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if results.posts %}
+  <section class="search-section">
+    <h3 class="search-h">📝 论坛帖子（{{ results.posts|length }}）</h3>
+    <div class="card" style="padding:8px 4px;">
+      {% for p in results.posts %}
+      <a class="search-row" href="{{ url_for('view_post', post_id=p.id) }}">
+        <div class="search-main">
+          <div class="search-title">{{ p.title }}</div>
+          <div class="search-sub">{{ (p.summary or p.content)|striptags|truncate(60, True, '…') }}</div>
+          <div class="search-meta">{{ p.username }} · ❤️ {{ p.likes }} · 💬 {{ p.comment_count }} · {{ p.created_at|timeago }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if results.groups %}
+  <section class="search-section">
+    <h3 class="search-h">👥 群组（{{ results.groups|length }}）</h3>
+    <div class="card" style="padding:8px 4px;">
+      {% for g in results.groups %}
+      <a class="search-row" href="{{ url_for('group_page', gid=g.id) }}">
+        <img class="search-ava" src="{{ g.avatar or cdn_url('default_avatar.png') }}" alt="" onerror="this.src='{{ cdn_url('default_avatar.png') }}'">
+        <div class="search-main">
+          <div class="search-title">{{ g.name }} <span class="tag-cate">{{ g.category }}</span></div>
+          <div class="search-sub">{{ g.intro or '暂无简介' }}</div>
+          <div class="search-meta">👥 {{ g.member_count }} 人</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if results.dynamics %}
+  <section class="search-section">
+    <h3 class="search-h">💬 动态（{{ results.dynamics|length }}）</h3>
+    <div class="card" style="padding:8px 4px;">
+      {% for d in results.dynamics %}
+      <a class="search-row" href="{{ url_for('dynamics_feed') }}#dyn-{{ d.id }}">
+        <div class="search-main">
+          <div class="search-title">{{ d.username }}</div>
+          <div class="search-sub">{{ d.content|striptags|truncate(80, True, '…') }}</div>
+          <div class="search-meta">{{ d.created_at|timeago }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if results.messages %}
+  <section class="search-section">
+    <h3 class="search-h">💬 聊天室记录（{{ results.messages|length }}）</h3>
+    <div class="card" style="padding:8px 4px;">
+      {% for m in results.messages %}
+      <a class="search-row" href="{{ url_for('chat') }}?room={{ m.room_id }}#msg-{{ m.id }}">
+        <div class="search-main">
+          <div class="search-title">{{ m.username }}</div>
+          <div class="search-sub">{{ m.content|striptags|truncate(80, True, '…') }}</div>
+          <div class="search-meta">{{ m.created_at|timeago }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if results.group_msgs %}
+  <section class="search-section">
+    <h3 class="search-h">👥 群消息（{{ results.group_msgs|length }}）</h3>
+    <div class="card" style="padding:8px 4px;">
+      {% for m in results.group_msgs %}
+      <a class="search-row" href="{{ url_for('group_page', gid=m.group_id) }}#gmsg-{{ m.id }}">
+        <div class="search-main">
+          <div class="search-title">{{ m.username }}
+            <span class="muted" style="font-weight:400;">· {{ m.group_name }}</span></div>
+          <div class="search-sub">{{ m.content|striptags|truncate(80, True, '…') }}</div>
+          <div class="search-meta">{{ m.created_at|timeago }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if results.files %}
+  <section class="search-section">
+    <h3 class="search-h">📎 群文件（{{ results.files|length }}）</h3>
+    <div class="card" style="padding:8px 4px;">
+      {% for f in results.files %}
+      <a class="search-row" href="{{ url_for('group_page', gid=f.group_id) }}">
+        <div class="search-main">
+          <div class="search-title">📄 {{ f.file_name }}</div>
+          <div class="search-sub">{{ f.username }} 上传 · {{ f.group_name }}</div>
+          <div class="search-meta">{{ f.created_at|timeago }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if total == 0 %}
+  <div class="card center" style="padding:48px;">
+    <p class="muted">没有找到与“{{ q }}”相关的内容</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+<style>
+  .search-section{margin-bottom:22px;}
+  .search-h{font-size:15px;margin:0 0 10px;color:var(--fg);}
+  .search-row{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:10px;text-decoration:none;transition:background .15s;}
+  .search-row:hover{background:var(--soft);}
+  .search-ava{width:42px;height:42px;border-radius:50%;object-fit:cover;flex:0 0 auto;border:1px solid var(--line);}
+  .search-main{flex:1;min-width:0;}
+  .search-title{font-weight:600;font-size:15px;color:var(--fg);}
+  .search-no{
+    font-size:12px;font-weight:400;color:var(--muted);
+    font-variant-numeric:tabular-nums;letter-spacing:.3px;
+  }
+  .search-sub{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .search-meta{font-size:12px;color:var(--muted);margin-top:4px;}
+  .tag-admin{font-size:11px;background:#ffd700;color:#111;padding:1px 6px;border-radius:6px;font-weight:700;}
+  .tag-cate{font-size:11px;background:var(--soft);color:var(--muted);padding:1px 6px;border-radius:6px;}
+</style>
+{% endblock %}

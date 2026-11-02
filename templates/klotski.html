@@ -1,0 +1,695 @@
+{% extends "base.html" %}
+{% block title %}数字华容道 - MONO 社区</div>
+{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="games-page">
+<style>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+.games-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    font-family: "Microsoft YaHei", sans-serif;
+    color: #111;
+    padding: 20px;
+    gap: 30px;
+}
+
+.top-bar {
+    position: fixed;
+    top: 76px;
+    left: 30px;
+    font-size: 14px;
+    z-index: 100;
+}
+.top-bar a {
+    color: #222;
+    text-decoration: none;
+    border-bottom: 1px solid #000;
+}
+
+.user-bar {
+    position: fixed;
+    top: 76px;
+    right: 30px;
+    background: #fff;
+    border: 1px solid #000;
+    padding: 10px 15px;
+    font-size: 14px;
+    z-index: 100;
+}
+.user-bar .best-time {
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+#homePage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    border: 2px solid #000;
+    padding: 50px 40px;
+}
+#homePage h1 {
+    font-size: 36px;
+    letter-spacing: 8px;
+    font-weight: 300;
+    margin-bottom: 40px;
+}
+.mode-group {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 240px;
+}
+.mode-btn {
+    padding: 16px 0;
+    background: #fff;
+    border: 1px solid #000;
+    color: #000;
+    font-size: 18px;
+    letter-spacing: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+.mode-btn:hover {
+    background: #000;
+    color: #fff;
+}
+
+#gamePage {
+    display: none;
+    gap: 32px;
+    align-items: flex-start;
+}
+.game-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    border: 2px solid #000;
+    padding: 30px;
+}
+.game-left h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    letter-spacing: 4px;
+    font-weight: 300;
+}
+.info-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    font-size: 14px;
+    border-top: 1px solid #000;
+    border-bottom: 1px solid #000;
+    padding: 10px 0;
+    width: 100%;
+}
+.info-item {
+    text-align: center;
+    flex: 1;
+}
+.info-item span {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 2px;
+}
+
+.board {
+    background: #000;
+    padding: 4px;
+    display: grid;
+    gap: 4px;
+}
+.tile {
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+}
+.tile:hover {
+    background: #e8e8e8;
+}
+.tile.empty {
+    background: #999;
+    cursor: default;
+    pointer-events: none;
+}
+
+.win-tip {
+    margin-top: 16px;
+    height: 24px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #27ae60;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.win-tip.show {
+    opacity: 1;
+}
+
+.controls {
+    margin-top: 76px;
+    display: flex;
+    gap: 10px;
+}
+.controls button {
+    padding: 8px 20px;
+    background: #fff;
+    border: 1px solid #000;
+    color: #000;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.controls button:hover {
+    background: #000;
+    color: #fff;
+}
+
+.rank-container {
+    background: #fff;
+    border: 2px solid #000;
+    padding: 25px;
+    width: 280px;
+    height: fit-content;
+}
+.rank-title {
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 2px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #000;
+    margin-bottom: 15px;
+}
+.rank-list {
+    list-style: none;
+}
+.rank-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 16px;
+}
+.rank-item:last-child {
+    border-bottom: none;
+}
+.rank-item.self {
+    background: #f0f0f0;
+    font-weight: bold;
+}
+.rank-num {
+    width: 30px;
+    text-align: center;
+    font-weight: bold;
+}
+.rank-name {
+    flex: 1;
+    padding: 0 10px;
+}
+.rank-time {
+    font-weight: bold;
+    min-width: 60px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.modal {
+    background: #fff;
+    border: 2px solid #000;
+    padding: 40px;
+    text-align: center;
+    max-width: 350px;
+    width: 90%;
+}
+.modal h2 {
+    font-size: 24px;
+    margin-bottom: 15px;
+    color: #000;
+    letter-spacing: 2px;
+}
+.modal p {
+    color: #333;
+    margin-bottom: 10px;
+    line-height: 1.6;
+}
+.new-record {
+    color: #e74c3c;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+.final-time {
+    font-size: 36px;
+    font-weight: bold;
+    color: #000;
+    margin: 20px 0;
+    font-variant-numeric: tabular-nums;
+}
+.modal-btns {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+.modal-btn {
+    padding: 12px 24px;
+    font-size: 15px;
+    border: 2px solid #000;
+    background: #fff;
+    color: #000;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+.modal-btn:hover {
+    background: #000;
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .games-page {
+        flex-direction: column;
+        gap: 20px;
+        padding-top: 70px;
+    }
+    .rank-container {
+        width: 100%;
+        max-width: 520px;
+    }
+    .user-bar {
+        top: 10px;
+        right: 10px;
+    }
+    .top-bar {
+        top: 10px;
+        left: 10px;
+    }
+}
+</style>
+
+    <div class="top-bar">
+        <a href="{{ url_for('games_center') }}">← 返回大厅</a>
+    </div>
+
+    <div class="user-bar">
+        {{ user.username }}
+        <span>最佳用时：<span class="best-time" id="userBestTime">--:--</span></span>
+    </div>
+
+    <div id="homePage">
+        <h1>华 容 道</h1>
+        <div class="mode-group">
+            <button class="mode-btn" data-size="4">4 × 4</button>
+            <button class="mode-btn" data-size="5">5 × 5</button>
+            <button class="mode-btn" data-size="6">6 × 6</button>
+        </div>
+    </div>
+
+    <div id="gamePage">
+        <div class="game-left">
+            <h1 id="gameTitle">4 × 4 华容道</h1>
+            <div class="info-bar" id="infoBar">
+                <div class="info-item">
+                    用时
+                    <span id="time">00:00</span>
+                </div>
+                <div class="info-item">
+                    步数
+                    <span id="steps">0</span>
+                </div>
+            </div>
+            <div class="board" id="board"></div>
+            <div class="win-tip" id="winTip">恭喜通关！</div>
+            <div class="controls">
+                <button id="restartBtn">重新开始</button>
+                <button id="backBtn">返回选关</button>
+            </div>
+        </div>
+
+        <div class="rank-container">
+            <h3 class="rank-title">排行榜</h3>
+            <ul class="rank-list" id="rankList">
+                {% for item in rank_list %}
+                <li class="rank-item {% if item.username == user.username %}self{% endif %}">
+                    <span class="rank-num">{{ loop.index }}</span>
+                    <span class="rank-name">{{ item.username }}</span>
+                    <span class="rank-time">{{ format_time(item.best_time) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal">
+            <h2>通关成功</h2>
+            <p id="gameInfo"></p>
+            <div class="new-record" id="newRecordTip" style="display:none;">🎉 新纪录！</div>
+            <div class="final-time" id="finalTime">00:00</div>
+            <div class="modal-btns">
+                <button class="modal-btn" onclick="backToHome()">返回选关</button>
+                <button class="modal-btn" onclick="restartGame()">再来一局</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+let SIZE = 4;
+let TOTAL = 16;
+let tiles = [];
+let emptyIndex = 0;
+let steps = 0;
+let timer = null;
+let seconds = 0;
+let started = false;
+let isWon = false;
+let submitted = false;
+/* 服务端复算用：初始盘面快照 + 有效点击序列（换子才算一步） */
+let tilesInit = null;
+let clickLog = [];
+
+const userBestTimes = {
+    4: {{ user.best_time_klotski_4 if user.best_time_klotski_4 is not none else 'null' }},
+    5: {{ user.best_time_klotski_5 if user.best_time_klotski_5 is not none else 'null' }},
+    6: {{ user.best_time_klotski_6 if user.best_time_klotski_6 is not none else 'null' }}
+};
+const currentUsername = {{ user.username|tojson }};
+
+window.MONO_GAME = { game: 'klotski', sub: '4', kind: 'time' };
+window.MONO_GAME_RENDER = function(s, el){
+  const st = tiles, ss = SIZE, stp = steps, ssc = seconds, sw = isWon, sb = submitted;
+  window.__monoReplay = true;
+  SIZE = s.z; TOTAL = s.z * s.z; tiles = s.t.slice();
+  steps = s.s; seconds = s.c; isWon = false; submitted = true;
+  const bd = document.getElementById('board');
+  renderBoard();
+  const c = bd.cloneNode(true);
+  c.style.pointerEvents = 'none';
+  el.innerHTML = '';
+  el.appendChild(c);
+  SIZE = ss; TOTAL = ss * ss; tiles = st;
+  steps = stp; seconds = ssc; isWon = sw; submitted = sb;
+  renderBoard();
+  window.__monoReplay = false;
+};
+
+const homePage = document.getElementById('homePage');
+const gamePage = document.getElementById('gamePage');
+const gameTitle = document.getElementById('gameTitle');
+const infoBar = document.getElementById('infoBar');
+const board = document.getElementById('board');
+const timeEl = document.getElementById('time');
+const stepsEl = document.getElementById('steps');
+const winTip = document.getElementById('winTip');
+const restartBtn = document.getElementById('restartBtn');
+const backBtn = document.getElementById('backBtn');
+const modeBtns = document.querySelectorAll('.mode-btn');
+const userBestTimeEl = document.getElementById('userBestTime');
+
+function formatTime(sec) {
+    if (sec === null || sec === undefined) return '--:--';
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+}
+
+function loadRank(size) {
+    fetch(`/api/klotski_rank/${size}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                renderRankList(data.rank_list);
+            }
+        });
+}
+
+function renderRankList(list) {
+    const rankListEl = document.getElementById('rankList');
+    rankListEl.innerHTML = '';
+    list.forEach((item, idx) => {
+        const li = document.createElement('li');
+        li.className = 'rank-item' + (item.username === currentUsername ? ' self' : '');
+        li.innerHTML = `
+            <span class="rank-num">${idx + 1}</span>
+            <span class="rank-name">${item.username}</span>
+            <span class="rank-time">${formatTime(item.best_time)}</span>
+        `;
+        rankListEl.appendChild(li);
+    });
+}
+
+function updateUserBestDisplay(size) {
+    userBestTimeEl.textContent = formatTime(userBestTimes[size]);
+}
+
+modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        SIZE = parseInt(btn.dataset.size);
+        TOTAL = SIZE * SIZE;
+        gameTitle.innerText = `${SIZE} × ${SIZE} 华容道`;
+
+        let boardSize, fontSize;
+        if(SIZE === 4){
+            boardSize = 320;
+            fontSize = 28;
+        }else if(SIZE === 5){
+            boardSize = 400;
+            fontSize = 24;
+        }else{
+            boardSize = 480;
+            fontSize = 20;
+        }
+        board.style.width = boardSize + 'px';
+        board.style.height = boardSize + 'px';
+        board.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        board.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+        infoBar.style.width = boardSize + 'px';
+
+        updateUserBestDisplay(SIZE);
+        loadRank(SIZE);
+
+        homePage.style.display = 'none';
+        gamePage.style.display = 'flex';
+        initGame();
+    });
+});
+
+function backToHome() {
+    clearInterval(timer);
+    document.getElementById('gameOverModal').style.display = 'none';
+    homePage.style.display = 'flex';
+    gamePage.style.display = 'none';
+}
+
+backBtn.addEventListener('click', backToHome);
+
+restartBtn.addEventListener('click', initGame);
+
+/* ---- 键盘操作：方向键推空格，R 重开 ---- */
+document.addEventListener('keydown', function(e){
+  if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  if(document.getElementById('gamePage') && document.getElementById('gamePage').style.display === 'none') return;
+  var k = e.key;
+  var er = Math.floor(emptyIndex / SIZE), ec = emptyIndex % SIZE;
+  var idx = -1;
+  if(k === 'ArrowUp' || k === 'w' || k === 'W'){ idx = (er + 1) * SIZE + ec; }
+  else if(k === 'ArrowDown' || k === 's' || k === 'S'){ idx = (er - 1) * SIZE + ec; }
+  else if(k === 'ArrowLeft' || k === 'a' || k === 'A'){ idx = er * SIZE + ec + 1; }
+  else if(k === 'ArrowRight' || k === 'd' || k === 'D'){ idx = er * SIZE + ec - 1; }
+  else if(k === 'r' || k === 'R'){ e.preventDefault(); initGame(); return; }
+  else return;
+  e.preventDefault();
+  /* 方向键的语义是「把空格推向那个方向」，所以取空格的反向格 */
+  if(idx >= 0 && idx < TOTAL) handleClick(idx);
+});
+
+function initGame() {
+    if (window.MONO_GAME) window.MONO_GAME.sub = String(SIZE);
+    if (window.MONO_REC) window.MONO_REC.start();
+    tiles = [];
+    for(let i = 1; i < TOTAL; i++){
+        tiles.push(i);
+    }
+    tiles.push(0);
+    emptyIndex = TOTAL - 1;
+
+    steps = 0;
+    seconds = 0;
+    started = false;
+    isWon = false;
+    submitted = false;
+    clearInterval(timer);
+    timer = null;
+
+    winTip.classList.remove('show');
+    document.getElementById('newRecordTip').style.display = 'none';
+    updateUI();
+    renderBoard();
+
+    let moveCount = SIZE * 100;
+    while(moveCount > 0){
+        let neighbors = getNeighbors(emptyIndex);
+        let rnd = neighbors[Math.floor(Math.random() * neighbors.length)];
+        [tiles[emptyIndex], tiles[rnd]] = [tiles[rnd], tiles[emptyIndex]];
+        emptyIndex = rnd;
+        moveCount--;
+    }
+    tilesInit = tiles.slice();   // 服务端复算：初始盘面
+    clickLog = [];               // 服务端复算：有效点击序列清零
+    renderBoard();
+}
+
+function renderBoard() {
+    if (window.MONO_REC && window.MONO_REC.active){
+        window.MONO_REC.snap({z: SIZE, t: tiles.slice(), s: steps, c: seconds});
+    }
+    board.innerHTML = '';
+    let tileSize = (board.offsetWidth - 8) / SIZE;
+    for(let i = 0; i < tiles.length; i++){
+        let div = document.createElement('div');
+        div.className = 'tile' + (tiles[i] === 0 ? ' empty' : '');
+        div.style.fontSize = tileSize * 0.4 + 'px';
+        div.textContent = tiles[i] === 0 ? '' : tiles[i];
+        div.addEventListener('click', () => handleClick(i));
+        board.appendChild(div);
+    }
+}
+
+function handleClick(index) {
+    if(isWon || tiles[index] === 0) return;
+
+    let row = Math.floor(index / SIZE);
+    let col = index % SIZE;
+    let eRow = Math.floor(emptyIndex / SIZE);
+    let eCol = emptyIndex % SIZE;
+
+    let adjacent = (Math.abs(row - eRow) === 1 && col === eCol)
+                || (Math.abs(col - eCol) === 1 && row === eRow);
+    if(!adjacent) return;
+
+    if(!started){
+        started = true;
+        startTimer();
+    }
+
+    [tiles[index], tiles[emptyIndex]] = [tiles[emptyIndex], tiles[index]];
+    emptyIndex = index;
+    steps++;
+    clickLog.push(index);   // 服务端复算：有效点击序列
+
+    updateUI();
+    renderBoard();
+    checkWin();
+}
+
+function startTimer() {
+    timer = setInterval(() => {
+        seconds++;
+        updateTimeDisplay();
+    }, 1000);
+}
+
+function updateTimeDisplay() {
+    timeEl.textContent = formatTime(seconds);
+}
+
+function updateUI() {
+    stepsEl.textContent = steps;
+    updateTimeDisplay();
+}
+
+function checkWin() {
+    for(let i = 0; i < TOTAL - 1; i++){
+        if(tiles[i] !== i + 1) return;
+    }
+    if(tiles[TOTAL - 1] !== 0) return;
+
+    isWon = true;
+    clearInterval(timer);
+    winTip.classList.add('show');
+
+    if (!submitted) {
+        submitted = true;
+        document.getElementById('gameInfo').textContent = `步数 ${steps}`;
+        document.getElementById('finalTime').textContent = formatTime(seconds);
+
+        setTimeout(() => {
+            document.getElementById('gameOverModal').style.display = 'flex';
+            submitTime(seconds);
+        }, 800);
+    }
+}
+
+function submitTime(time) {
+    if (window.MONO_REC) window.MONO_REC.finish(time * 1000);
+    fetch('/api/game/submit/klotski', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            size: SIZE, time: time,
+            seq: {size: SIZE, tiles0: tilesInit, clicks: clickLog}
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            if (data.new_best) {
+                document.getElementById('newRecordTip').style.display = 'block';
+                userBestTimes[SIZE] = time;
+                updateUserBestDisplay(SIZE);
+            }
+            renderRankList(data.rank_list);
+        }
+    });
+}
+
+function getNeighbors(idx) {
+    let row = Math.floor(idx / SIZE);
+    let col = idx % SIZE;
+    let res = [];
+    if(row > 0) res.push(idx - SIZE);
+    if(row < SIZE - 1) res.push(idx + SIZE);
+    if(col > 0) res.push(idx - 1);
+    if(col < SIZE - 1) res.push(idx + 1);
+    return res;
+}
+
+function restartGame() {
+    document.getElementById('gameOverModal').style.display = 'none';
+    initGame();
+}
+
+updateUserBestDisplay(4);
+</script>
+{% endblock %}

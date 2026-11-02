@@ -1,0 +1,890 @@
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<script src="http://cdn.bootcss.com/react/0.14.6/react.min.js"></script>
+		<script src="http://cdn.bootcss.com/react/0.13.3/JSXTransformer.js"></script>
+		<script src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+		<script src="http://apps.bdimg.com/libs/lodash/3.5.0/lodash.min.js"></script>
+	</head>
+	<body>
+		<div id="main"></div>
+	</body>
+<script type="text/jsx">
+var normalTransition = 'all .3s ease';
+var lineColor = '#aaa';
+var styles = {
+	footer: {
+		leftNavStyle : {
+			position:'absolute',
+			left:'0',
+			width:'19px',
+			borderRight:'1px solid '+lineColor,
+			marginTop:'-14px',
+			height:'100%',
+			transition:normalTransition,
+			zIndex:2,
+			padding:'0 10px',
+			fontSize:'15px',
+			textAlign:'center',
+			cursor:'pointer'
+		},
+		rightNavStyle : {
+			position:'absolute',
+			right:'0',
+			width:'19px',
+			borderLeft:'1px solid '+lineColor,
+			marginTop:'-14px',
+			height:'100%',
+			transition:normalTransition,
+			zIndex:2,
+			padding:'0 10px',
+			fontSize:'15px',
+			textAlign:'center',
+			cursor:'pointer'
+		},
+		wrapStyle : {
+			overflow:'hidden',
+			position:'absolute',
+			bottom:'0',
+			height:'54px',
+			paddingTop:'14px',
+			width:'100%',
+			borderTop:'1px solid '+lineColor,
+			left:0,
+			right:0,
+			transition:normalTransition
+		},
+		innerStyle : {
+			position:'absolute',
+			bottom:'0',
+			height:'54px',
+			width:'100%',
+			transition:normalTransition
+		}
+	}	
+}
+
+
+
+/**
+ * 顶部日期时间组件
+ */
+var HeaderComponent = React.createClass({
+	render:function(){
+		var wrapStyle = {
+
+		}
+		var season = this.props.day/365;
+		if(season < 0.25){
+			season = '春';
+		}else if(season >= 0.25 && season < 0.5){
+			season = '夏';
+		}else if(season >= 0.5 && season < 0.75){
+			season = '秋';
+		}else{
+			season = '冬';
+		}
+
+		var time = '早晨';
+		var headerStyle = {
+			fontSize:'18px',
+			textAlign:'center',
+			fontWeight:'normal',
+			height:'45px',
+			lineHeight:'45px',
+			margin:0,
+			borderBottom:'1px solid '+lineColor
+		}
+
+		var colorBox = {
+			display:'inline-block',
+			height:'30px',
+			width:'30px',
+			background:'#eee',
+			boxShadow: lineColor+' 0px 0px 1px',
+			marginBottom: '-9px'
+		}
+
+		return (
+			<div>
+				<h2 style={headerStyle}>{season}-第{this.props.day}天-{time} <span style={colorBox}></span></h2>
+			</div>
+		)
+	}
+});
+
+/**
+ * 顶部组件
+ */
+var FooterComponent = React.createClass({
+	getInitialState() {
+	    return {
+	        left:'0px',
+	        transition:normalTransition
+	    };
+	},
+	toLeft:function(){
+		this.setState({
+			left:'320px',
+			transition:normalTransition
+		});
+		var next;
+		switch(this.props.footerFlag){
+			case 'bag':
+				next = 'equip';
+				break;
+			case 'equip':
+				next = 'skill';
+				break;
+			case 'skill':
+				next = 'bag';
+				break;
+		}
+		setTimeout(function(){
+			this.props.setFlag(next);
+			this.setState({
+				left:'0px',
+				transition:'none'
+			})
+		}.bind(this),300);
+	},
+	toRight:function(){
+		this.setState({
+			left:'-320px',
+			transition:normalTransition
+		});
+		var next;
+		switch(this.props.footerFlag){
+			case 'bag':
+				next = 'skill';
+				break;
+			case 'equip':
+				next = 'bag';
+				break;
+			case 'skill':
+				next = 'equip';
+				break;
+		}
+		setTimeout(function(){
+			this.props.setFlag(next);
+			this.setState({
+				left:'0px',
+				transition:'none'
+			})
+		}.bind(this),300);
+	},
+	render:function(){
+		var wrapStyle = {
+			position:'absolute',
+			bottom:0,
+			width:'100%',
+			left:this.state.left,
+			transition:this.state.transition
+		}
+		var bag = (
+			<FooterBagComponnent 
+				items={this.props.items}
+				footerOnClick={this.props.footerOnClick}
+				spread={this.props.spread}
+				toLeft={this.toLeft}
+				toRight={this.toRight}
+				footerFlag={this.props.footerFlag}>
+			</FooterBagComponnent>
+		);
+		var equip = (
+			<FooterEquipComponent 
+				items={this.props.items}
+				footerOnClick={this.props.footerOnClick}
+				spread={this.props.spread}
+				toLeft={this.toLeft}
+				toRight={this.toRight}
+				footerFlag={this.props.footerFlag}>
+			</FooterEquipComponent>
+		);
+		var skill = (
+			<FooterSkillComponent 
+				items={this.props.items}
+				spread={this.props.spread}
+				toLeft={this.toLeft}
+				toRight={this.toRight}
+				footerFlag={this.props.footerFlag}>
+			</FooterSkillComponent>
+		)
+		var result;
+		switch(this.props.footerFlag){
+			case 'bag':
+				result = (<div style={wrapStyle}>{equip}{bag}{skill}</div>);
+				break;
+			case 'equip':
+				result = (<div style={wrapStyle}>{skill}{equip}{bag}</div>);
+				break;
+			case 'skill':
+				result = (<div style={wrapStyle}>{bag}{skill}{equip}</div>);
+				break;
+		}
+		return result;
+	}
+});
+
+/**
+ * 底部装备子组件
+ * left:skill right:bag
+ */
+var FooterEquipComponent = React.createClass({
+	render:function(){
+		var wrapStyle = _.clone(window.styles.footer.wrapStyle);
+		var innerStyle = _.clone(window.styles.footer.innerStyle);
+
+		if(this.props.left){
+			wrapStyle.left = this.props.left;
+		}
+
+		if(this.props.footerFlag == 'skill'){
+			wrapStyle.left = 'initial';
+			wrapStyle.right = '-320px';
+		}else if(this.props.footerFlag == 'bag'){
+			wrapStyle.right = 'initial';
+			wrapStyle.left = '-320px';
+		}
+
+		var itemsHeight = 40;
+		var itemsWidth = 206;
+		var rowCount = 7;
+
+		var leftNavStyle = _.clone(window.styles.footer.leftNavStyle);
+		var rightNavStyle = _.clone(window.styles.footer.rightNavStyle);
+
+		var textStyle = {
+			marginTop:'13px',
+			display:'inline-block'
+		}
+
+		var slotWrapStyle = {
+			width:'208px',
+			margin:'0 auto'
+		}
+
+		var slotStyle = {
+			display:'block',
+			width:'38px',
+			height:'38px',
+			textAlign:'center',
+			lineHeight:'40px',
+			border:'1px solid '+lineColor,
+			display:'inline-block',
+			marginRight:'16px'
+		}
+
+		var lastSlotStyle = _.clone(slotStyle);
+		lastSlotStyle.marginRight = 0;
+
+		if(this.props.spread){
+			wrapStyle.height = '188px';
+			innerStyle.height = '188px';
+			itemsHeight = 160;
+			itemsWidth = 288;
+			leftNavStyle.left='-40px';
+			rightNavStyle.right='-40px';
+		}
+
+		// console.log(rowCount);
+		return (
+			<div style={wrapStyle}>
+				<div style={leftNavStyle} onClick={this.props.toLeft}>
+					<span style={textStyle}>技能</span>
+				</div>
+				<div style={innerStyle} onClick={this.props.footerOnClick}>
+					<div style={slotWrapStyle}>
+						<div style={slotStyle}>小刀</div>
+						<div style={slotStyle}>大衣</div>
+						<div style={slotStyle}>头</div>
+						<div style={lastSlotStyle}>足</div>
+					</div>
+				</div>
+				<div style={rightNavStyle} onClick={this.props.toRight}>
+					<span style={textStyle}>背包</span>
+				</div>
+			</div>
+		)
+	}
+});
+
+/**
+ * 底部技能子组件
+ * left:bag right:equip
+ */
+var FooterSkillComponent = React.createClass({
+	skillClickHandle:function(flag){
+		return function(){
+			window.setState({
+				footerSpread:flag
+			});
+		}
+	},
+	render:function(){
+		var wrapStyle = _.clone(window.styles.footer.wrapStyle);
+		var innerStyle = _.clone(window.styles.footer.innerStyle);
+
+		if(this.props.left){
+			wrapStyle.left = this.props.left;
+		}
+
+		if(this.props.footerFlag == 'bag'){
+			wrapStyle.left = 'initial';
+			wrapStyle.right = '-320px';
+		}else if(this.props.footerFlag == 'equip'){
+			wrapStyle.right = 'initial';
+			wrapStyle.left = '-320px';
+		}
+
+		var itemsHeight = 40;
+		var itemsWidth = 206;
+		var rowCount = 7;
+
+		var leftNavStyle = _.clone(window.styles.footer.leftNavStyle);
+		var rightNavStyle = _.clone(window.styles.footer.rightNavStyle);
+
+		var textStyle = {
+			marginTop:'13px',
+			display:'inline-block'
+		}
+
+		var skillWrapStyle = {
+			width:'220px',
+			margin:'0 auto',
+			position:'relative',
+			transition:normalTransition
+		}
+
+		var progressWrapStyle = {
+			height:'12px',
+			width:'70%',
+			border:'1px solid'+lineColor,
+			margin:'0px auto',
+			marginTop:'8px',
+			// borderRadius:'1px',
+		}
+
+		var combetProgressStyle = {
+			width:'40%',
+			height:'100%',
+			background:lineColor
+		}
+
+		var discoverProgressStyle = {
+			width:'65%',
+			height:'100%',
+			background:lineColor
+		}
+
+		var robProgressStyle = {
+			width:'20%',
+			height:'100%',
+			background:lineColor
+		}
+
+		var homeProgressStyle = {
+			width:'10%',
+			height:'100%',
+			background:lineColor
+		}
+
+		var skillBoxStyle = {
+			width:'25%',
+			textAlign:'center',
+			fontSize:'13px',
+			display:'inline-block',
+			paddingBottom:'14px',
+			paddingTop:'14px',
+			marginTop:'-14px',
+			transition:normalTransition
+		}
+
+		var spreadLineStyle = {
+			width:'1px',
+			background:lineColor,
+			height:'45px',
+			top:'-14px',
+			left:'25%',
+			position:'absolute',
+			display:'none',
+			transition:normalTransition
+		}
+
+		var skillContentStyle = {
+			position:'absolute',
+			top:'32px',
+			bottom:'0px',
+			width:'100%',
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			display: 'none'
+		}
+
+		var skillListWrapStyle = {
+			width:'90%',
+			padding:'5%',
+			textAlign:'center'
+		}
+
+		var skillItemStyle = {
+			border: '1px solid '+lineColor,
+			padding: '2px 5px',
+			fontSize: '14px',
+			display:'inline-block',
+			margin:'10px'
+		}
+
+		if(this.props.spread){
+			innerStyle.height          = '188px';
+			wrapStyle.height           = '188px';
+			itemsHeight                = 160;
+			itemsWidth                 = 288;
+			leftNavStyle.left          = '-40px';
+			rightNavStyle.right        = '-40px';
+			progressWrapStyle.display  = 'none';
+			skillWrapStyle.width       = '100%';
+			skillBoxStyle.borderBottom = '1px solid '+lineColor;
+			spreadLineStyle.display    = 'block';
+			skillContentStyle.display  = 'flex';
+		}
+
+		var combetSpreadLineStyle    = _.clone(spreadLineStyle);
+		var discoverSpreadLineStyle  = _.clone(spreadLineStyle);
+		var robSpreadLineStyle       = _.clone(spreadLineStyle);
+		discoverSpreadLineStyle.left = '50%';
+		robSpreadLineStyle.left      = '75%';
+
+		var combetSkillBoxStyle   = _.clone(skillBoxStyle);
+		var discoverSkillBoxStyle = _.clone(skillBoxStyle);
+		var robSkillBoxStyle      = _.clone(skillBoxStyle);
+		var homeSkillBoxStyle     = _.clone(skillBoxStyle);
+
+		var skillList = [];
+
+		switch(this.props.spread){
+			case 'combet':
+				combetSkillBoxStyle.borderBottom = 'none';
+				skillList = [{
+					name:'寻物',
+					level:5
+				},{
+					name:'呵呵',
+					level:2
+				},{
+					name:'哈哈',
+					level:5
+				},{
+					name:'扑哧',
+					level:4
+				},{
+					name:'箱子',
+					level:5
+				},{
+					name:'大家',
+					level:5
+				}];
+				break;
+			case 'discover':
+				discoverSkillBoxStyle.borderBottom = 'none';
+				skillList = [{
+					name:'阿三',
+					level:1
+				},{
+					name:'风格',
+					level:7
+				},{
+					name:'来看',
+					level:1
+				},{
+					name:'事情',
+					level:2
+				},{
+					name:'同样',
+					level:1
+				},{
+					name:'两个',
+					level:5
+				}];
+				break;
+			case 'rob':
+				robSkillBoxStyle.borderBottom = 'none';
+				skillList = [{
+					name:'那边',
+					level:3
+				},{
+					name:'携程',
+					level:7
+				},{
+					name:'阿三',
+					level:2
+				},{
+					name:'地方',
+					level:6
+				},{
+					name:'放到',
+					level:6
+				},{
+					name:'方式',
+					level:2
+				}];
+				break;
+			case 'home':
+				homeSkillBoxStyle.borderBottom = 'none';
+				skillList = [{
+					name:'这些',
+					level:8
+				},{
+					name:'阿三',
+					level:2
+				},{
+					name:'收到',
+					level:5
+				},{
+					name:'改好',
+					level:7
+				},{
+					name:'大概',
+					level:3
+				},{
+					name:'收到',
+					level:2
+				}];
+				break;
+		}
+
+		skillList = skillList.map(function(skill){
+			return (
+				<span style={skillItemStyle}>{skill.name} lv.{skill.level}</span>
+			)
+		});
+
+		return (
+			<div style={wrapStyle}>
+				<div style={leftNavStyle} onClick={this.props.toLeft}>
+					<span style={textStyle}>背包</span>
+				</div>
+				<div style={innerStyle} onClick={this.props.footerOnClick}>
+					<div style={skillWrapStyle}>
+						<div style={combetSkillBoxStyle} onClick={this.skillClickHandle('combet')}>
+							<span>战斗</span>
+							<div style={progressWrapStyle}>
+								<div style={combetProgressStyle}></div>
+							</div>
+						</div>
+						<div style={combetSpreadLineStyle}></div>
+						<div style={discoverSkillBoxStyle} onClick={this.skillClickHandle('discover')}>
+							<span>探索</span>
+							<div style={progressWrapStyle}>
+								<div style={discoverProgressStyle}></div>
+							</div>
+						</div>
+						<div style={discoverSpreadLineStyle}></div>
+						<div style={robSkillBoxStyle} onClick={this.skillClickHandle('rob')}>
+							<span>掠夺</span>
+							<div style={progressWrapStyle}>
+								<div style={robProgressStyle}></div>
+							</div>
+						</div>
+						<div style={robSpreadLineStyle}></div>
+						<div style={homeSkillBoxStyle} onClick={this.skillClickHandle('home')}>
+							<span>家政</span>
+							<div style={progressWrapStyle}>
+								<div style={homeProgressStyle}></div>
+							</div>
+						</div>
+					</div>
+					<div style={skillContentStyle}>
+						<div style={skillListWrapStyle}>{skillList}</div>
+					</div>
+				</div>
+				<div style={rightNavStyle} onClick={this.props.toRight}>
+					<span style={textStyle}>装备</span>
+				</div>
+			</div>
+		)
+	}
+});
+
+/**
+ * 底部背包子组件
+ * left:equip right:skill
+ */
+var FooterBagComponnent = React.createClass({
+	render:function(){
+		var wrapStyle = _.clone(window.styles.footer.wrapStyle);
+		var innerStyle = _.clone(window.styles.footer.innerStyle);
+
+		if(this.props.left){
+			wrapStyle.left = this.props.left;
+		}
+
+		if(this.props.footerFlag == 'equip'){
+			wrapStyle.left = 'initial';
+			wrapStyle.right = '-320px';
+		}else if(this.props.footerFlag == 'skill'){
+			wrapStyle.right = 'initial';
+			wrapStyle.left = '-320px';
+		}
+
+		var itemsHeight = 40;
+		var itemsWidth = 206;
+		var rowCount = 7;
+
+		var leftNavStyle = _.clone(window.styles.footer.leftNavStyle);
+		var rightNavStyle = _.clone(window.styles.footer.rightNavStyle);
+
+		var textStyle = {
+			marginTop:'13px',
+			display:'inline-block'
+		}
+
+		if(this.props.spread){
+			innerStyle.height = '188px';
+			wrapStyle.height = '188px';
+			itemsHeight = 160;
+			itemsWidth = 288;
+			leftNavStyle.left='-40px';
+			rightNavStyle.right='-40px';
+		}
+
+		// console.log(rowCount);
+		return (
+			<div style={wrapStyle}>
+				<div style={leftNavStyle} onClick={this.props.toLeft}>
+					<span style={textStyle}>装备</span>
+				</div>
+				<div style={innerStyle} onClick={this.props.footerOnClick}>
+					<ItemsComponent 
+						items={this.props.items} 
+						height={itemsHeight} 
+						width={itemsWidth} 
+						rowCount={rowCount}>
+					</ItemsComponent>
+				</div>
+				<div style={rightNavStyle} onClick={this.props.toRight}>
+					<span style={textStyle}>技能</span>
+				</div>
+			</div>
+		)
+	}
+})
+
+/**
+ * 中间内容区块组件
+ */
+var ContentComponent = React.createClass({
+	render:function(){
+		var contentStyle = {
+			position:'absolute',
+			top:'46px',
+			width:'100%',
+			height: '453px',
+			transition:normalTransition,
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+		}
+		if(this.props.spread){
+			contentStyle.height = '333px';
+		}
+
+		var items = [null,null,null,null,null,null,null,null,null,null,null];
+		return (
+			<div onClick={this.props.contentClick} style={contentStyle}>
+				<ChestComponent items={items}></ChestComponent>
+			</div>
+		)
+	}
+});
+
+/**
+ * 箱子组件
+ */
+var ChestComponent = React.createClass({
+	render:function(){
+		var boxStyle = {
+			width:'260px',
+			padding:'16px 10px',
+			float:'left',
+			border:'1px solid '+lineColor,
+		}
+		var titleStyle = {
+			textAlign:'center'
+		}
+		var btnsWrapStyle = {
+			textAlign:'center'
+		}
+		var btnStyle = {
+			background:'#fff',
+			border:'1px solid '+lineColor,
+			display:'inline-block',
+			width:'30px',
+			textAlign:'center',
+			padding:'6px',
+			width:'80px',
+			marginTop:'20px',
+			borderRadius:'5px'
+		}
+		return (
+			<div>
+				<h4 style={titleStyle}>大箱子</h4>
+				<div style={boxStyle}>
+					<ItemsComponent items={this.props.items} rowCount={6}></ItemsComponent>
+				</div>
+				<div style={btnsWrapStyle}>
+					<button style={btnStyle}>全部放入</button>
+					<span style={{width:'30px',display:'inline-block'}}></span>
+					<button style={btnStyle}>整 理</button>
+				</div>
+			</div>
+		)
+	}
+});
+
+/**
+ * 物品列表复用组件
+ */
+var ItemsComponent = React.createClass({
+	render:function(){
+		var height = this.props.height || (parseInt(this.props.items.length / this.props.rowCount) + 1) * 40;
+		var width = this.props.width || this.props.rowCount * 41 + 1;
+		var itemHolderStyle = {
+			margin:'0 auto',
+			position:'relative',
+			height:height + 'px',
+			overflow:'hidden',
+			width:width + 'px',
+			transition:normalTransition,
+		}
+		var nameStyle = {
+			margin:0,
+			textAlign:'center',
+			fontSize:'12px',
+			fontWeight:'normal'
+		}
+		var countStyle = {
+			width:'100%',
+			fontSize:'12px',
+			textAlign:'center',
+			display: 'inline-block'
+		}
+		var items = this.props.items.map(function(item,index){
+			var itemStyle = {
+				width:'40px',
+				height:'38px',
+				border:'1px solid '+lineColor,
+				position:'absolute',
+				top:parseInt(index/this.props.rowCount) * 40 + 'px',
+				left:index % this.props.rowCount * 41 + 'px'
+			}
+			if(index + 1 > this.props.rowCount){
+				itemStyle.borderTop = 'none';
+			}else{
+				itemStyle.borderTop = '1px solid '+lineColor;
+			}
+			if((index+1) % this.props.rowCount != 0 && index != this.props.items.length - 1){
+				itemStyle.borderRight = 'none';
+			}else{
+				itemStyle.borderRight = '1px solid '+lineColor;
+			}
+			if(item){
+				var progress;
+				if(item.progress){
+					var progressStyle = {
+						width:item.progress+'%',
+						height:'5px',
+						background:'#3c8dbc',
+						margin: '0 4px',
+						borderRadius: '5px',
+					}
+					progress = <div style={progressStyle}></div>;
+				}
+				return (
+					<div style={itemStyle}>
+						<h5 style={nameStyle}>{item.name}</h5>
+						<span style={countStyle}>{item.count}</span>
+						{progress}
+					</div>
+				)
+			}else{
+				return (
+					<div style={itemStyle}></div>
+				)
+			}
+			
+		}.bind(this));
+
+		return (
+			<div style={itemHolderStyle}>
+				{items}
+			</div>
+		)
+	}
+})
+
+var Main = React.createClass({
+	getInitialState:function() {
+		window.setState = this.setState.bind(this);
+	    return {
+	        items:[
+	        	{
+	        		name:'面包',
+	        		progress:60,
+	        		count:2
+	        	},
+	        	{
+	        		name:'烤鱼',
+	        		count:3
+	        	},null,null,null,null,null,null,null,null,null,null,
+	        	{
+	        		name:'斧头',
+	        		progress:70,
+	        		count:5
+	        	},null,null,null,null,null,null,null,null,null,null,null,
+	        ],
+	        footerSpread:false,
+	        footerFlag:'bag'
+	    };
+	},
+	footerOpen:function(){
+		this.setState({
+			footerSpread:true
+		});
+	},
+	footerClose:function(){
+		this.setState({
+			footerSpread:false
+		});	
+	},
+	setFlag:function(flag){
+		this.setState({
+			footerFlag:flag
+		})
+	},
+	render:function(){
+		var mainStyle = {
+			width:'320px',
+			height:'568px',
+			border:'1px solid '+lineColor,
+			fontFamily:'微软雅黑',
+			position:'absolute',
+			overflow:'hidden'
+		}
+		return (
+			<div id="main" style={mainStyle}>
+				<HeaderComponent day={200} time={8}></HeaderComponent>
+				<ContentComponent contentClick={this.footerClose} spread={this.state.footerSpread}></ContentComponent>
+				<FooterComponent footerFlag={this.state.footerFlag} setFlag={this.setFlag} items={this.state.items} spread={this.state.footerSpread} footerOnClick={this.footerOpen}></FooterComponent>
+			</div>
+		)
+	},
+})
+
+React.render(
+	<Main></Main>,
+	document.getElementById("main")
+)
+</script>
+</html>

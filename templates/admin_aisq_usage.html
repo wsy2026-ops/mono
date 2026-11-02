@@ -1,0 +1,196 @@
+{% extends "_admin_base.html" %}
+{% block title %}AI 广场用量 · 管理后台{% endblock %}
+{% block admin_icon %}📊{% endblock %}
+{% block admin_heading %}AI 广场 · 用量统计{% endblock %}
+{% block admin_desc %}按模型 / 按天 / 按用户统计 AI 广场的调用次数与花费。数据来自独立流水表，删对话不影响统计{% endblock %}
+
+{% block admin_content %}
+<style>
+  .au-cards{display:flex;gap:12px;flex-wrap:wrap;padding:14px;}
+  .au-card{flex:1;min-width:150px;border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    background:var(--soft);}
+  .au-card .k{font-size:11.5px;color:var(--muted);margin-bottom:6px;}
+  .au-card .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .au-card .v small{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px;}
+  .au-sec{padding:0 14px 14px;}
+  .au-sec h3{font-size:13.5px;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  .au-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+  .au-tbl th,.au-tbl td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;
+    white-space:nowrap;}
+  .au-tbl th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft);}
+  .au-tbl tr:hover td{background:var(--soft);}
+  .au-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .au-empty{padding:28px;text-align:center;color:var(--muted);font-size:13px;}
+  .au-userbar{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .au-userbar input{flex:1;max-width:320px;box-sizing:border-box;padding:8px 12px;font-size:13px;
+    border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg);outline:none;}
+  .au-userbar input:focus{border-color:rgba(91,140,255,.5);}
+  .au-count{font-size:12px;color:var(--muted);}
+  .au-ulist{display:flex;flex-direction:column;gap:6px;}
+  .au-urow{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
+    border-radius:9px;background:var(--card);text-decoration:none;color:var(--fg);font-size:13px;
+    transition:background .13s,border-color .13s;}
+  .au-urow:hover{background:var(--soft);border-color:rgba(91,140,255,.45);}
+  .au-uname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+  .au-uid{font-size:11.5px;color:var(--muted);flex:none;}
+  .au-num{font-size:12px;color:var(--muted);flex:none;font-variant-numeric:tabular-nums;}
+  .au-cost{font-weight:700;flex:none;font-variant-numeric:tabular-nums;}
+  .au-time{font-size:11.5px;color:var(--muted);flex:none;min-width:112px;text-align:right;}
+  .au-more-wrap{text-align:center;padding:14px 0 4px;}
+  .au-more{padding:8px 26px;border:1px solid var(--line);border-radius:9px;background:var(--card);
+    color:var(--fg);font-size:13px;cursor:pointer;transition:background .15s;}
+  .au-more:hover:not(:disabled){background:var(--soft);}
+  .au-more:disabled{opacity:.6;cursor:default;}
+  .au-end{font-size:12px;color:var(--muted);}
+</style>
+
+<div class="au-cards">
+  <div class="au-card">
+    <div class="k">总调用次数</div>
+    <div class="v">{{ total['n'] if total else 0 }}<small>次</small></div>
+  </div>
+  <div class="au-card">
+    <div class="k">累计花费</div>
+    <div class="v">¥{{ '%.4f' % (total['c'] if total else 0) }}</div>
+  </div>
+  <div class="au-card">
+    <div class="k">今日调用</div>
+    <div class="v">{{ today['n'] if today else 0 }}<small>次</small></div>
+  </div>
+  <div class="au-card">
+    <div class="k">今日花费</div>
+    <div class="v">¥{{ '%.4f' % (today['c'] if today else 0) }}</div>
+  </div>
+  <div class="au-card">
+    <div class="k">累计 Tokens</div>
+    <div class="v">{{ '{:,}'.format((total['pt'] if total else 0) + (total['ct'] if total else 0)) }}</div>
+  </div>
+</div>
+
+<div class="au-sec">
+  <h3>按模型</h3>
+  {% if by_model %}
+  <table class="au-tbl">
+    <tr><th>模型</th><th>供应商</th><th class="num">调用次数</th><th class="num">花费</th>
+        <th class="num">输入 tokens</th><th class="num">输出 tokens</th><th class="num">均价/次</th></tr>
+    {% for r in by_model %}
+    <tr>
+      <td>{{ r['model'] or '（历史）' }}</td>
+      <td>{{ r['provider'] or '—' }}</td>
+      <td class="num">{{ r['n'] }}</td>
+      <td class="num">¥{{ '%.4f' % r['c'] }}</td>
+      <td class="num">{{ '{:,}'.format(r['pt']) }}</td>
+      <td class="num">{{ '{:,}'.format(r['ct']) }}</td>
+      <td class="num">¥{{ '%.6f' % (r['c'] / r['n']) if r['n'] else '0' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="au-empty">还没有用量数据</div>
+  {% endif %}
+
+  <h3>按天（最近 14 天）</h3>
+  {% if by_day %}
+  <table class="au-tbl">
+    <tr><th>日期</th><th class="num">调用次数</th><th class="num">花费</th></tr>
+    {% for r in by_day %}
+    <tr><td>{{ r['d'] }}</td><td class="num">{{ r['n'] }}</td><td class="num">¥{{ '%.4f' % r['c'] }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="au-empty">还没有用量数据</div>
+  {% endif %}
+
+  <h3>按用户</h3>
+  <div class="au-userbar">
+    <input type="text" id="auSearch" placeholder="搜索用户名或 ID…" autocomplete="off">
+    <span class="au-count" id="auCount"></span>
+  </div>
+  <div id="auUserList" class="au-ulist"></div>
+  <div class="au-more-wrap">
+    <button type="button" id="auMore" class="au-more" style="display:none;">加载更多</button>
+    <div id="auEnd" class="au-end" style="display:none;">已经到底了</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var listEl = document.getElementById('auUserList');
+  var moreBtn = document.getElementById('auMore');
+  var endEl = document.getElementById('auEnd');
+  var searchEl = document.getElementById('auSearch');
+  var countEl = document.getElementById('auCount');
+  var offset = 0, limit = 20, loading = false, q = '', total = 0;
+
+  function fmtTime(ts){
+    if (!ts) return '—';
+    var d = new Date(ts * 1000);
+    function p(n){ return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) +
+           ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function render(items){
+    items.forEach(function(it){
+      var row = document.createElement('a');
+      row.className = 'au-urow';
+      row.href = '/admin/aisq-user/' + it.uid;
+      row.innerHTML =
+        '<span class="au-uname"></span>' +
+        '<span class="au-uid">uid ' + it.uid + '</span>' +
+        '<span class="au-num">' + it.n + ' 次</span>' +
+        '<span class="au-cost">¥' + it.cost.toFixed(4) + '</span>' +
+        '<span class="au-time">' + fmtTime(it.last_at) + '</span>';
+      row.querySelector('.au-uname').textContent = it.name;
+      listEl.appendChild(row);
+    });
+  }
+
+  function load(reset){
+    if (loading) return;
+    loading = true;
+    if (reset) { offset = 0; listEl.innerHTML = ''; endEl.style.display = 'none'; }
+    moreBtn.disabled = true;
+    moreBtn.textContent = '加载中…';
+    fetch('/admin/api/aisq-users?q=' + encodeURIComponent(q) +
+          '&offset=' + offset + '&limit=' + limit, {credentials: 'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) { moreBtn.textContent = '加载失败，点我重试'; moreBtn.disabled = false; return; }
+        render(d.items || []);
+        offset += (d.items || []).length;
+        total = d.total || 0;
+        countEl.textContent = '共 ' + total + ' 位用户';
+        if (d.has_more) {
+          moreBtn.style.display = '';
+          moreBtn.textContent = '加载更多';
+          moreBtn.disabled = false;
+        } else {
+          moreBtn.style.display = 'none';
+          if (offset > 0) endEl.style.display = '';
+        }
+        if (!offset) {
+          listEl.innerHTML = '<div class="au-empty">' + (q ? '没有匹配的用户' : '还没有用量数据') + '</div>';
+        }
+      })
+      .catch(function(){ moreBtn.textContent = '加载失败，点我重试'; moreBtn.disabled = false; })
+      .finally(function(){ loading = false; });
+  }
+
+  var timer = null;
+  searchEl.addEventListener('input', function(){
+    q = this.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(function(){ load(true); }, 260);
+  });
+  moreBtn.addEventListener('click', function(){ load(false); });
+
+  window.addEventListener('scroll', function(){
+    if (loading || moreBtn.style.display === 'none') return;
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 220) load(false);
+  });
+
+  load(true);
+})();
+</script>
+{% endblock %}

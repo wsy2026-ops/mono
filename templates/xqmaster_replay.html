@@ -1,0 +1,218 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}对局复盘{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-head">
+  <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="{{ url_for('xqmaster_page') }}">← 返回</a>
+  <h1>对局复盘</h1>
+  <span class="xqm-hsub" id="xqmRpSub">加载中…</span>
+</div>
+<div class="xqm-rp" id="xqmRp" style="display:none">
+  <div class="xqm-rp-board">
+    <div class="xqm-board" id="xqmRpBoard"></div>
+  </div>
+  <div class="xqm-rp-side">
+    <div class="xqm-panel">
+      <h4>回放控制</h4>
+      <div class="xqm-rp-step" id="xqmRpStep">第 0 / 0 手</div>
+      <input class="xqm-rp-range" id="xqmRpRange" type="range" min="0" max="0" value="0" step="1">
+      <div class="xqm-rp-btns">
+        <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmRpFirst" title="回到开局">⏮</button>
+        <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmRpPrev" title="上一手">◀</button>
+        <button class="xqm-btn xqm-btn-g xqm-btn-sm" id="xqmRpPlay" style="flex:1">播放</button>
+        <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmRpNext" title="下一手">▶</button>
+        <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmRpLast" title="跳到结束">⏭</button>
+      </div>
+      <div class="xqm-rp-hint" id="xqmRpTurn">—</div>
+    </div>
+    <div class="xqm-panel xqm-panel-log">
+      <h4>行动记录</h4>
+      <div class="xqm-log" id="xqmRpLog"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var GID = {{ gid }};
+  var evs = [], steps = [], board = null, cur = 0, timer = null;
+  var initBoard = null;
+
+  function clone(b){ return JSON.parse(JSON.stringify(b)); }
+  function glyph(p){ return (p && X.GLYPH[p.t]) ? X.GLYPH[p.t][0] : '？'; }
+  function coord(r,c){ return '(' + (r+1) + ',' + (c+1) + ')'; }
+  function sideName(s){ return s === 'red' ? '红方' : '黑方'; }
+
+  var TAG_CN = {splash:'溅射', sweep:'横扫', pierce:'穿透', chain:'连珠',
+                reflect:'反伤', burn:'自燃', guard:'舍身', sacrifice:'舍身'};
+
+  function applyTo(n){
+    var b = clone(initBoard), log = [];
+    for(var i=0;i<n;i++){
+      var ev = steps[i];
+      if(ev.k === 'move'){
+        var p = b[ev.fr][ev.fc];
+        b[ev.fr][ev.fc] = null; b[ev.tr][ev.tc] = p;
+        log.unshift({cls: p && p.s === 'red' ? 'r' : 'b',
+          text: glyph(p) + ' ' + coord(ev.fr,ev.fc) + ' → ' + coord(ev.tr,ev.tc)});
+      } else if(ev.k === 'attack'){
+        var a = b[ev.fr][ev.fc], d = b[ev.tr][ev.tc];
+        log.unshift({cls: a && a.s === 'red' ? 'r' : 'b',
+          text: glyph(a) + ' 攻击 ' + glyph(d)
+            + (ev.notes && ev.notes.length ? '（' + ev.notes.join(' · ') + '）' : '')});
+      } else if(ev.k === 'dmg'){
+        var q = b[ev.r][ev.c];
+        if(q) q.hp = Math.max(0, q.hp - ev.v);
+        log.unshift({cls:'d', text: glyph(q) + ' 受到 ' + ev.v + ' 点'
+          + (TAG_CN[ev.tag] ? '（' + TAG_CN[ev.tag] + '）' : '')});
+      } else if(ev.k === 'heal'){
+        var hq = b[ev.r][ev.c];
+        if(hq){
+          hq.hp = Math.min(hq.mh, hq.hp + ev.v);
+          log.unshift({cls:'d', text: glyph(hq) + ' 回复 ' + ev.v + ' 点'
+            + (ev.note ? '（' + ev.note + '）' : '')});
+        }
+      } else if(ev.k === 'shieldup'){
+        var sq = b[ev.r][ev.c];
+        if(sq){ sq.sh = (sq.sh || 0) + ev.v;
+          log.unshift({cls:'d', text: glyph(sq) + ' 获得 ' + ev.v + ' 点护盾（妙手）'}); }
+      } else if(ev.k === 'shield'){
+        var dq = b[ev.r][ev.c];
+        if(dq){ dq.sh = Math.max(0, (dq.sh || 0) - ev.v);
+          log.unshift({cls:'d', text: glyph(dq) + ' 的护盾挡下 ' + ev.v + ' 点'}); }
+      } else if(ev.k === 'reflect'){
+        log.unshift({cls:'d', text: glyph(b[ev.tr] && b[ev.tr][ev.tc]) + ' 反伤 ' + ev.v
+          + ' 点给 ' + glyph(b[ev.fr] && b[ev.fr][ev.fc])});
+      } else if(ev.k === 'miss'){
+        log.unshift({cls:'d', text: glyph(b[ev.r] && b[ev.r][ev.c]) + ' '
+          + (ev.why || '影袭') + '生效，这一击落空'});
+      } else if(ev.k === 'extra'){
+        log.unshift({cls:'d', text: glyph(b[ev.r] && b[ev.r][ev.c]) + ' 猛扑，可以再行动一次'});
+      } else if(ev.k === 'dot'){
+        log.unshift({cls:'d', text: glyph(b[ev.r] && b[ev.r][ev.c]) + ' 被藤缠住，损失 ' + ev.v + ' 点'});
+      } else if(ev.k === 'swap'){
+        log.unshift({cls:'d', text: glyph(b[ev.fr][ev.fc]) + ' 与 '
+          + glyph(b[ev.tr][ev.tc]) + ' 交换了位置'});
+        var _sw = b[ev.fr][ev.fc];
+        b[ev.fr][ev.fc] = b[ev.tr][ev.tc];
+        b[ev.tr][ev.tc] = _sw;
+      } else if(ev.k === 'guard'){
+        log.unshift({cls:'d', text: glyph(b[ev.tr][ev.tc]) + ' 替 '
+          + glyph(b[ev.fr][ev.fc]) + ' 挡下致命一击'});
+      } else if(ev.k === 'revive'){
+        var rq = b[ev.r][ev.c];
+        if(rq) rq.hp = ev.v;
+        log.unshift({cls:'k', text: glyph(rq) + ' 残兵不屈，以 ' + ev.v + ' 点生命站了起来'});
+      } else if(ev.k === 'mark'){
+        log.unshift({cls:'d', text: glyph(b[ev.r][ev.c]) + ' 被标记'
+          + (ev.turns > 1 ? '（持续 2 回合）' : '')});
+      } else if(ev.k === 'cut'){
+        log.unshift({cls:'d', text: glyph(b[ev.r][ev.c])
+          + (ev.buff ? ' 被断援：不能回血，也拿不到增益' : ' 被断粮：下回合不能回血')});
+      } else if(ev.k === 'kill'){
+        log.unshift({cls:'k', text: glyph(b[ev.r][ev.c]) + ' 阵亡'});
+        b[ev.r][ev.c] = null;
+      } else if(ev.k === 'turn'){
+        log.unshift({cls:'d', text: '第 ' + ev.round + ' 回合 · ' + sideName(ev.turn) + '行动'});
+      } else if(ev.k === 'over'){
+        log.unshift({cls:'k', text: '对局结束'});
+      }
+    }
+    return {board: b, log: log.slice(0, 60)};
+  }
+
+  function renderBoard(b){
+    var el = document.getElementById('xqmRpBoard');
+    var html = '';
+    for(var r=0;r<10;r++) for(var c=0;c<9;c++){
+      html += '<div class="xqm-cell" data-r="'+r+'" data-c="'+c+'">';
+      var p = b[r][c];
+      if(p) html += X.pcHTML(p, {});
+      html += '</div>';
+    }
+    html += '<div class="xqm-palace p1"></div><div class="xqm-palace p2"></div>';
+    html += '<div class="xqm-river"><span>楚 河</span><span>汉 界</span></div>';
+    el.innerHTML = html;
+  }
+
+  function paint(){
+    var res = applyTo(cur);
+    renderBoard(res.board);
+    document.getElementById('xqmRpStep').textContent = '第 ' + cur + ' / ' + steps.length + ' 手';
+    document.getElementById('xqmRpRange').value = cur;
+    var last = cur > 0 ? steps[cur-1] : null;
+    document.getElementById('xqmRpTurn').textContent = last && last.turn
+      ? ('第 ' + last.round + ' 回合 · ' + sideName(last.turn) + '行动')
+      : '开局局面';
+    document.getElementById('xqmRpLog').innerHTML = res.log.length
+      ? res.log.map(function(l){
+          return '<div class="xqm-logline ' + (l.cls||'') + '"><span>' + l.text + '</span></div>';
+        }).join('')
+      : '<div class="xqm-empty" style="padding:12px 0">开局</div>';
+    document.getElementById('xqmRpPrev').disabled = cur <= 0;
+    document.getElementById('xqmRpFirst').disabled = cur <= 0;
+    document.getElementById('xqmRpNext').disabled = cur >= steps.length;
+    document.getElementById('xqmRpLast').disabled = cur >= steps.length;
+  }
+
+  function goto(n){
+    cur = Math.max(0, Math.min(steps.length, n));
+    paint();
+  }
+  function stop(){
+    if(timer){ clearInterval(timer); timer = null; }
+    var b = document.getElementById('xqmRpPlay');
+    if(b) b.textContent = '播放';
+  }
+  function play(){
+    if(timer){ stop(); return; }
+    if(cur >= steps.length) goto(0);
+    document.getElementById('xqmRpPlay').textContent = '暂停';
+    timer = setInterval(function(){
+      if(cur >= steps.length){ stop(); return; }
+      goto(cur + 1);
+    }, 700);
+  }
+
+  document.getElementById('xqmRpFirst').onclick = function(){ stop(); goto(0); };
+  document.getElementById('xqmRpPrev').onclick = function(){ stop(); goto(cur - 1); };
+  document.getElementById('xqmRpNext').onclick = function(){ stop(); goto(cur + 1); };
+  document.getElementById('xqmRpLast').onclick = function(){ stop(); goto(steps.length); };
+  document.getElementById('xqmRpPlay').onclick = play;
+  document.getElementById('xqmRpRange').oninput = function(e){ stop(); goto(+e.target.value); };
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowLeft'){ stop(); goto(cur - 1); }
+    else if(e.key === 'ArrowRight'){ stop(); goto(cur + 1); }
+    else if(e.key === ' '){ e.preventDefault(); play(); }
+  });
+
+  X.api('/api/xqm/game/' + GID + '/replay').then(function(r){
+    if(!r.ok){
+      document.getElementById('xqmRpSub').textContent = r.msg || '加载失败';
+      return;
+    }
+    evs = r.events || [];
+    if(!evs.length || evs[0].k !== 'init'){
+      document.getElementById('xqmRpSub').textContent = '这局没有留下复盘记录（早于复盘功能上线）';
+      return;
+    }
+    initBoard = evs[0].board;
+    steps = evs.slice(1);
+    var win = r.winner === 'draw' ? '和棋'
+      : (r.winner === 'red' ? r.red : r.black) + ' 胜';
+    document.getElementById('xqmRpSub').textContent =
+      r.red + '（红） vs ' + r.black + '（黑） · ' + win
+      + (r.reason ? ' · ' + r.reason : '');
+    document.getElementById('xqmRp').style.display = '';
+    var range = document.getElementById('xqmRpRange');
+    range.max = steps.length;
+    goto(steps.length);
+  }).catch(function(){
+    document.getElementById('xqmRpSub').textContent = '网络异常';
+  });
+})();
+</script>
+{% endblock %}

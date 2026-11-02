@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ target.username }} 的公开收藏 - MONO 社区{% endblock %}
+{% set active = 'profile' %}
+
+{% block content %}
+<style>
+  .pf-wrap{max-width:760px;margin:0 auto;}
+  .pf-head{border:1px solid var(--line);border-radius:16px;padding:22px 28px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);margin-bottom:20px;}
+  .pf-head h1{font-size:21px;margin:0 0 4px;font-weight:700;}
+  .pf-head p{margin:0;font-size:12.5px;color:var(--muted);}
+  .pf-sec{margin-bottom:22px;}
+  .pf-sec h2{font-size:15px;margin:0 0 10px;font-weight:700;}
+  .pf-row{display:flex;gap:12px;align-items:baseline;border:1px solid var(--line);
+    border-radius:11px;padding:10px 15px;background:var(--card);margin-bottom:7px;font-size:13.5px;}
+  .pf-row a{color:inherit;text-decoration:none;font-weight:600;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pf-empty{padding:20px;color:var(--muted);font-size:12.5px;}
+</style>
+
+<div class="pf-wrap">
+  <div class="pf-head">
+    <h1>⭐ {{ target.username }} 的公开收藏</h1>
+    <p>TA 选择公开分享的收藏内容 · <a href="{{ url_for('user_page', user_id=target.id) }}">查看主页</a></p>
+  </div>
+
+  <div class="pf-sec">
+    <h2>📄 帖子（{{ posts|length }}）</h2>
+    {% for p in posts %}
+    <div class="pf-row"><a href="{{ url_for('view_post', post_id=p.id) }}">{{ p.title }}</a></div>
+    {% else %}<div class="pf-empty">没有公开的帖子收藏</div>{% endfor %}
+  </div>
+
+  <div class="pf-sec">
+    <h2>👤 用户（{{ users|length }}）</h2>
+    {% for u in users %}
+    <div class="pf-row"><a href="{{ url_for('user_page', user_id=u.id) }}">{{ u.title }}</a></div>
+    {% else %}<div class="pf-empty">没有公开的用户收藏</div>{% endfor %}
+  </div>
+
+  <div class="pf-sec">
+    <h2>🎮 游戏（{{ games|length }}）</h2>
+    {% for g in games %}
+    <div class="pf-row"><a href="{{ url_for('games_center') }}">{{ g.title }}</a></div>
+    {% else %}<div class="pf-empty">没有公开的游戏收藏</div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

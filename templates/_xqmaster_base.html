@@ -1,0 +1,3174 @@
+{% extends "base.html" %}
+{% block title %}{% block xqm_title %}中国象棋大师{% endblock %} - MONO 社区{% endblock %}
+{% set active = 'games' %}
+
+{% block content %}
+<style>
+/* ══════════════════════════════════════════
+   中国象棋大师 —— 所有类名带 xqm- 前缀
+   面板用站点主题变量（跟随明暗/羊皮纸/海洋主题），
+   棋盘保留木质配色（游戏本体，不跟主题走）
+   ══════════════════════════════════════════ */
+.xqm{--xqm-red:#8B1A1A;--xqm-red-lt:#C0392B;--xqm-red-dk:#5E0F0F;
+     --xqm-green:#1B3A2F;--xqm-green-lt:#2E6151;--xqm-green-dk:#0B1E18;
+     --xqm-gold:#C9A227;--xqm-gold-lt:#E4C55A;--xqm-gold-dk:#8C6E15;
+     --xqm-wood1:#E3C9A2;--xqm-wood2:#CFAE81;--xqm-wood3:#B99464;
+     --xqm-hp-full:#4A8B5C;--xqm-hp-mid:#C9A227;--xqm-hp-low:#A52222;
+     --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;
+     --r1:8px;--r2:12px;--r3:18px;
+     --t-xs:11px;--t-sm:12.5px;--t-md:15px;--t-lg:18px;--t-xl:24px;--t-2xl:32px;
+     --d1:120ms;--d2:180ms;--d3:260ms;--d4:420ms;
+     --ease:cubic-bezier(.22,.9,.3,1);
+     --spring:cubic-bezier(.34,1.5,.64,1);
+     --sh1:0 2px 8px rgba(60,40,20,.1);
+     --sh2:0 8px 22px rgba(60,40,20,.14);
+     --sh3:0 18px 44px rgba(60,40,20,.2);
+     --n1:rgba(60,45,28,.06);--n2:rgba(60,45,28,.13);--n3:rgba(60,45,28,.24);
+     max-width:1280px;margin:0 auto;}
+html[data-theme="dark"] .xqm{
+     --sh1:0 2px 8px rgba(0,0,0,.32);
+     --sh2:0 8px 22px rgba(0,0,0,.42);
+     --sh3:0 18px 44px rgba(0,0,0,.55);
+     --n1:rgba(255,245,225,.06);--n2:rgba(255,245,225,.12);--n3:rgba(255,245,225,.2);}
+.xqm *{box-sizing:border-box}
+.wrap.xqm-wide{max-width:1280px}
+
+/* 视图切换 */
+.xqm-view{display:none;animation:xqmIn .34s cubic-bezier(.22,.9,.3,1) both}
+.xqm-view.xqm-on{display:block}
+@keyframes xqmIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* 按钮 */
+.xqm-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:12px 26px;border-radius:12px;border:1px solid transparent;
+  font-size:14.5px;font-weight:700;letter-spacing:.03em;cursor:pointer;
+  font-family:inherit;
+  transition:transform .16s cubic-bezier(.34,1.5,.64,1),box-shadow .18s ease;
+}
+.xqm-btn:active{transform:translateY(1px) scale(.985)}
+.xqm-btn-p{background:linear-gradient(180deg,#A52222,#7A1212);color:#FFF6E0;
+  box-shadow:0 6px 18px rgba(122,18,18,.3),inset 0 1px 0 rgba(255,255,255,.18)}
+.xqm-btn-p:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(122,18,18,.38)}
+.xqm-btn-g{background:linear-gradient(180deg,rgba(228,197,90,.96),rgba(201,162,39,.92));color:#3A2C05;
+  box-shadow:0 6px 18px rgba(140,110,21,.28),inset 0 1px 0 rgba(255,255,255,.4)}
+.xqm-btn-g:hover{transform:translateY(-2px)}
+/* ── 国风字体栈：优先华文中宋 / 宋体-简，回退思源宋 / 系统宋体 ── */
+.xqm{
+  --xqm-f-serif:"STZhongsong","华文中宋","Songti SC","STSong","宋体-简","Source Han Serif SC",
+    "Noto Serif CJK SC","SimSun",serif;
+  --xqm-f-kai:"STKaiti","KaiTi","楷体","Kaiti SC","Kaiti TC",serif;
+}
+.xqm-cdx-head .nm{
+  font-family:var(--xqm-f-serif);font-feature-settings:"halt" 0}
+.xqm-pc,.xqm-river span,.xqm-cdx-head .sub,.xqm-cdx-card .nm{
+  font-family:var(--xqm-f-kai)}
+.xqm-cdx-card .nm{letter-spacing:.1em}
+/* 移动端横屏是沉浸式的，导航被隐藏了 —— 给个回主页的出口。
+   PC 有导航栏，不需要这个按钮，所以只在横屏态显示。 */
+.xqm-homeback{display:none}
+html[data-xqm-land="1"] .xqm-homeback{
+  display:inline-flex;align-items:center;
+  /* 固定到舞台左上角（.xqm 是 fixed，作为定位参考）——
+     放右栏里会跟标题挤在一起，也不好找。 */
+  position:absolute;left:10px;top:8px;z-index:30;
+  font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:99px;
+  border:1px solid rgba(120,90,50,.40);background:rgba(255,252,245,.92);
+  color:#7a5b00;text-decoration:none;
+  box-shadow:0 1px 6px rgba(90,70,40,.16);
+}
+html[data-xqm-land="1"] .xqm-homeback:active{background:rgba(201,162,39,.22)}
+/* ── 图鉴：状态角标 + 进度条 ── */
+.xqm-cdx-card .pb{width:100%;height:5px;border-radius:99px;background:rgba(120,90,50,.16);
+  overflow:hidden;margin-top:5px}
+.xqm-cdx-card .pb > i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,rgba(201,162,39,.75),rgba(228,197,90,.95))}
+.xqm-cdx-card .pb.full > i{background:linear-gradient(90deg,#3B9A5F,#5FBF7F)}
+.xqm-cdx-card .pbt{font-size:10px;color:var(--muted);margin-top:3px;
+  font-variant-numeric:tabular-nums}
+.xqm-cdx-card .tagcat{position:absolute;right:8px;bottom:8px;font-size:10px;font-weight:800;
+  padding:2px 7px;border-radius:99px;letter-spacing:.04em;z-index:4}
+.xqm-cdx-card .tagcat.c0{background:rgba(201,162,39,.24);color:#8a6a12}
+.xqm-cdx-card .tagcat.c1{background:rgba(44,111,224,.18);color:#1d4fa8}
+.xqm-cdx-card .tagcat.c2{background:rgba(59,154,95,.18);color:#226b3c}
+.xqm-cdx-card .tagcat.c3{background:rgba(120,120,120,.18);color:#6b6b6b}
+.xqm-cdx-card .badge,.xqm-grade{font-family:var(--xqm-f-serif);letter-spacing:.16em}
+.xqm-btn-o{color:var(--fg);
+  background:linear-gradient(180deg,rgba(255,252,244,.98),rgba(246,238,224,.98));
+  border:1px solid rgba(201,162,39,.38);
+  box-shadow:0 2px 8px rgba(90,60,20,.06),inset 0 1px 0 rgba(255,255,255,.8)}
+.xqm-btn-o:hover{transform:translateY(-2px);border-color:rgba(201,162,39,.7);
+  box-shadow:0 8px 20px rgba(90,60,20,.14)}
+html[data-theme="dark"] .xqm-btn-o{
+  background:linear-gradient(180deg,rgba(62,54,44,.92),rgba(44,38,32,.92));
+  border-color:rgba(201,162,39,.32)}
+.xqm-btn-d{background:transparent;color:var(--xqm-red-lt);
+  border:1px solid rgba(192,57,43,.5);box-shadow:none}
+.xqm-btn-d:hover{background:rgba(192,57,43,.12);border-color:var(--xqm-red-lt)}
+html[data-theme="dark"] .xqm-btn-d{color:#E2705F;border-color:rgba(226,112,95,.5)}
+html[data-theme="dark"] .xqm-btn-d:hover{background:rgba(226,112,95,.14);border-color:#E2705F}
+.xqm-btn-sm{padding:8px 16px;font-size:13px;border-radius:10px}
+.xqm-btn:disabled{opacity:.5;cursor:not-allowed;transform:none !important}
+
+/* ══ 首页 ══ */
+.xqm-hero{text-align:center;padding:36px 20px 30px;border-bottom:1px solid var(--line);margin-bottom:32px;
+  position:relative}
+.xqm-hero::after{content:"";position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);
+  width:170px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,transparent,var(--xqm-gold),transparent)}
+.xqm-badge{display:inline-flex;align-items:center;gap:9px;font-size:12px;letter-spacing:.22em;
+  color:#FFF6E0;padding:6px 16px 6px 9px;border-radius:9px;margin-bottom:22px;
+  background:linear-gradient(160deg,#C0392B,#7A1212);
+  box-shadow:inset 0 0 0 1px rgba(255,246,224,.3),0 3px 10px rgba(90,20,10,.28)}
+.xqm-badge::before{content:"弈";width:22px;height:22px;border-radius:5px;display:grid;
+  place-items:center;background:rgba(255,246,224,.16);font-family:"KaiTi","STKaiti","楷体",serif;
+  font-size:14px;font-weight:800;letter-spacing:0;transform:rotate(-6deg);color:#FFF6E0}
+.xqm-title{margin:0;font-size:48px;font-weight:800;letter-spacing:.09em;line-height:1.2;
+  font-family:"Songti SC","STSong","SimSun",serif;
+  background:linear-gradient(178deg,#B02A2A,var(--xqm-red) 45%,var(--xqm-red-dk));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.xqm-sub{margin:16px 0 0;color:var(--muted);font-size:14.5px;letter-spacing:.1em;line-height:2}
+.xqm-pieces{display:flex;gap:13px;margin:30px 0 34px;flex-wrap:wrap;justify-content:center}
+.xqm-acts{display:flex;gap:13px;flex-wrap:wrap;justify-content:center}
+.xqm-me{display:inline-flex;align-items:center;gap:10px;margin-top:22px;
+  padding:8px 18px;border-radius:99px;background:var(--soft);border:1px solid var(--line);
+  font-size:13px;color:var(--fg)}
+.xqm-me b{color:var(--xqm-gold-dk);font-size:15px}
+
+/* ══ 棋子 ══ */
+.xqm-pc{--sz:62px;width:var(--sz);height:var(--sz);border-radius:50%;
+  display:grid;place-items:center;position:relative;flex-shrink:0;
+  font-family:"STKaiti","KaiTi","楷体","Kaiti SC","STSong","Songti SC","SimSun",serif;
+  font-weight:700;font-size:calc(var(--sz)*.46);color:#FFF8E7;
+  letter-spacing:.04em;
+  text-shadow:0 1px 2px rgba(0,0,0,.62),0 0 1px rgba(0,0,0,.95),
+    0 -1px 0 rgba(255,255,255,.14);user-select:none}
+.xqm-pc::before{content:"";position:absolute;inset:6%;border-radius:50%;
+  border:1px solid rgba(255,248,231,.16);pointer-events:none}
+.xqm-pc.red{background:radial-gradient(circle at 34% 26%,#D0483F 0%,#A52222 44%,#6E0F0F 100%);
+  box-shadow:inset 0 0 0 2px rgba(201,162,39,.92),inset 0 0 0 3.5px rgba(0,0,0,.2),
+    inset 0 3px 9px rgba(255,255,255,.3),inset 0 -6px 12px rgba(0,0,0,.42),0 4px 12px rgba(70,20,20,.38)}
+.xqm-pc.black{background:radial-gradient(circle at 34% 26%,#3A6B57 0%,#1E4536 44%,#0A1C16 100%);
+  box-shadow:inset 0 0 0 2px rgba(201,162,39,.92),inset 0 0 0 3.5px rgba(0,0,0,.2),
+    inset 0 3px 9px rgba(255,255,255,.26),inset 0 -6px 12px rgba(0,0,0,.45),0 4px 12px rgba(10,30,24,.42)}
+.xqm-pc .xqm-glyph{position:relative;z-index:2;line-height:1}
+.xqm-pc .xqm-cracks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.xqm-pc .xqm-cracks path{fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:220;stroke-dashoffset:220;opacity:0;
+  transition:stroke-dashoffset .46s cubic-bezier(.32,.94,.4,1),opacity .24s ease}
+.xqm-pc .xqm-cracks path.dk{stroke:rgba(6,3,2,.74)}
+.xqm-pc .xqm-cracks path.lt{stroke:rgba(255,247,228,.34);stroke-width:1;transform:translate(.85px,-.85px)}
+.xqm-pc .xqm-cracks polygon.chip{fill:rgba(6,3,2,.46);opacity:0;transform:scale(.4);
+  transform-origin:50% 50%;transition:opacity .3s ease,transform .34s cubic-bezier(.34,1.5,.64,1)}
+.xqm-pc[data-dmg="1"] .xqm-cracks path[data-t="1"],
+.xqm-pc[data-dmg="2"] .xqm-cracks path[data-t="1"],.xqm-pc[data-dmg="2"] .xqm-cracks path[data-t="2"],
+.xqm-pc[data-dmg="3"] .xqm-cracks path[data-t="1"],.xqm-pc[data-dmg="3"] .xqm-cracks path[data-t="2"],
+.xqm-pc[data-dmg="3"] .xqm-cracks path[data-t="3"],
+.xqm-pc[data-dmg="4"] .xqm-cracks path{stroke-dashoffset:0;opacity:1}
+.xqm-pc[data-dmg="2"] .xqm-cracks polygon.chip[data-t="1"],
+.xqm-pc[data-dmg="3"] .xqm-cracks polygon.chip,.xqm-pc[data-dmg="4"] .xqm-cracks polygon.chip{opacity:1;transform:scale(1)}
+.xqm-pc[data-dmg="4"]{filter:saturate(.72) brightness(.9)}
+.xqm-pc.xqm-cracking .xqm-cracks path{transition-duration:.24s}
+.xqm-pc.xqm-static .xqm-cracks path,
+.xqm-pc.xqm-static .xqm-cracks polygon.chip{transition:none}
+.xqm-pc.xqm-low::before{animation:xqmLow 1.15s ease-in-out infinite}
+@keyframes xqmLow{0%,100%{box-shadow:0 0 4px 0 rgba(165,34,34,.35),inset 0 0 4px rgba(165,34,34,.3)}
+  50%{box-shadow:0 0 12px 3px rgba(190,40,34,.85),inset 0 0 9px rgba(190,40,34,.6)}}
+.xqm-pc.xqm-hit{animation:xqmHit .34s ease}
+@keyframes xqmHit{0%{filter:brightness(1)}18%{filter:brightness(2.6) saturate(.3)}100%{filter:brightness(1)}}
+.xqm-pc.xqm-sel::after{content:"";position:absolute;inset:-7px;border-radius:50%;
+  border:2.5px solid var(--xqm-gold);pointer-events:none;
+  animation:xqmSel 1.5s ease-in-out infinite}
+@keyframes xqmSel{0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 0 0 rgba(201,162,39,.5)}
+  50%{opacity:.62;transform:scale(1.05);box-shadow:0 0 0 8px rgba(201,162,39,0)}}
+.xqm-pc.xqm-ghost{opacity:.2;filter:grayscale(.75)}
+.xqm-hpwrap{width:58px;margin-top:6px}
+.xqm-hpbar{height:6px;border-radius:99px;overflow:hidden;position:relative;
+  background:rgba(40,30,20,.24);box-shadow:inset 0 1px 2px rgba(0,0,0,.28)}
+.xqm-hpbar > i{display:block;height:100%;border-radius:99px;position:relative;
+  transition:width .42s cubic-bezier(.4,0,.2,1),background .3s ease}
+.xqm-hpbar > i::after{content:"";position:absolute;inset:0;border-radius:99px;
+  background:linear-gradient(180deg,rgba(255,255,255,.42),transparent 60%)}
+.xqm-hpbar.hp-full > i{background:linear-gradient(90deg,#3E7A4E,var(--xqm-hp-full))}
+.xqm-hpbar.hp-mid  > i{background:linear-gradient(90deg,#A8861D,var(--xqm-hp-mid))}
+.xqm-hpbar.hp-low  > i{background:linear-gradient(90deg,#7E1A1A,var(--xqm-hp-low))}
+.xqm-hptext{font-size:10.5px;color:var(--muted);text-align:center;margin-top:3px;
+  font-variant-numeric:tabular-nums}
+
+/* ══ 匹配页 ══ */
+.xqm-match,#xqmMatch{min-height:60vh;display:grid;place-items:center;padding:30px 20px}
+.xqm-mbox{text-align:center;max-width:520px;width:100%;margin:0 auto}
+.xqm-ring{width:158px;height:158px;margin:0 auto 30px;position:relative}
+.xqm-ring .r{position:absolute;inset:0;border-radius:50%;border:2px solid transparent}
+.xqm-ring .r1{border-top-color:var(--xqm-gold);border-right-color:rgba(201,162,39,.3);
+  animation:xqmSpin 1.5s linear infinite}
+.xqm-ring .r2{inset:19px;border-bottom-color:var(--xqm-red);border-left-color:rgba(139,26,26,.3);
+  animation:xqmSpin 2.1s linear infinite reverse}
+.xqm-ring .r3{inset:38px;border-top-color:var(--xqm-green-lt);animation:xqmSpin 1.2s linear infinite}
+@keyframes xqmSpin{to{transform:rotate(360deg)}}
+.xqm-core{position:absolute;inset:53px;border-radius:50%;
+  background:radial-gradient(circle,rgba(201,162,39,.22),rgba(201,162,39,.04));
+  display:grid;place-items:center;font-size:32px;animation:xqmCore 1.7s ease-in-out infinite}
+@keyframes xqmCore{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}
+.xqm-ring.xqm-ring-done .r{animation:none;border-color:rgba(201,162,39,.9)}
+.xqm-ring.xqm-ring-done .r2,.xqm-ring.xqm-ring-done .r3{border-color:rgba(201,162,39,.45)}
+.xqm-ring.xqm-ring-done .xqm-core{animation:xqmFoundPop .5s var(--spring) both;font-size:38px;
+  background:radial-gradient(circle,rgba(201,162,39,.42),rgba(201,162,39,.08))}
+@keyframes xqmFoundPop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+.xqm-mtitle{font-size:22px;font-weight:800;letter-spacing:.06em;margin:0 0 11px;
+  font-family:"Songti SC","STSong",serif;color:var(--fg)}
+.xqm-mfail .xqm-ring .r{animation:none;border-color:rgba(165,34,34,.4)}
+.xqm-mfail .xqm-ring .xqm-core{animation:none;color:var(--xqm-red-lt)}
+.xqm-mfail .xqm-mtitle{color:var(--xqm-red-lt)}
+.xqm-msub{color:var(--muted);font-size:13.5px;line-height:1.9;min-height:52px}
+.xqm-mfound{margin-top:24px;padding:20px;border-radius:16px;
+  background:var(--card);border:1px solid rgba(201,162,39,.45);
+  animation:xqmFound .5s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes xqmFound{from{opacity:0;transform:scale(.9) translateY(14px)}to{opacity:1;transform:none}}
+.xqm-vs{display:flex;align-items:center;justify-content:center;gap:24px}
+.xqm-vs .side{flex:1;text-align:center;min-width:0}
+.xqm-vs .nm{font-size:15px;font-weight:700;margin-top:10px;color:var(--fg);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xqm-vs .rt{font-size:12px;color:var(--xqm-gold-dk);margin-top:4px;letter-spacing:.06em}
+.xqm-vs .vsw{font-size:22px;font-weight:900;color:var(--xqm-gold-dk);
+  font-family:"Songti SC",serif;letter-spacing:.1em}
+
+/* ══ 对战页 ══ */
+.xqm-bt{--btnav:56px;--btbot:0px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+  height:calc(100dvh - var(--btnav) - var(--btbot) - 26px);min-height:420px;gap:var(--s3)}
+.xqm-bt-top,.xqm-bt-bot{display:flex;align-items:center;gap:var(--s3);
+  padding:var(--s2) var(--s3);border-radius:var(--r2);background:var(--card);
+  border:1px solid var(--line);min-width:0}
+.xqm-side{display:flex;align-items:center;gap:var(--s2);min-width:0}
+.xqm-sideinfo{min-width:0;flex:1 1 auto;overflow:hidden}
+.xqm-ava{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+  font-size:19px;flex-shrink:0;border:2px solid}
+.xqm-ava.red{background:linear-gradient(160deg,#C0392B,#7A1212);border-color:rgba(201,162,39,.85)}
+.xqm-ava.black{background:linear-gradient(160deg,#2E6151,#0B1E18);border-color:rgba(201,162,39,.85)}
+.xqm-nm{font-size:var(--t-sm);font-weight:700;line-height:1.3;color:var(--fg);
+  max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xqm-rt{font-size:var(--t-xs);color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.xqm-round{font-size:var(--t-sm);color:var(--xqm-gold-dk);letter-spacing:.08em;font-weight:700;
+  padding:5px 13px;border-radius:99px;border:1px solid rgba(201,162,39,.45);
+  background:rgba(201,162,39,.1);white-space:nowrap}
+html[data-theme="dark"] .xqm-round{color:var(--xqm-gold-lt)}
+
+.xqm-ringwrap{position:relative;width:46px;height:46px;flex-shrink:0}
+.xqm-ringwrap .xqm-ava{position:absolute;inset:3px;width:auto;height:auto;font-size:16px}
+/* 只作用于头像外圈的进度环。裸 .xqm-ring 也会命中匹配页那个 158px 的大圆环，
+   两者共用一个类名，必须用 .xqm-ringwrap > 把小环的尺寸钉死在父容器上。 */
+.xqm-ringwrap > .xqm-ring{position:absolute;inset:0;width:100%;height:100%;
+  border-radius:50%;pointer-events:none;color:var(--xqm-gold);
+  background:conic-gradient(currentColor var(--p,0%),transparent 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 3px));
+  mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 3px));
+  transition:color var(--d3) var(--ease)}
+.xqm-ringwrap.urgent > .xqm-ring{color:var(--xqm-red-lt);
+  animation:xqmRingPulse .9s ease-in-out infinite}
+.xqm-ringwrap.off > .xqm-ring{opacity:0}
+@keyframes xqmRingPulse{0%,100%{opacity:1}50%{opacity:.42}}
+.xqm-ringnum{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);
+  font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--muted);
+  white-space:nowrap;padding:0 5px;border-radius:99px;background:var(--card);
+  border:1px solid var(--line);line-height:1.5}
+.xqm-ringwrap.off .xqm-ringnum{display:none}
+.xqm-ringwrap.urgent .xqm-ringnum{color:#FFF6E0;background:var(--xqm-red-lt);
+  border-color:var(--xqm-red-lt)}
+
+.xqm-trays{display:flex;gap:3px;align-items:center;min-height:20px;flex-wrap:wrap;
+  max-width:210px;flex:1}
+.xqm-trays .xqm-tray{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+  font-size:9.5px;font-weight:700;font-family:"Songti SC","STSong",serif;color:#FFF8E7;
+  opacity:.6;flex-shrink:0}
+.xqm-trays .xqm-tray.red{background:radial-gradient(circle at 34% 26%,#D0483F,#7A1212)}
+.xqm-trays .xqm-tray.black{background:radial-gradient(circle at 34% 26%,#3A6B57,#0B1E18)}
+
+.xqm-tug{flex:1.2;min-width:130px}
+.xqm-tug-bar{height:12px;border-radius:99px;overflow:hidden;display:flex;background:var(--n2);
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.25)}
+.xqm-tug-bar > i{display:block;height:100%;transition:width var(--d4) var(--ease)}
+.xqm-tug-bar > i.red{background:linear-gradient(90deg,#7A1212,#D0483F)}
+.xqm-tug-bar > i.black{background:linear-gradient(90deg,#0B1E18,#3A6B57);margin-left:auto}
+.xqm-tug-txt{display:flex;justify-content:space-between;gap:14px;font-size:var(--t-xs);
+  color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums;min-width:0}
+.xqm-tug-txt > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xqm-tug-txt > span:last-child{text-align:right}
+
+.xqm-bt-mid{display:grid;grid-template-columns:minmax(0,1fr) 320px;
+  grid-template-rows:minmax(0,1fr);gap:var(--s3);min-height:0}
+.xqm-boardwrap{display:flex;align-items:center;justify-content:center;
+  min-width:0;min-height:0;position:relative}
+.xqm-board{--cw:50px;--ch:48px;--bpx:19px;--bpy:17px;--gw:1.1px;display:grid;
+  grid-template-columns:repeat(9,var(--cw));grid-template-rows:repeat(10,var(--ch));
+  padding:var(--bpy) var(--bpx);border-radius:16px;position:relative;
+  background-image:
+    repeating-linear-gradient(88deg,rgba(150,115,70,.055) 0 1px,transparent 1px 25px),
+    linear-gradient(168deg,var(--xqm-wood1),var(--xqm-wood2) 55%,var(--xqm-wood3));
+  background-repeat:no-repeat;
+  box-shadow:inset 0 0 0 2px rgba(120,90,50,.35),0 16px 38px rgba(90,70,40,.22);
+  transition:box-shadow .3s ease}
+.xqm-board.xqm-focus{box-shadow:inset 0 0 0 2px rgba(120,90,50,.35),
+  0 16px 38px rgba(90,70,40,.22),inset 0 0 90px rgba(60,40,20,.26)}
+.xqm-board.xqm-shake{animation:xqmShake .32s cubic-bezier(.36,.07,.19,.97)}
+@keyframes xqmShake{10%,90%{transform:translate(-2px,0)}20%,80%{transform:translate(4px,0)}
+  30%,50%,70%{transform:translate(-6px,0)}40%,60%{transform:translate(6px,0)}}
+.xqm-cell{display:grid;place-items:center;position:relative}
+.xqm-hl{position:absolute;inset:7%;border-radius:50%;z-index:1;cursor:pointer;
+  animation:xqmHl .26s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes xqmHl{from{transform:scale(.55);opacity:0}to{transform:scale(1);opacity:1}}
+.xqm-hl.mv{background:radial-gradient(circle at 38% 32%,rgba(95,190,130,.62),rgba(78,168,112,.42) 68%);
+  box-shadow:inset 0 0 0 2px rgba(58,140,92,.9),0 0 12px rgba(95,190,130,.55)}
+.xqm-hl.rng{background:repeating-linear-gradient(45deg,
+    rgba(240,214,110,.95) 0 4px,rgba(196,158,36,.62) 4px 8px);
+  box-shadow:inset 0 0 0 2px rgba(201,162,39,.95),0 0 12px rgba(228,197,90,.5)}
+.xqm-hl.both{background:repeating-linear-gradient(45deg,
+    rgba(240,214,110,.92) 0 4px,rgba(196,158,36,.55) 4px 8px),rgba(78,168,112,.42);
+  box-shadow:inset 0 0 0 2px rgba(201,162,39,.95),0 0 14px rgba(228,197,90,.6)}
+.xqm-hl.heal{background:radial-gradient(circle at 38% 32%,rgba(120,225,175,.34),rgba(78,168,112,.22) 68%);
+  box-shadow:inset 0 0 0 3px rgba(120,225,175,.95),0 0 14px rgba(120,225,175,.5)}
+.xqm-hl .foemark{position:absolute;inset:-4%;border-radius:50%;
+  border:2.5px solid rgba(200,60,50,.95);animation:xqmFoe 1.25s ease-in-out infinite}
+@keyframes xqmFoe{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(200,60,50,.55)}
+  50%{opacity:.65;box-shadow:0 0 0 7px rgba(200,60,50,0)}}
+.xqm-cell .xqm-pc{z-index:3;cursor:pointer;transition:transform .18s cubic-bezier(.34,1.56,.64,1)}
+.xqm-cell .xqm-pc.xqm-mine:hover{transform:translateY(-3px) scale(1.06)}
+.xqm-board .xqm-pc{--sz:calc(var(--cw) - 8px)}
+.xqm-board .xqm-pc.xqm-sel::after{inset:-3px;border-width:2px}
+.xqm-river{position:absolute;left:0;right:0;height:var(--ch);top:calc(var(--bpy) + var(--ch)*4.5);
+  pointer-events:none;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  padding:0 36px;
+  background:linear-gradient(180deg,rgba(110,140,120,.10),rgba(110,140,120,.03) 55%,rgba(110,140,120,.09));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(90,70,40,.14)}
+.xqm-river::before{content:"";position:absolute;left:8%;right:8%;top:50%;height:0;
+  border-top:1.5px dashed rgba(80,115,90,.28)}
+.xqm-river span{font-family:"KaiTi","STKaiti","楷体","Kaiti SC","Songti SC",serif;font-size:21px;
+  letter-spacing:.5em;color:rgba(52,84,64,.58);text-shadow:0 1px 0 rgba(255,255,255,.32);
+  animation:xqmWater 5.5s ease-in-out infinite}
+.xqm-river span:last-child{animation-delay:1.6s}
+@keyframes xqmWater{0%,100%{opacity:.62}50%{opacity:.92}}
+.xqm-palace{position:absolute;width:calc(var(--cw)*2);height:calc(var(--ch)*2);
+  left:calc(var(--bpx) + var(--cw)*3.5);
+  pointer-events:none;z-index:1;
+  background:
+    linear-gradient(to bottom right,transparent calc(50% - var(--gw)),var(--xqm-grid,rgba(110,82,48,.42)) calc(50% - var(--gw)),
+      var(--xqm-grid,rgba(110,82,48,.42)) calc(50% + var(--gw)),transparent calc(50% + var(--gw))),
+    linear-gradient(to bottom left,transparent calc(50% - var(--gw)),var(--xqm-grid,rgba(110,82,48,.42)) calc(50% - var(--gw)),
+      var(--xqm-grid,rgba(110,82,48,.42)) calc(50% + var(--gw)),transparent calc(50% + var(--gw)))}
+.xqm-palace.p2{top:calc(var(--bpy) + var(--ch)*0.5)}
+.xqm-palace.p1{top:calc(var(--bpy) + var(--ch)*7.5)}
+
+/* 深色主题下的棋盘 */
+html[data-theme="dark"] .xqm-board{
+  background-image:
+    repeating-linear-gradient(88deg,rgba(190,160,110,.05) 0 1px,transparent 1px 25px),
+    linear-gradient(168deg,#3B3328,#2C261D 55%,#1F1A13);
+  box-shadow:inset 0 0 0 2px rgba(140,115,75,.4),0 16px 38px rgba(0,0,0,.5)}
+html[data-theme="dark"] .xqm-board,
+html[data-theme="dark"] .xqm-hboard,
+html[data-theme="dark"] .xqm-mb{--xqm-grid:rgba(205,180,135,.32)}
+html[data-theme="dark"] .xqm-palace{
+  background:
+    linear-gradient(to bottom right,transparent calc(50% - 1.1px),rgba(205,180,135,.3) calc(50% - 1.1px),
+      rgba(205,180,135,.3) calc(50% + 1.1px),transparent calc(50% + 1.1px)),
+    linear-gradient(to bottom left,transparent calc(50% - 1.1px),rgba(205,180,135,.3) calc(50% - 1.1px),
+      rgba(205,180,135,.3) calc(50% + 1.1px),transparent calc(50% + 1.1px))}
+html[data-theme="dark"] .xqm-river span{color:rgba(150,190,170,.5);text-shadow:none}
+
+/* 右侧面板 */
+.xqm-col{display:flex;flex-direction:column;gap:var(--s3);min-width:0;min-height:0;overflow-y:auto}
+.xqm-panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);
+  padding:var(--s3) var(--s4);color:var(--fg);flex-shrink:0}
+.xqm-panel h4{margin:0 0 10px;font-size:var(--t-sm);font-weight:700;color:var(--muted);letter-spacing:.07em}
+.xqm-panel-log{flex:1 1 auto;min-height:130px;display:flex;flex-direction:column}
+.xqm-log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;
+  font-size:var(--t-sm);line-height:1.6;min-height:0}
+.xqm-logline{display:flex;gap:7px;padding:4px 8px;border-radius:7px;background:var(--n1);
+  color:var(--fg)}
+.xqm-logline .t{color:var(--muted);font-size:var(--t-xs);flex-shrink:0;
+  font-variant-numeric:tabular-nums}
+.xqm-logline.r{background:rgba(192,57,43,.1);color:var(--xqm-red)}
+.xqm-logline.b{background:rgba(46,97,81,.1);color:var(--xqm-green-lt)}
+.xqm-logline.k{background:rgba(201,162,39,.16);color:var(--xqm-gold-dk);font-weight:700}
+.xqm-logline.d{color:var(--muted)}
+html[data-theme="dark"] .xqm-logline.r{color:#F0A0A0}
+html[data-theme="dark"] .xqm-logline.b{color:#8FD0BB}
+html[data-theme="dark"] .xqm-logline.k{color:var(--xqm-gold-lt)}
+
+.xqm-prev{position:absolute;left:50%;top:-10px;transform:translateX(-50%);z-index:9;
+  font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:99px;white-space:nowrap;
+  background:rgba(122,18,18,.94);color:#FFE9A8;pointer-events:none;
+  box-shadow:0 2px 8px rgba(0,0,0,.32);animation:xqmPrevIn var(--d2) var(--spring) both}
+@keyframes xqmPrevIn{from{opacity:0;transform:translate(-50%,4px) scale(.8)}
+  to{opacity:1;transform:translate(-50%,0) scale(1)}}
+.xqm-last{position:absolute;inset:15%;border-radius:50%;pointer-events:none;z-index:2;
+  border:2px dashed rgba(201,162,39,.9);animation:xqmLastIn var(--d3) var(--ease) both}
+.xqm-last.to{inset:8%;border-style:solid;box-shadow:0 0 12px rgba(201,162,39,.55)}
+@keyframes xqmLastIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+.xqm-tagpop{position:absolute;left:50%;top:-16px;transform:translateX(-50%);z-index:10;
+  font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;white-space:nowrap;
+  background:rgba(201,162,39,.95);color:#3A2C05;pointer-events:none;
+  animation:xqmTagPop 1.2s var(--ease) forwards}
+.xqm-tagpop.heal{background:rgba(56,148,92,.96);color:#F2FFF7;
+  box-shadow:0 2px 10px rgba(28,88,52,.38)}
+@keyframes xqmTagPop{0%{opacity:0;transform:translate(-50%,6px) scale(.8)}
+  18%{opacity:1;transform:translate(-50%,0) scale(1)}
+  78%{opacity:1;transform:translate(-50%,-14px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-26px) scale(.95)}}
+.xqm-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.xqm-only-sm{display:none}
+/* 教程是右侧栏里的一张普通卡片，不是浮层。
+   原来做成 fixed 浮层，但棋盘几乎撑满左栏、四周留白不足 150px，
+   浮层无论放哪都会压住棋子或侧栏。塞进 .xqm-col 最省事，也不挡任何东西。 */
+.xqm-tut{background:var(--gc-bg,var(--card));border:1px solid rgba(201,162,39,.6);
+  border-radius:var(--r2);padding:14px 16px;animation:xqmTutIn .34s var(--ease) both;
+  flex-shrink:0}
+@keyframes xqmTutIn{from{opacity:0;transform:translateY(-8px)}
+  to{opacity:1;transform:none}}
+.xqm-tut .st{display:flex;gap:6px;margin-bottom:12px}
+.xqm-tut .st i{width:22px;height:4px;border-radius:99px;background:var(--n3);display:block;
+  transition:background var(--d3) var(--ease)}
+.xqm-tut .st i.on{background:var(--xqm-gold)}
+.xqm-tut h5{margin:0 0 8px;font-size:var(--t-md);font-weight:800;color:var(--fg)}
+.xqm-tut p{margin:0 0 16px;font-size:var(--t-sm);line-height:1.85;color:var(--muted)}
+.xqm-tut .acts{display:flex;gap:10px}
+.xqm-tut .acts .xqm-btn{flex:1}
+
+/* ══ 首页数据卡 / 继续对局 ══ */
+.xqm-resume{display:flex;align-items:center;gap:10px;background:rgba(201,162,39,.12);
+  border:1px solid rgba(201,162,39,.55);border-radius:var(--r2);padding:11px 14px;
+  margin-bottom:12px;text-decoration:none;color:var(--fg);font-size:var(--t-sm);font-weight:700;
+  animation:xqmIn .4s var(--ease) both}
+.xqm-resume:hover{border-color:var(--xqm-gold)}
+.xqm-resume .dot{width:8px;height:8px;border-radius:50%;background:var(--xqm-gold);
+  animation:xqmDot 1.3s ease-in-out infinite;flex-shrink:0}
+.xqm-resume .go{margin-left:auto;color:var(--xqm-gold-dk)}
+html[data-theme="dark"] .xqm-resume .go{color:var(--xqm-gold-lt)}
+.xqm-hstat{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);
+  padding:14px 16px;margin-bottom:12px}
+.xqm-hstat .row{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
+.xqm-hstat .big{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--fg);line-height:1}
+.xqm-hstat .k{font-size:var(--t-xs);color:var(--muted)}
+.xqm-hstat .bar{height:8px;border-radius:99px;background:var(--n2);overflow:hidden;display:flex}
+.xqm-hstat .bar > i{display:block;height:100%}
+.xqm-hstat .bar > i.w{background:linear-gradient(90deg,#3E7A4E,#4A8B5C)}
+.xqm-hstat .bar > i.d{background:var(--n3)}
+.xqm-hstat .bar > i.l{background:linear-gradient(90deg,#7E1A1A,#A52222)}
+.xqm-hstat .legend{display:flex;gap:13px;font-size:var(--t-xs);color:var(--muted);margin-top:8px;
+  font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.xqm-hstat .legend b{color:var(--fg);font-weight:800}
+.xqm-hassets{display:flex;gap:10px;margin-bottom:16px}
+.xqm-hassets .a{flex:1;background:var(--card);border:1px solid var(--line);border-radius:var(--r2);
+  padding:11px 13px;display:flex;align-items:center;gap:10px;min-width:0}
+.xqm-hassets .a .ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  font-size:12px;font-weight:800;flex-shrink:0;
+  background:linear-gradient(160deg,rgba(228,197,90,.3),rgba(201,162,39,.1));
+  border:1px solid rgba(201,162,39,.45);color:var(--xqm-gold-dk)}
+html[data-theme="dark"] .xqm-hassets .a .ico{color:var(--xqm-gold-lt)}
+.xqm-hassets .a .v{font-size:var(--t-md);font-weight:800;color:var(--fg);
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.xqm-hassets .a .k{font-size:var(--t-xs);color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.xqm-hach{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+.xqm-hach .b{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;
+  font-size:var(--t-xs);font-weight:700;border:1px solid var(--line);background:var(--n1);
+  color:var(--muted);cursor:default;transition:transform var(--d2) var(--spring)}
+.xqm-hach .b.on{background:linear-gradient(160deg,rgba(228,197,90,.24),rgba(201,162,39,.08));
+  border-color:rgba(201,162,39,.6);color:var(--xqm-gold-dk)}
+html[data-theme="dark"] .xqm-hach .b.on{color:var(--xqm-gold-lt)}
+.xqm-hach .b.on:hover{transform:translateY(-2px)}
+.xqm-hach .b .n{font-variant-numeric:tabular-nums;opacity:.75}
+
+/* ══ 设置页 ══ */
+.xqm-set{display:flex;flex-direction:column;gap:10px;max-width:640px;margin:0 auto}
+.xqm-set .it{display:flex;align-items:center;gap:14px;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--r2);padding:14px 16px}
+.xqm-set .it .tx{flex:1;min-width:0}
+.xqm-set .it .nm{font-size:var(--t-md);font-weight:700;color:var(--fg)}
+.xqm-set .it .ds{font-size:var(--t-xs);color:var(--muted);margin-top:3px;line-height:1.6}
+.xqm-sw{width:52px;height:30px;border-radius:99px;border:1px solid var(--line);background:var(--n2);
+  position:relative;cursor:pointer;flex-shrink:0;transition:background var(--d2) var(--ease)}
+.xqm-sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+  background:var(--card);box-shadow:var(--sh1);transition:transform var(--d2) var(--spring)}
+.xqm-sw.on{background:linear-gradient(180deg,rgba(228,197,90,.95),rgba(201,162,39,.9));
+  border-color:var(--xqm-gold-dk)}
+.xqm-sw.on::after{transform:translateX(22px)}
+.xqm-sw:focus-visible{outline:2px solid var(--xqm-gold);outline-offset:2px}
+html[data-xqm-motion="0"] .xqm-board.xqm-shake,
+html[data-xqm-motion="0"] .xqm-pc.xqm-hit,
+html[data-xqm-motion="0"] .xqm-pc.xqm-low::before{animation:none !important}
+html[data-xqm-motion="0"] .xqm-trail,
+html[data-xqm-motion="0"] .xqm-frag{display:none}
+html[data-xqm-cracks="0"] .xqm-pc .xqm-cracks{display:none}
+.xqm-net{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:90;
+  background:rgba(122,18,18,.96);color:#FFE9A8;font-size:var(--t-sm);font-weight:700;
+  padding:8px 18px;border-radius:99px;box-shadow:var(--sh2);
+  animation:xqmIn .3s var(--ease) both;white-space:nowrap}
+.xqm-net.ok{background:rgba(46,97,81,.96);color:#D6F5E8}
+.xqm-rp{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--s3);align-items:start}
+.xqm-rp-board{display:flex;justify-content:center;min-width:0}
+.xqm-rp-board .xqm-board{--cw:46px;--ch:44px;--bpx:17px;--bpy:15px}
+.xqm-rp-side{display:flex;flex-direction:column;gap:var(--s3);min-width:0}
+.xqm-rp-step{font-size:var(--t-md);font-weight:800;color:var(--fg);
+  font-variant-numeric:tabular-nums;margin-bottom:10px;text-align:center}
+.xqm-rp-range{width:100%;margin-bottom:12px;accent-color:var(--xqm-gold);cursor:pointer}
+.xqm-rp-btns{display:flex;gap:6px}
+.xqm-rp-btns .xqm-btn{padding:8px 10px;min-width:40px}
+.xqm-rp-hint{font-size:var(--t-xs);color:var(--muted);margin-top:10px;text-align:center}
+.xqm-ltp{max-width:720px;margin:0 auto}
+.xqm-ltp-stage{position:relative;height:min(54vh,400px);border-radius:var(--r3);overflow:hidden;
+  background:radial-gradient(circle at 50% 52%,rgba(201,162,39,.16),transparent 64%),
+    linear-gradient(170deg,var(--card),var(--soft));
+  border:1px solid var(--line);display:grid;place-items:center}
+.xqm-ltp-rays{position:absolute;left:50%;top:52%;width:160%;aspect-ratio:1;
+  transform:translate(-50%,-50%) scale(.2);pointer-events:none;opacity:0;
+  background:repeating-conic-gradient(from 0deg,rgba(240,214,110,.5) 0 1.6deg,transparent 1.6deg 13deg);
+  -webkit-mask:radial-gradient(circle,transparent 16%,#000 34%,transparent 74%);
+  mask:radial-gradient(circle,transparent 16%,#000 34%,transparent 74%)}
+.xqm-ltp-ring{position:absolute;left:50%;top:52%;width:190px;height:190px;margin:-95px 0 0 -95px;
+  border-radius:50%;pointer-events:none;opacity:0;
+  border:2px solid rgba(228,197,90,.85);
+  border-top-color:transparent;border-right-color:rgba(228,197,90,.25)}
+.xqm-ltp-ring.r2{width:250px;height:250px;margin:-125px 0 0 -125px;
+  border-color:rgba(228,197,90,.42);
+  border-bottom-color:transparent;border-left-color:rgba(228,197,90,.14)}
+.xqm-ltp-seal{width:118px;height:118px;border-radius:20px;display:grid;place-items:center;
+  font-family:"KaiTi","STKaiti","楷体",serif;font-size:62px;font-weight:800;color:#FFF6E0;
+  background:linear-gradient(160deg,#C0392B,#7A1212);position:relative;z-index:3;
+  box-shadow:inset 0 0 0 3px rgba(255,246,224,.3),0 14px 34px rgba(90,20,10,.34)}
+.xqm-ltp-flash{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:6;
+  background:radial-gradient(circle at 50% 52%,#FFFDF2 0%,#FFEFC0 24%,
+    rgba(255,239,192,.38) 50%,transparent 76%)}
+.xqm-ltp-dot{position:absolute;border-radius:50%;pointer-events:none;z-index:7}
+.xqm-ltp-card{position:relative;z-index:5;display:inline-flex;flex-direction:column;align-items:center;
+  gap:9px;padding:20px 34px;border-radius:var(--r3);background:var(--card);border:2px solid;
+  opacity:0;transform:scale(.35) rotate(-10deg)}
+.xqm-ltp-card.in{animation:xqmLtCardIn .64s cubic-bezier(.2,1.35,.4,1) forwards}
+@keyframes xqmLtCardIn{
+  0%{opacity:0;transform:scale(.35) rotate(-10deg);box-shadow:0 0 0 0 rgba(232,198,110,0)}
+  56%{opacity:1;transform:scale(1.11) rotate(2.6deg);box-shadow:0 0 38px 12px rgba(232,198,110,.55)}
+  76%{transform:scale(.975) rotate(-.9deg)}
+  100%{opacity:1;transform:scale(1) rotate(0);box-shadow:0 0 0 0 rgba(232,198,110,0)}}
+.xqm-ltp-card{overflow:hidden}
+/* ── 抽赏：十连结果列表（按抽到的原始顺序，不合并不排序）── */
+.xqm-ltp-list{position:relative;z-index:5;display:flex;flex-wrap:wrap;gap:9px;
+  justify-content:center;align-content:flex-start;
+  width:100%;max-height:100%;overflow:auto;padding:6px 4px;box-sizing:border-box}
+.xqm-ltp-item{display:flex;flex-direction:column;align-items:center;gap:3px;
+  border:2px solid #bbb;border-radius:12px;padding:7px 9px;
+  background:rgba(255,255,255,.78);box-shadow:0 2px 8px rgba(90,70,40,.10);
+  animation:xqmLtItemIn .38s ease-out both}
+.xqm-ltp-item .gi{font-size:10px;font-weight:800;letter-spacing:.1em;line-height:1}
+.xqm-ltp-item .nm{font-size:11.5px;font-weight:700;letter-spacing:.06em}
+.xqm-ltp-item .ct{font-size:11px;font-weight:800;color:#8a6a12}
+@keyframes xqmLtItemIn{from{opacity:0;transform:translateY(12px) scale(.88)}to{opacity:1;transform:none}}
+.xqm-ltp-card::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(105deg,transparent 34%,rgba(255,255,255,.66) 47%,transparent 60%);
+  background-size:260% 100%;opacity:0}
+.xqm-ltp-card.in::after{animation:xqmLtSheen 1s ease-out .28s both}
+@keyframes xqmLtSheen{0%{opacity:0;background-position:-130% 0}
+  20%{opacity:1}100%{opacity:0;background-position:250% 0}}
+.xqm-ltp-grade{font-size:var(--t-sm);font-weight:900;letter-spacing:.3em;text-indent:.3em}
+.xqm-ltp-name{font-size:var(--t-lg);font-weight:800;color:var(--fg)}
+.xqm-ltp-gain{font-size:var(--t-md);font-weight:800;color:var(--xqm-gold-dk);
+  font-variant-numeric:tabular-nums}
+html[data-theme="dark"] .xqm-ltp-gain{color:var(--xqm-gold-lt)}
+.xqm-ltp-stage.charge .xqm-ltp-seal{animation:xqmLtSeal .9s cubic-bezier(.3,.9,.3,1) both}
+@keyframes xqmLtSeal{
+  0%{transform:scale(1) rotate(0);
+     box-shadow:inset 0 0 0 3px rgba(255,246,224,.3),0 14px 34px rgba(90,20,10,.34)}
+  18%{transform:scale(.93) rotate(-2.6deg)}
+  34%{transform:scale(1.06) rotate(2.2deg)}
+  50%{transform:scale(.97) rotate(-1.8deg)}
+  64%{transform:scale(1.1) rotate(1.4deg)}
+  78%{transform:scale(1.01) rotate(-.9deg)}
+  90%{transform:scale(1.15) rotate(.6deg)}
+  100%{transform:scale(1.24) rotate(0);
+     box-shadow:inset 0 0 0 3px rgba(255,246,224,.6),
+       0 0 46px 14px rgba(232,198,110,.78),0 14px 34px rgba(90,20,10,.34)}}
+.xqm-ltp-stage.charge .xqm-ltp-ring{animation:xqmLtRingIn .9s cubic-bezier(.3,.9,.3,1) both}
+@keyframes xqmLtRingIn{0%{opacity:0;transform:scale(2.7) rotate(0)}
+  55%{opacity:.95}100%{opacity:1;transform:scale(1) rotate(210deg)}}
+.xqm-ltp-stage.charge .xqm-ltp-ring.r2{animation:xqmLtRingIn2 .9s cubic-bezier(.3,.9,.3,1) both}
+@keyframes xqmLtRingIn2{0%{opacity:0;transform:scale(2.35) rotate(0)}
+  55%{opacity:.85}100%{opacity:1;transform:scale(1) rotate(-170deg)}}
+.xqm-ltp-stage.burst{animation:xqmLtShake .42s cubic-bezier(.36,.07,.19,.97)}
+@keyframes xqmLtShake{10%,90%{transform:translate(-3px,0)}20%,80%{transform:translate(5px,0)}
+  30%,50%,70%{transform:translate(-7px,0)}40%,60%{transform:translate(7px,0)}}
+.xqm-ltp-stage.burst .xqm-ltp-flash{animation:xqmLtFlash .44s ease-out both}
+@keyframes xqmLtFlash{0%{opacity:0;transform:scale(.4)}
+  9%{opacity:.97}100%{opacity:0;transform:scale(1.55)}}
+.xqm-ltp-stage.burst .xqm-ltp-rays{animation:xqmLtRays .95s cubic-bezier(.15,.8,.3,1) both}
+@keyframes xqmLtRays{0%{opacity:0;transform:translate(-50%,-50%) scale(.12) rotate(0)}
+  12%{opacity:1}70%{opacity:.5}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.34) rotate(52deg)}}
+.xqm-ltp-stage.burst .xqm-ltp-seal{animation:xqmLtSealOut .42s ease-out both}
+@keyframes xqmLtSealOut{0%{opacity:1;transform:scale(1.24) rotate(0)}
+  100%{opacity:0;transform:scale(2.15) rotate(40deg)}}
+.xqm-ltp-hist{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.xqm-ltp-hist .h{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;
+  font-size:var(--t-xs);font-weight:700;border:1px solid var(--line);background:var(--card);
+  animation:xqmIn .3s var(--ease) both}
+.xqm-ltp-hist .h .d{width:9px;height:9px;border-radius:50%}
+.xqm-ltp-bar{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.xqm-ltp-bal{font-size:var(--t-sm);color:var(--muted);font-variant-numeric:tabular-nums}
+.xqm-ltp-bal b{color:var(--xqm-gold-dk);font-size:var(--t-lg);font-weight:900}
+html[data-theme="dark"] .xqm-ltp-bal b{color:var(--xqm-gold-lt)}
+.xqm-ltp-odds{font-size:var(--t-xs);color:var(--muted);line-height:1.9;margin-top:10px}
+.xqm-szn{background:var(--card);border:1px solid rgba(201,162,39,.45);border-radius:var(--r3);
+  padding:18px 20px;margin-bottom:18px}
+.xqm-szn .szn-top{display:flex;align-items:baseline;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.xqm-szn .szn-name{font-size:var(--t-lg);font-weight:800;color:var(--fg);letter-spacing:.04em}
+.xqm-szn .szn-left{margin-left:auto;font-size:var(--t-xs);color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.xqm-szn .szn-bar{height:10px;border-radius:99px;background:var(--n2);overflow:hidden;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.2)}
+.xqm-szn .szn-bar > i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--xqm-gold-dk),var(--xqm-gold-lt));
+  transition:width .8s var(--ease)}
+.xqm-szn .szn-note{font-size:var(--t-xs);color:var(--muted);margin-top:9px;line-height:1.7}
+.xqm-szn-hist{margin-top:24px}
+.xqm-szn-hist h4{margin:0 0 12px;font-size:var(--t-sm);font-weight:700;color:var(--muted);
+  letter-spacing:.07em}
+.xqm-szn-hist .h{display:flex;align-items:center;gap:12px;padding:12px 16px;
+  background:var(--card);border:1px solid var(--line);border-bottom:none;font-size:var(--t-sm)}
+.xqm-szn-hist .h:first-of-type{border-radius:var(--r2) var(--r2) 0 0}
+.xqm-szn-hist .h:last-of-type{border-radius:0 0 var(--r2) var(--r2);border-bottom:1px solid var(--line)}
+.xqm-szn-hist .h .s{color:var(--muted);font-size:var(--t-xs);width:132px;flex-shrink:0}
+.xqm-szn-hist .h .n{flex:1;font-weight:700;color:var(--fg);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xqm-szn-hist .h .r{color:var(--xqm-gold-dk);font-weight:800;font-variant-numeric:tabular-nums}
+html[data-theme="dark"] .xqm-szn-hist .h .r{color:var(--xqm-gold-lt)}
+@media (max-width:900px){
+  .xqm-rp{grid-template-columns:minmax(0,1fr)}
+  .xqm-rp-board .xqm-board{--cw:36px;--ch:35px;--bpx:13px;--bpy:11px}
+  .xqm-rp-side{flex-direction:row;overflow-x:auto;gap:var(--s2)}
+  .xqm-rp-side .xqm-panel{flex-shrink:0;min-width:200px}
+  .xqm-rp-side .xqm-panel-log{min-width:240px}
+  .xqm-rp-side .xqm-log{max-height:120px}
+}
+.xqm-cell:focus-visible{outline:2px solid var(--xqm-gold);outline-offset:-2px;z-index:5}
+.xqm-board.xqm-kbd .xqm-cell.xqm-cursor{box-shadow:inset 0 0 0 2px rgba(201,162,39,.95)}
+.xqm-turn{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:11px;
+  font-size:14px;font-weight:700;border:1px solid var(--line);transition:all .3s ease}
+.xqm-turn.red{background:linear-gradient(135deg,rgba(192,57,43,.16),rgba(139,26,26,.07));
+  border-color:rgba(192,57,43,.4);color:var(--xqm-red)}
+.xqm-turn.black{background:linear-gradient(135deg,rgba(46,97,81,.16),rgba(11,30,24,.07));
+  border-color:rgba(46,97,81,.4);color:var(--xqm-green-lt)}
+html[data-theme="dark"] .xqm-turn.red{color:#F0A0A0}
+html[data-theme="dark"] .xqm-turn.black{color:#8FD0BB}
+.xqm-turn .dot{width:10px;height:10px;border-radius:50%;background:currentColor;
+  animation:xqmDot 1.3s ease-in-out infinite;flex-shrink:0}
+@keyframes xqmDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.75)}}
+.xqm-ap{display:flex;gap:6px;align-items:center;margin-top:10px}
+.xqm-apdot{width:19px;height:19px;border-radius:50%;border:2px solid rgba(201,162,39,.5);
+  background:rgba(201,162,39,.12);transition:all .28s cubic-bezier(.34,1.5,.64,1)}
+.xqm-apdot.on{background:radial-gradient(circle at 35% 30%,var(--xqm-gold-lt),var(--xqm-gold));
+  border-color:var(--xqm-gold-dk);box-shadow:0 0 10px rgba(201,162,39,.65)}
+.xqm-aptxt{margin-left:5px;font-size:12.5px;color:var(--muted)}
+.xqm-empty{color:var(--muted);font-size:13px;text-align:center;padding:20px 0;line-height:1.8}
+.xqm-skel{background:linear-gradient(90deg,var(--n1) 25%,var(--n2) 37%,var(--n1) 63%);
+  background-size:400% 100%;animation:xqmSkel 1.3s ease-in-out infinite;border-radius:var(--r1)}
+@keyframes xqmSkel{0%{background-position:100% 0}100%{background-position:0 0}}
+.xqm-skel-row{height:48px;margin-bottom:8px}
+.xqm-skel-card{height:104px;border-radius:var(--r3)}
+.xqm-selhead{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.xqm-selname{font-size:15px;font-weight:800;color:var(--fg)}
+.xqm-selsub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.xqm-s2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
+.xqm-s2 .s{background:var(--soft);border-radius:9px;padding:8px 10px}
+.xqm-s2 .s .k{font-size:10.5px;color:var(--muted);letter-spacing:.05em}
+.xqm-s2 .s .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--fg)}
+.xqm-s2 .s.hp .v{color:var(--xqm-hp-full)}
+.xqm-s2 .s.atk .v{color:var(--xqm-red-lt)}
+.xqm-trait{border-radius:10px;padding:10px 12px;
+  background:linear-gradient(135deg,rgba(201,162,39,.14),rgba(201,162,39,.05));
+  border:1px solid rgba(201,162,39,.4)}
+.xqm-trait .t{font-size:12px;font-weight:800;color:var(--xqm-gold-dk);letter-spacing:.05em;margin-bottom:4px}
+.xqm-trait .d{font-size:12px;line-height:1.7;color:var(--fg)}
+.xqm-trait .on{color:var(--xqm-hp-full);font-weight:700}
+html[data-theme="dark"] .xqm-trait .t{color:var(--xqm-gold-lt)}
+
+/* ══ 首页两栏 ══ */
+.xqm-home{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:24px;margin:18px 0;align-items:start}
+.xqm-hleft{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:0}
+.xqm-hboard{--cw:56px;--ch:54px;--bpx:16px;--bpy:14px;--gw:1.1px;display:grid;position:relative;
+  grid-template-columns:repeat(9,var(--cw));grid-template-rows:repeat(5,var(--ch));
+  padding:var(--bpy) var(--bpx);border-radius:14px;
+  background-image:
+    repeating-linear-gradient(88deg,rgba(150,115,70,.055) 0 1px,transparent 1px 25px),
+    linear-gradient(168deg,var(--xqm-wood1),var(--xqm-wood2) 55%,var(--xqm-wood3));
+  background-repeat:no-repeat;
+  box-shadow:inset 0 0 0 2px rgba(120,90,50,.35),0 14px 32px rgba(90,70,40,.2)}
+.xqm-hboard .xqm-cell{display:grid;place-items:center;position:relative}
+.xqm-board .xqm-cell::before,.xqm-hboard .xqm-cell::before,.xqm-mb .xqm-cell::before{
+  content:"";position:absolute;left:0;right:0;top:50%;height:1px;
+  background:var(--xqm-grid,rgba(110,82,48,.42));pointer-events:none}
+.xqm-board .xqm-cell::after,.xqm-hboard .xqm-cell::after,.xqm-mb .xqm-cell::after{
+  content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;
+  background:var(--xqm-grid,rgba(110,82,48,.42));pointer-events:none}
+.xqm-hboard .xqm-pc{--sz:calc(var(--cw) - 6px);cursor:default}
+.xqm-hboard .xqm-palace.p1{top:calc(var(--bpy) + var(--ch)*2.5)}
+.xqm-hcap{font-size:12.5px;color:var(--muted);letter-spacing:.06em}
+.xqm-hcap a{color:var(--xqm-gold-dk);font-weight:700;text-decoration:none}
+.xqm-hright{display:flex;flex-direction:column;gap:12px;background:var(--card);
+  border:1px solid var(--line);border-radius:16px;padding:22px 20px;position:relative;overflow:hidden}
+.xqm-hright::before{content:"";position:absolute;top:-40px;right:-40px;width:150px;height:150px;
+  border-radius:50%;background:radial-gradient(circle,rgba(201,162,39,.12),transparent 65%);pointer-events:none}
+.xqm-hright .xqm-badge{align-self:flex-start}
+.xqm-hright h1{margin:6px 0 8px;font-size:30px;font-weight:800;letter-spacing:.12em;
+  font-family:"Songti SC","STSong","SimSun",serif;color:var(--fg)}
+.xqm-hright .xqm-sub{margin:0 0 14px;font-size:13px;line-height:1.9;color:var(--fg-2)}
+.xqm-hbtns{display:flex;flex-direction:column;gap:10px}
+.xqm-hbtns .xqm-btn{width:100%;padding:13px 18px;font-size:14.5px;justify-content:space-between}
+.xqm-hbtns .xqm-btn .arr{opacity:.65;font-weight:400}
+.xqm-hbtns .xqm-btn:disabled .arr{display:none}
+.xqm-hbtns .xqm-tag{font-size:10.5px;font-weight:600;color:var(--xqm-gold-dk);
+  background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.4);
+  border-radius:20px;padding:2px 9px;letter-spacing:.05em}
+@media (max-width:900px){
+  .xqm-home{grid-template-columns:1fr}
+  .xqm-hright{order:-1}
+}
+
+/* ══ 编辑阵容 ══ */
+.xqm-lu{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;margin:16px 0;align-items:start}
+.xqm-lu-left{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:0}
+.xqm-lu-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.xqm-lu-head h2{margin:0;font-size:19px;color:var(--fg)}
+.xqm-lu-head .tip{font-size:12.5px;color:var(--muted)}
+.xqm-lu-right{display:flex;flex-direction:column;gap:10px;background:var(--card);
+  border:1px solid var(--line);border-radius:16px;padding:18px 16px}
+.xqm-lu-right h3{margin:0 0 4px;font-size:13px;color:var(--muted);letter-spacing:.07em}
+.xqm-luitem{display:flex;align-items:center;gap:11px;padding:7px 10px;
+  border:1px solid var(--line);border-radius:12px;background:var(--bg-elev,transparent);
+  cursor:pointer;transition:border-color .18s,box-shadow .18s;user-select:none}
+.xqm-luitem.on{border-color:var(--xqm-gold);box-shadow:0 0 0 2px rgba(201,162,39,.22)}
+.xqm-luitem.empty{opacity:.38;cursor:not-allowed}
+.xqm-luitem .nm{font-size:13.5px;color:var(--fg);font-weight:600}
+.xqm-luitem .rl{font-size:11px;color:var(--muted)}
+.xqm-luitem .n{margin-left:auto;font-size:12.5px;color:var(--xqm-gold-dk);font-weight:700;
+  font-variant-numeric:tabular-nums}
+.xqm-lucan{position:absolute;inset:26%;border-radius:50%;
+  border:2px dashed rgba(78,168,112,.75);z-index:2;pointer-events:none;
+  animation:xqmHl .26s cubic-bezier(.34,1.56,.64,1) both}
+.xqm-lu-board .xqm-cell{cursor:pointer}
+.xqm-lufoot{display:flex;gap:10px;margin-top:14px}
+.xqm-lufoot .xqm-btn{flex:1}
+@media (max-width:900px){
+  .xqm-lu{grid-template-columns:1fr}
+  .xqm-lu-right{order:-1}
+}
+
+/* ══ 结算 ══ */
+.xqm-result,#xqmResult{min-height:60vh;display:grid;place-items:center;padding:30px 20px}
+.xqm-rbox{max-width:540px;width:100%;text-align:center;margin:0 auto}
+.xqm-verdict{font-size:46px;font-weight:900;letter-spacing:.15em;margin:0 0 8px;
+  font-family:"Songti SC","STSong",serif;animation:xqmVer .65s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes xqmVer{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:none}}
+.xqm-verdict.win{background:linear-gradient(178deg,#D0483F,var(--xqm-red-dk));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.xqm-verdict.lose{background:linear-gradient(178deg,#3A6B57,var(--xqm-green-dk));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.xqm-verdict.draw{background:linear-gradient(178deg,var(--xqm-gold-lt),var(--xqm-gold-dk));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.xqm-why{color:var(--muted);font-size:13.5px;letter-spacing:.06em;margin-bottom:26px}
+.xqm-rcard{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:22px;text-align:left;margin-bottom:20px}
+.xqm-rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:11px}
+.xqm-rgrid .g{background:var(--soft);border-radius:11px;padding:12px;text-align:center}
+.xqm-rgrid .g .k{font-size:11px;color:var(--muted);letter-spacing:.05em;margin-bottom:5px}
+.xqm-rgrid .g .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--fg)}
+.xqm-rgrid .g .v.up{color:var(--xqm-hp-full)}
+.xqm-rgrid .g .v.down{color:var(--xqm-red-lt)}
+.xqm-racts{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.xqm-rloot{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:16px 22px;margin-bottom:20px}
+.xqm-rloot .lt{font-size:12px;color:var(--muted);letter-spacing:.08em;margin-bottom:10px}
+.xqm-rloot .ls{display:flex;flex-wrap:wrap;gap:10px}
+.xqm-rloot .li{display:inline-flex;align-items:center;gap:8px;background:var(--soft);
+  border-radius:11px;padding:8px 12px}
+.xqm-rloot .li .g{font-family:"KaiTi","STKaiti","楷体",serif;font-weight:700;font-size:16px;
+  color:#FFF8E7;background:radial-gradient(circle at 34% 26%,#D0483F,#A52222 44%,#6E0F0F);
+  width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+  box-shadow:inset 0 0 0 1.5px rgba(201,162,39,.85)}
+.xqm-rloot .li .nm2{font-size:13px;font-weight:700;color:var(--fg)}
+.xqm-rloot .li .cnt{font-size:13px;font-weight:800;color:var(--xqm-gold-dk);font-variant-numeric:tabular-nums}
+.xqm-ryizhu{display:none;align-items:center;gap:10px;background:var(--card);
+  border:1px solid var(--line);border-radius:14px;padding:13px 22px;margin-bottom:20px}
+.xqm-ryizhu .yz-ico{font-size:13px;font-weight:800;letter-spacing:.2em;color:var(--fg)}
+.xqm-ryizhu .yz-gain{font-size:19px;font-weight:900;color:var(--xqm-gold-dk);font-variant-numeric:tabular-nums}
+.xqm-ryizhu .yz-bal{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;margin-left:auto}
+.xqm-verdict{animation:xqmVerdictIn .52s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes xqmVerdictIn{from{opacity:0;transform:scale(.62) translateY(20px)}
+  to{opacity:1;transform:none}}
+.xqm-why{animation:xqmIn .4s var(--ease) .2s both}
+.xqm-rcard{animation:xqmIn .42s var(--ease) .3s both}
+.xqm-rgrid .g{animation:xqmStatIn .36s var(--spring) both}
+@keyframes xqmStatIn{from{opacity:0;transform:translateY(12px) scale(.94)}to{opacity:1;transform:none}}
+.xqm-rloot{animation:xqmIn .4s var(--ease) both}
+.xqm-rloot .li{animation:xqmLootIn .5s var(--spring) both}
+@keyframes xqmLootIn{from{opacity:0;transform:translateY(16px) rotate(-7deg) scale(.78)}
+  to{opacity:1;transform:none}}
+.xqm-ryizhu{animation:xqmIn .4s var(--ease) both}
+.xqm-racts{animation:xqmIn .4s var(--ease) .5s both}
+.xqm-ltres{display:flex;justify-content:center;margin-bottom:14px}
+.xqm-ltres .lt-card{display:flex;flex-direction:column;align-items:center;gap:7px;
+  background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 26px;
+  animation:xqmHl .3s cubic-bezier(.34,1.4,.64,1) both}
+.xqm-ltres .lt-cgrade{font-size:11px;font-weight:800;letter-spacing:.3em}
+.xqm-ltres .lt-cname{font-size:14px;font-weight:800;color:var(--fg);letter-spacing:.1em}
+.xqm-ltres .lt-cgain{font-size:12.5px;font-weight:700;color:var(--xqm-gold-dk);
+  font-variant-numeric:tabular-nums}
+
+/* ══ 榜单 / 图鉴 ══ */
+/* 页面头：返回 + 标题 + 右侧附注（各页统一） */
+.xqm-head{display:flex;align-items:center;gap:12px;margin:0 0 18px;min-width:0}
+.xqm-head h1{margin:0;font-size:21px;font-weight:800;letter-spacing:.16em;
+  font-family:var(--xqm-f-serif);color:var(--fg);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xqm-hsub{margin-left:auto;font-size:12.5px;color:var(--muted);
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* 图鉴顶部的抽赏入口条 */
+.xqm-promo{display:flex;align-items:center;gap:14px;margin:0 0 20px;
+  padding:13px 16px;border-radius:var(--r2);min-width:0;
+  background:linear-gradient(135deg,rgba(201,162,39,.14),rgba(201,162,39,.04));
+  border:1px solid rgba(201,162,39,.4)}
+.xqm-promo-tx{min-width:0;flex:1 1 auto}
+.xqm-promo b{display:block;font-size:14px;font-weight:800;color:var(--fg);letter-spacing:.06em}
+.xqm-promo span{display:block;font-size:11.5px;color:var(--muted);margin-top:3px}
+.xqm-promo em{display:block;font-size:11px;color:var(--xqm-gold-dk);font-style:normal;
+  margin-top:5px;font-variant-numeric:tabular-nums}
+html[data-theme="dark"] .xqm-promo em{color:var(--xqm-gold-lt)}
+
+/* 结算页动作区：主按钮独占一行，次要按钮排在下面 */
+.xqm-racts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
+.xqm-racts-main{flex:1 1 100%}
+
+/* 匹配页：无人提示 + 底部动作 */
+.xqm-mask{margin-top:18px}
+.xqm-mask .t{margin:0 0 6px;font-size:14px;color:var(--fg)}
+.xqm-mask .d{margin:0 0 14px;font-size:12.5px;color:var(--muted);line-height:1.8}
+.xqm-mask .acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.xqm-mfoot{margin-top:22px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* 阵容页 */
+.xqm-lu-tip{font-size:12px;color:var(--muted);text-align:center;line-height:1.7;margin-top:10px}
+.xqm-lu-rhead{font-size:12.5px;font-weight:700;color:var(--muted);letter-spacing:.08em}
+.xqm-vol{-webkit-appearance:none;appearance:none;width:150px;height:26px;background:none;
+  cursor:pointer;flex-shrink:0}
+.xqm-vol::-webkit-slider-runnable-track{height:5px;border-radius:99px;background:var(--n2)}
+.xqm-vol::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;
+  margin-top:-6px;border-radius:50%;background:var(--xqm-gold);
+  box-shadow:0 1px 5px rgba(90,70,40,.35)}
+.xqm-vol::-moz-range-track{height:5px;border-radius:99px;background:var(--n2)}
+.xqm-vol::-moz-range-thumb{width:17px;height:17px;border:0;border-radius:50%;background:var(--xqm-gold)}
+
+.xqm-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:11px;margin-bottom:22px}
+.xqm-stats .g{background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:15px;text-align:center}
+.xqm-stats .g .k{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+.xqm-stats .g .v{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--fg)}
+.xqm-tbl{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.xqm-trow{display:flex;align-items:center;gap:12px;padding:13px 16px;
+  border-bottom:1px solid var(--line);font-size:13.5px;color:var(--fg)}
+.xqm-trow:last-child{border-bottom:none}
+.xqm-trow.me{background:rgba(201,162,39,.1);font-weight:700}
+.xqm-trow .rk{width:30px;text-align:center;font-weight:800;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.xqm-trow .rk.top{color:var(--xqm-gold-dk)}
+.xqm-trow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xqm-trow .rt{font-variant-numeric:tabular-nums;font-weight:700;color:var(--xqm-gold-dk)}
+.xqm-trow .wl{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.xqm-cdx{display:flex;flex-direction:column;gap:16px}
+.xqm-cdx-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.xqm-cdx-info{border-radius:18px;padding:21px;
+  background:linear-gradient(180deg,rgba(255,252,244,.97),var(--card));
+  border:1px solid rgba(201,162,39,.32);
+  box-shadow:0 2px 14px rgba(90,60,20,.07),inset 0 1px 0 rgba(255,255,255,.7)}
+html[data-theme="dark"] .xqm-cdx-info{
+  background:linear-gradient(180deg,rgba(56,48,40,.9),var(--card));
+  border-color:rgba(201,162,39,.28)}
+.xqm-cdx-head{display:flex;align-items:center;gap:15px;padding-bottom:15px;
+  border-bottom:1px solid transparent;
+  border-image:linear-gradient(90deg,transparent,rgba(201,162,39,.5),transparent) 1}
+.xqm-cdx-head .nm{font-size:23px;font-weight:800;letter-spacing:.07em;color:var(--fg);
+  font-family:"Songti SC","STSong",serif}
+.xqm-cdx-head .sub{font-size:11.5px;color:var(--muted);margin-top:5px;letter-spacing:.08em}
+.xqm-cdx-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:15px 0}
+.xqm-cdx-nums .s{border-radius:10px;padding:10px 5px;text-align:center;
+  background:linear-gradient(180deg,rgba(201,162,39,.11),rgba(201,162,39,.03));
+  border:1px solid rgba(201,162,39,.22)}
+.xqm-cdx-nums .s .k{font-size:10px;color:var(--muted);margin-bottom:4px}
+.xqm-cdx-nums .s .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--fg)}
+.xqm-cdx-rows{font-size:12.5px;line-height:1.95}
+.xqm-cdx-rows .r{display:flex;gap:9px;padding:5px 0;border-top:1px dashed var(--line)}
+.xqm-cdx-rows .r:first-child{border-top:none}
+.xqm-cdx-rows .r .lb{color:var(--muted);flex-shrink:0;width:54px}
+.xqm-cdx-rows .r .vl{flex:1;min-width:0;color:var(--fg)}
+.xqm-cdx-rows .r .vl b{color:var(--xqm-gold-dk)}
+html[data-theme="dark"] .xqm-cdx-rows .r .vl b{color:var(--xqm-gold-lt)}
+
+.xqm-demo{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;overflow:hidden}
+/* 两栏在窄屏堆叠 */
+@media (max-width:1080px){
+  .xqm-cdx-main{grid-template-columns:minmax(0,1fr)}
+}
+.xqm-demo-tabs{display:flex;gap:8px;margin-bottom:13px;flex-wrap:wrap}
+.xqm-demo-tab{font-size:12.5px;font-weight:700;padding:7px 16px;border-radius:10px;cursor:pointer;
+  border:1px solid var(--line);background:var(--soft);color:var(--muted);font-family:inherit;
+  letter-spacing:.04em;transition:color .18s ease,border-color .18s ease,box-shadow .18s ease}
+.xqm-demo-tab:hover{color:var(--fg)}
+.xqm-demo-tab.on{background:var(--card);color:var(--fg);border-color:rgba(201,162,39,.8);
+  box-shadow:0 2px 10px var(--shadow)}
+.xqm-demo .hint{font-size:11.5px;color:var(--muted);line-height:1.75;margin-bottom:11px}
+.xqm-demo .body{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+.xqm-demo .res{min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-size:12.5px;line-height:1.6;color:var(--fg);
+  border-top:1px dashed var(--line);padding-top:10px}
+.xqm-demo .res .big{font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;
+  color:var(--xqm-red-lt);line-height:1.25}
+.xqm-demo .res .note{display:inline-block;font-size:10.5px;padding:2px 9px;border-radius:99px;
+  background:rgba(201,162,39,.16);color:var(--xqm-gold-dk);margin:3px 4px 0 0}
+html[data-theme="dark"] .xqm-demo .res .note{color:var(--xqm-gold-lt)}
+.xqm-demo .res .dim{color:var(--muted)}
+.xqm-demo .res .ln{display:inline-flex;align-items:center;gap:4px}
+.xqm-demo .tools{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+.xqm-demo .tool{font-size:11.5px;padding:6px 14px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--line);background:var(--soft);color:var(--fg);font-family:inherit;
+  transition:transform .15s ease}
+.xqm-demo .tool:hover{transform:translateY(-1px)}
+
+/* ⚠️ align-self:center 不能删：.xqm-demo .body 是 align-items:stretch 的竖排 flex，
+   木板会被拉满整栏宽，而网格的列是 auto —— 于是每列被撑到 2 倍格宽，
+   棋子之间横向空出一大截，竖线全断掉。木板必须贴合棋盘自身的宽度再居中。 */
+.xqm-mb{--cw:56px;--ch:54px;--bpx:16px;--bpy:14px;position:relative;flex-shrink:0;
+  align-self:center;
+  border-radius:14px;padding:var(--bpy) var(--bpx);
+  background-image:
+    repeating-linear-gradient(88deg,rgba(150,115,70,.055) 0 1px,transparent 1px 25px),
+    linear-gradient(168deg,var(--xqm-wood1),var(--xqm-wood2) 55%,var(--xqm-wood3));
+  background-repeat:no-repeat;
+  box-shadow:inset 0 0 0 2px rgba(120,90,50,.35),0 14px 32px rgba(90,70,40,.2)}
+.xqm-mb-grid{display:grid;justify-content:center}
+.xqm-mb .xqm-cell{width:var(--cw);height:var(--ch);position:relative;display:grid;place-items:center;
+  cursor:pointer}
+.xqm-mb .xqm-cell:hover{background:rgba(255,248,225,.2)}
+.xqm-mb .xqm-pc{--sz:calc(var(--cw) - 6px)}
+.xqm-mb .xqm-pc.xqm-sel::after{inset:-4px;border-width:2px}
+.xqm-mb .xqm-hl{position:absolute;inset:2px;border-radius:6px;pointer-events:none}
+.xqm-mb .xqm-hl.mv{background:rgba(58,140,92,.36);box-shadow:inset 0 0 0 2px rgba(96,200,140,.85)}
+.xqm-mb .xqm-hl.rng{background:rgba(201,162,39,.22);box-shadow:inset 0 0 0 2px rgba(201,162,39,.9)}
+.xqm-mb .xqm-hl.both{background:rgba(201,162,39,.32);box-shadow:inset 0 0 0 2px rgba(201,162,39,.95)}
+.xqm-mb .xqm-hl.aura{background:rgba(176,42,42,.18);box-shadow:inset 0 0 0 2px rgba(200,70,70,.7)}
+.xqm-mb .xqm-hl.heal{background:rgba(58,180,120,.18);box-shadow:inset 0 0 0 2px rgba(96,220,150,.9)}
+.xqm-mb .xqm-hot{position:absolute;inset:1px;border-radius:7px;pointer-events:none;
+  box-shadow:0 0 0 2px rgba(201,162,39,.95);animation:xqmHot 1.35s ease-in-out infinite}
+@keyframes xqmHot{0%,100%{opacity:.4}50%{opacity:1}}
+.xqm-mb .xqm-mbdmg{position:absolute;left:50%;top:35%;font-size:16px;font-weight:900;
+  pointer-events:none;z-index:9;
+  color:#FFE9A8;text-shadow:0 0 7px rgba(255,120,60,.95),0 1px 3px #000;
+  animation:xqmDmg 1.05s cubic-bezier(.2,.7,.3,1) forwards}
+
+.xqm-cdx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:13px}
+.xqm-cdx-group{margin-bottom:22px}
+.xqm-cdx-card{position:relative;background:var(--gc-bg);border:1px solid var(--gc-bd)}
+.xqm-cdx-card .badge{position:absolute;top:7px;left:7px;font-size:10px;font-weight:800;
+  letter-spacing:.1em;padding:2px 8px;border-radius:999px;border:1px solid;line-height:1.5}
+.xqm-cdx-card .lock{position:absolute;top:7px;right:7px;font-size:15px;line-height:1;
+  filter:none;opacity:.9}
+.xqm-cdx-card.lk{filter:grayscale(1);opacity:.5}
+.xqm-cdx-card.lk:hover{transform:none;opacity:.62;cursor:pointer;
+  box-shadow:0 2px 10px rgba(90,60,20,.06),inset 0 1px 0 rgba(255,255,255,.7);
+  border-color:var(--line)}
+.xqm-cdx-card.lk::after{opacity:.18}
+.xqm-cdx-card .sh.lk{color:#b42318}
+.xqm-cdx-ghead{display:flex;align-items:center;gap:9px;margin:0 0 10px}
+.xqm-cdx-ghead .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.xqm-cdx-ghead .gn{font-size:14px;font-weight:800;letter-spacing:.18em}
+.xqm-cdx-ghead .gc{font-size:11px;color:var(--muted);letter-spacing:.05em}
+.xqm-cdx-empty{border:1px dashed var(--line);border-radius:14px;padding:26px;
+  text-align:center;color:var(--muted);font-size:12.5px;letter-spacing:.1em}
+.xqm-cdx-card{display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;
+  padding:26px 12px 18px;border-radius:16px;font-family:inherit;
+  background:linear-gradient(180deg,var(--gc-bg),transparent 68%),var(--card);
+  border:1px solid var(--gc-bd);
+  box-shadow:0 2px 10px rgba(90,60,20,.06),inset 0 1px 0 rgba(255,255,255,.7);
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.xqm-cdx-card::after{content:'';position:absolute;left:16%;right:16%;bottom:0;height:2px;
+  border-radius:2px;background:linear-gradient(90deg,transparent,var(--gc),transparent);opacity:.55}
+.xqm-cdx-card:hover{transform:translateY(-5px);border-color:var(--gc);
+  box-shadow:0 14px 32px rgba(90,60,20,.17),inset 0 1px 0 rgba(255,255,255,.7)}
+.xqm-cdx-card .xqm-pc{--sz:66px}
+.xqm-cdx-card .nm{font-size:15px;font-weight:800;color:var(--fg);letter-spacing:.06em;
+  font-family:"Songti SC","STSong",serif}
+.xqm-cdx-card .st{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.xqm-grade{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.14em;
+  border:1px solid;border-radius:20px;padding:2px 9px;line-height:1.5;
+  white-space:nowrap;vertical-align:1px}
+/* 对局棋盘上不显示等级（只在入场动画期间淡入 + 状态面板里显示） */
+body.xqm-bt-page .xqm-pc .xqm-lv{display:none}
+body.xqm-bt-page.xqm-intro .xqm-pc .xqm-lv{display:block;animation:xqmIntroLv .5s ease both}
+@keyframes xqmIntroLv{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* 入场：棋子依次落下（animation-delay 由 JS 按顺序设置） */
+@keyframes xqmIntroPc{
+  0%{opacity:0;transform:translateY(-30px) scale(.55)}
+  62%{opacity:1;transform:translateY(3px) scale(1.07)}
+  100%{opacity:1;transform:none}}
+body.xqm-bt-page.xqm-intro .xqm-pc{animation:xqmIntroPc .52s cubic-bezier(.22,1,.36,1) both}
+html[data-xqm-motion="0"] body.xqm-bt-page.xqm-intro .xqm-pc{animation:none !important}
+.xqm-pc .xqm-lv{position:absolute;right:4%;bottom:4%;z-index:6;font-style:normal;
+  font-size:calc(var(--sz)*.19);font-weight:800;line-height:1;color:#FFEFC2;
+  background:rgba(24,16,8,.78);border-radius:999px;padding:calc(var(--sz)*.03) calc(var(--sz)*.1);
+  font-variant-numeric:tabular-nums;pointer-events:none;
+  box-shadow:0 0 0 1px rgba(201,162,39,.55)}
+.xqm-cdx-card .sh{font-size:11.5px;color:var(--xqm-gold-dk);font-variant-numeric:tabular-nums}
+.xqm-grow{margin-top:15px;border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--soft)}
+.xqm-grow .gh{display:flex;justify-content:space-between;align-items:baseline;
+  font-size:12px;color:var(--muted);letter-spacing:.1em}
+.xqm-grow .gh .lv{font-size:16px;font-weight:800;color:var(--fg);letter-spacing:0}
+.xqm-grow .bar{height:8px;border-radius:99px;background:rgba(40,30,20,.14);overflow:hidden;margin:10px 0 6px}
+.xqm-grow .bar i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,#9C7A1F,#E0A93C);transition:width .3s ease}
+.xqm-grow .gs{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.xqm-grow .up{margin:10px 0 0;width:100%;justify-content:center}
+.xqm-grow .up:disabled{opacity:.45;cursor:not-allowed}
+.xqm-grow .grows{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;display:grid;gap:6px}
+.xqm-grow .grows .r{display:flex;justify-content:space-between;font-size:12.5px;color:var(--fg-2)}
+.xqm-grow .grows em{font-style:normal;color:#3B9A5F;font-weight:700;margin-left:4px}
+.xqm-grow .nt{margin-top:10px;font-size:12px;line-height:1.75;color:var(--muted);
+  border-top:1px dashed var(--line);padding-top:10px}
+.xqm-grow .nt b{color:var(--xqm-gold-dk)}
+.xqm-grow .nt.lock{opacity:.62}
+.xqm-hintbar{text-align:center;font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.8}
+/* 超时判负预警：只剩 30 秒内出现，掉线回来能一眼看到自己快被判负 */
+.xqm-towarn{position:sticky;top:8px;z-index:90;margin:0 auto 10px;max-width:min(460px,92vw);
+  text-align:center;padding:9px 16px;border-radius:99px;
+  font-size:13px;font-weight:700;color:#FFF6E0;
+  background:var(--xqm-red-lt);box-shadow:0 4px 16px rgba(165,34,34,.34);
+  animation:xqmWarnPulse 1.1s ease-in-out infinite}
+@keyframes xqmWarnPulse{0%,100%{opacity:1}50%{opacity:.72}}
+
+/* ══ 特效 ══ */
+.xqm-fx{position:absolute;inset:0;pointer-events:none;z-index:20}
+.xqm-dmg{position:absolute;font-size:25px;font-weight:900;pointer-events:none;z-index:30;
+  font-family:"Songti SC","STSong",serif;color:#FFE9A8;
+  text-shadow:0 0 8px rgba(255,120,60,.9),0 2px 4px rgba(0,0,0,.7),0 0 2px #000;
+  animation:xqmDmg 1.05s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes xqmDmg{0%{opacity:0;transform:translate(-50%,0) scale(.5)}
+  22%{opacity:1;transform:translate(-50%,-16px) scale(1.22)}
+  45%{transform:translate(-50%,-26px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-66px) scale(.92)}}
+.xqm-dmg.splash{font-size:17px;color:#FFC48A}
+.xqm-dmg.combo{color:#FF8A3C;text-shadow:0 0 10px rgba(255,90,30,.95),0 2px 4px rgba(0,0,0,.7),0 0 2px #000}
+.xqm-dmg.combo2{color:#FF5A2E}
+.xqm-frag{position:absolute;border-radius:50%;pointer-events:none;z-index:25}
+.xqm-trail{position:absolute;border-radius:50%;pointer-events:none;z-index:12;
+  animation:xqmTrail .72s ease-out forwards}
+@keyframes xqmTrail{0%{opacity:.55;transform:scale(1)}100%{opacity:0;transform:scale(.35)}}
+@keyframes xqmBurst{0%{transform:scale(.18);opacity:1}52%{transform:scale(1.02);opacity:.95}
+  100%{transform:scale(1.55);opacity:0}}
+@keyframes xqmRing{0%{transform:scale(.28);opacity:1}100%{transform:scale(1.95);opacity:0}}
+@keyframes xqmSpike{0%{transform:translate(0,0) scale(1.5);opacity:1}
+  100%{transform:translate(var(--tx),var(--ty)) scale(.28);opacity:0}}
+
+/* 顶部提示 */
+.xqm-toast{position:fixed;left:50%;top:74px;transform:translateX(-50%);z-index:1999;
+  padding:11px 22px;border-radius:11px;font-size:13.5px;font-weight:700;
+  background:rgba(42,38,32,.93);color:#FFF6E0;letter-spacing:.04em;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);animation:xqmToastIn .3s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes xqmToastIn{from{opacity:0;transform:translate(-50%,-14px) scale(.94)}
+  to{opacity:1;transform:translate(-50%,0) scale(1)}}
+
+/* ══ 移动端 ══ */
+@media (max-width:900px){
+  .xqm-title{font-size:34px}
+  /* 手机端整体收紧一档（棋盘尺寸不动，只缩外围 UI） */
+  .xqm{--t-xs:10px;--t-sm:11.5px;--t-md:13.5px;--t-lg:16px;--t-xl:20px;--t-2xl:26px;
+       --s2:7px;--s3:10px;--s4:13px;--s5:18px;--r1:7px;--r2:10px;--r3:15px}
+  .xqm-btn{padding:10px 18px;font-size:13px;border-radius:10px}
+  .xqm-btn-sm{padding:6px 12px;font-size:11.5px;border-radius:8px}
+  .xqm-set .it{padding:10px 12px;gap:10px;flex:0 0 auto}
+  .xqm-sw{width:42px;height:25px}
+  .xqm-sw::after{width:18px;height:18px;top:2.5px;left:2.5px}
+  .xqm-sw.on::after{transform:translateX(17px)}
+  .xqm-luitem{padding:5px 8px;gap:8px;border-radius:10px}
+  .xqm-luitem .xqm-pc{--sz:38px}
+  .xqm-luitem .nm{font-size:var(--t-sm)}
+  .xqm-luitem .rl{font-size:10px}
+  /* 手机棋盘：棋子缩小，别把格线盖住（否则看起来像「棋子在格子里」而不是落在交点上） */
+  .xqm-board .xqm-pc,.xqm-hboard .xqm-pc{--sz:calc(var(--cw) - 13px)}
+  /* 手机首页右栏精简：去掉装饰角标、收紧卡片留白，一屏看得完 */
+  .xqm-hright > .xqm-badge{display:none}
+  .xqm-hright h1{font-size:21px;margin:2px 0 10px}
+  .xqm-hstat{padding:11px 13px;margin-bottom:10px}
+  .xqm-hstat .legend{display:none}
+  .xqm-hstat .bar{margin:6px 0 0}
+  .xqm-hassets{gap:8px;margin-bottom:12px}
+  .xqm-hassets .a{padding:8px 10px;gap:9px;align-items:center;
+    background:var(--soft);border:0;border-radius:10px}
+  .xqm-hassets .a .ico{width:26px;height:26px;border-radius:8px;font-size:11px}
+  .xqm-hassets .a > div:last-child{display:block;min-width:0;line-height:1}
+  .xqm-hassets .a .v{font-size:15px;font-weight:800;line-height:1.15}
+  .xqm-hassets .a .k{font-size:10.5px;margin-top:2px;line-height:1.3;
+    white-space:normal;overflow-wrap:anywhere}
+  .xqm-hbtns{gap:8px}
+  .xqm-hbtns .xqm-btn{padding:11px 14px;font-size:13.5px}
+  .xqm-board{--cw:36px;--ch:35px;--bpx:14px;--bpy:12px}
+  .xqm-board .xqm-hpwrap{display:none}
+  .xqm-river{padding:0 24px}
+  .xqm-river span{font-size:15px;letter-spacing:.35em}
+  .xqm-cdx-main{grid-template-columns:1fr}
+  .xqm-cdx-grid{grid-template-columns:repeat(2,1fr)}
+  .xqm-mb .xqm-cell{width:29px;height:29px}
+  .xqm-mb .xqm-pc{--sz:24px}
+  .xqm-bt{--btbot:64px;min-height:0}
+  .xqm-tut{padding:11px 13px}
+  .xqm-tut h5{margin-bottom:5px;font-size:var(--t-sm)}
+  .xqm-tut p{margin-bottom:11px;line-height:1.65;font-size:var(--t-xs)}
+  .xqm-tut .st{margin-bottom:9px}
+  .xqm-bt-mid{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .xqm-bt-top,.xqm-bt-bot{padding:5px 10px;gap:var(--s2);flex-wrap:nowrap}
+  .xqm-bt-top .xqm-sideinfo{flex:1 1 auto;min-width:0}
+  .xqm-bt-top .xqm-trays{flex:0 0 auto}
+  .xqm-bt-top #xqmSfxBtn{display:none}
+  .xqm-bt-top .xqm-nm{max-width:74px}
+  .xqm-bt-top .xqm-rt{font-size:10.5px}
+  .xqm-bt-top .xqm-btn-sm{padding:6px 9px;font-size:11.5px;white-space:nowrap}
+  .xqm-ava{width:34px;height:34px;font-size:15px}
+  .xqm-ringwrap{width:38px;height:38px}
+  .xqm-ringwrap .xqm-ava{font-size:13px}
+  .xqm-ringnum{bottom:-12px;font-size:9px}
+  .xqm-trays{max-width:96px;min-height:16px;gap:2px}
+  .xqm-trays .xqm-tray{width:16px;height:16px;font-size:8px}
+  .xqm-nm{max-width:92px}
+  .xqm-round{padding:3px 9px;font-size:var(--t-xs)}
+  .xqm-col{flex-direction:row;overflow-x:auto;overflow-y:visible;gap:var(--s2);
+    padding-bottom:2px;align-items:stretch}
+  .xqm-col::-webkit-scrollbar{display:none}
+  .xqm-col .xqm-panel{flex-shrink:0;padding:8px 11px;display:flex;flex-direction:column;
+    justify-content:center;min-width:0}
+  .xqm-panel h4{display:none}
+  .xqm-turn{padding:6px 10px;font-size:var(--t-sm)}
+  .xqm-ap{margin-top:6px}
+  .xqm-apdot{width:15px;height:15px}
+  .xqm-panel-log{position:fixed;left:8px;right:8px;bottom:88px;max-height:44vh;z-index:60;
+    display:none;box-shadow:var(--sh3)}
+  .xqm-panel-log.open{display:flex}
+  .xqm-log{max-height:calc(44vh - 42px)}
+  .xqm-only-sm{display:inline-flex}
+  /* 给站点底部 tab 让位 */
+  .xqm{padding-bottom:64px}
+  body.xqm-bt-page .nav,
+  body.xqm-bt-page .mono-bottom-nav,
+  body.xqm-bt-page #installBar{display:none !important}
+  body.xqm-bt-page .wrap{padding:8px 10px 10px}
+  body.xqm-bt-page .xqm{padding-bottom:0}
+  body.xqm-bt-page .xqm-bt{--btbot:0px}
+}
+@media (max-width:420px){
+  .xqm-board{--cw:33px;--ch:32px;--bpx:12px;--bpy:10px}
+  .xqm-river{padding:0 20px}
+  .xqm-river span{font-size:13px}
+  .xqm-mb .xqm-cell{width:26px;height:26px}
+  .xqm-mb .xqm-pc{--sz:21px}
+}
+@media (orientation: landscape) and (max-height: 560px){
+  .xqm{padding-bottom:52px}
+  .xqm-toast{top:8px}
+  .xqm-title{font-size:20px;margin-bottom:2px}
+  .xqm-home{grid-template-columns:minmax(0,1fr) 300px}
+  .xqm-lu{grid-template-columns:minmax(0,1fr) 300px}
+  .xqm-hright,.xqm-lu-right{order:0}
+  .xqm-hright,.xqm-lu-right{
+    position:sticky;top:58px;max-height:calc(100vh - 116px);overflow-y:auto;
+    padding:14px}
+  .xqm-hright h1{font-size:20px;margin:4px 0 6px}
+  .xqm-hright .xqm-sub{display:none}
+  .xqm-hbtns .xqm-btn{padding:11px 16px;font-size:14px}
+  .xqm-bt{--btnav:50px;--btbot:52px;min-height:0;gap:var(--s2)}
+  .xqm-bt-mid{grid-template-columns:minmax(0,1fr) 248px;grid-template-rows:minmax(0,1fr)}
+  .xqm-bt-top,.xqm-bt-bot{padding:5px var(--s2)}
+  .xqm-col{flex-direction:column;overflow-y:auto;overflow-x:hidden}
+  .xqm-col .xqm-panel{min-width:0}
+  .xqm-panel-log{min-height:80px}
+  .xqm-log{max-height:120px}
+  .xqm-side .xqm-nm{max-width:110px}
+  .xqm-trays{max-width:120px}
+  body.xqm-bt-page .nav,
+  body.xqm-bt-page .mono-bottom-nav,
+  body.xqm-bt-page #installBar{display:none !important}
+  body.xqm-bt-page .wrap{padding:6px 10px 8px}
+  body.xqm-bt-page .xqm{padding-bottom:0}
+  body.xqm-bt-page .xqm-bt{--btnav:0px;--btbot:0px}
+}
+
+/* ── 整体氛围：暖色底纹 + 全幅背景（内容收在约 60% 宽，两侧留白） ── */
+.xqm{
+  padding:20px 18px 32px;
+  min-height:60vh;
+  background:
+    radial-gradient(1100px 520px at 50% -8%, rgba(201,162,39,.15), transparent 68%),
+    radial-gradient(760px 380px at 8% 104%, rgba(160,42,42,.07), transparent 70%),
+    repeating-linear-gradient(135deg, rgba(122,90,40,.03) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg,#F8F2E6 0%,#F1E7D5 46%,#E9DBC2 100%);
+  border-top:1px solid rgba(201,162,39,.34);
+  border-bottom:1px solid rgba(201,162,39,.34);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(122,90,40,.08);
+}
+.xqm::before{
+  content:'';display:block;height:0;
+}
+html[data-theme="dark"] .xqm{
+  background:
+    radial-gradient(1100px 520px at 50% -8%, rgba(201,162,39,.12), transparent 68%),
+    radial-gradient(760px 380px at 8% 104%, rgba(160,42,42,.10), transparent 70%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg,#1D1A17 0%,#181512 52%,#12100E 100%);
+  border-top-color:rgba(201,162,39,.30);
+  border-bottom-color:rgba(201,162,39,.30);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+@media (max-width:900px){
+  .xqm{padding:16px 14px 26px;min-height:auto}
+}
+
+
+/* ══ 棋子圆牌精修：镜面高光 + 金属圈 ══ */
+.xqm-pc::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,.36) 0%, rgba(255,255,255,.10) 24%, transparent 50%),
+    radial-gradient(circle at 50% 118%, rgba(0,0,0,.34) 0%, transparent 56%);}
+.xqm-pc.red{box-shadow:
+  inset 0 0 0 1px rgba(255,238,190,.5),
+  inset 0 0 0 3px rgba(201,162,39,.95),
+  inset 0 0 0 4.5px rgba(58,18,10,.38),
+  inset 0 4px 10px rgba(255,255,255,.26),
+  inset 0 -7px 14px rgba(0,0,0,.46),
+  0 4px 14px rgba(70,20,20,.40),
+  0 1px 0 rgba(255,255,255,.16)}
+.xqm-pc.black{box-shadow:
+  inset 0 0 0 1px rgba(255,238,190,.42),
+  inset 0 0 0 3px rgba(201,162,39,.9),
+  inset 0 0 0 4.5px rgba(0,18,12,.42),
+  inset 0 4px 10px rgba(255,255,255,.2),
+  inset 0 -7px 14px rgba(0,0,0,.5),
+  0 4px 14px rgba(10,30,24,.42),
+  0 1px 0 rgba(255,255,255,.14)}
+
+/* ══ 图鉴卡片入场：依次浮现，不是一起蹦出来 ══ */
+@keyframes xqmCardIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.xqm-cdx-grid > .xqm-cdx-card{animation:xqmCardIn .42s cubic-bezier(.22,1,.36,1) backwards}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(1){animation-delay:.02s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(2){animation-delay:.07s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(3){animation-delay:.12s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(4){animation-delay:.17s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(5){animation-delay:.22s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(6){animation-delay:.27s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(7){animation-delay:.32s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(8){animation-delay:.37s}
+.xqm-cdx-grid > .xqm-cdx-card:nth-child(n+9){animation-delay:.42s}
+
+/* ══ 小锁：轻微呼吸，提示「这里有事要做」 ══ */
+@keyframes xqmLockPulse{0%,100%{opacity:.82;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+.xqm-cdx-card .lock{animation:xqmLockPulse 2.4s ease-in-out infinite}
+
+/* ══ 品质角标：一道极淡的掠光 ══ */
+@keyframes xqmBadgeSheen{0%{background-position:-140% 0}100%{background-position:240% 0}}
+.xqm-cdx-card .badge{overflow:hidden}
+.xqm-cdx-card .badge::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.55) 50%,transparent 62%);
+  background-size:220% 100%;animation:xqmBadgeSheen 3.6s ease-in-out infinite}
+
+/* ══ 按钮按下：更像实体键 ══ */
+.xqm-btn{will-change:transform}
+.xqm-btn:active{transform:translateY(1px) scale(.972);
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.28) !important}
+
+/* ══ 动效总开关：关掉时全部静止 ══ */
+html[data-xqm-motion="0"] .xqm-cdx-grid > .xqm-cdx-card,
+html[data-xqm-motion="0"] .xqm-cdx-card .lock,
+html[data-xqm-motion="0"] .xqm-cdx-card .badge::after{animation:none !important}
+html[data-xqm-motion="0"] .xqm-cdx-card .badge::after{display:none}
+html[data-xqm-motion="0"] .xqm-ltp-card.in::after{display:none}
+
+@media (prefers-reduced-motion: reduce){
+  .xqm *{animation-duration:.01ms !important;animation-iteration-count:1 !important}
+}
+
+/* ══════════════════════════════════════════
+   强制横屏布局
+   写在所有媒体查询之后：舞台已经是横屏尺寸，
+   这里要把 max-width:900px 那套竖屏单栏规则全部顶掉，
+   恢复成横屏该有的两栏 / 三栏，且高度必须刚好铺满不出现滚动条。
+   高度用舞台变量算，不看视口 —— 因为竖屏时视口是竖的。
+   舞台本体的 fixed / 尺寸 / 安全区 padding 定义在本文件后段「舞台基础样式」那一处，
+   这里只管内部怎么排，避免同一条规则写两遍互相覆盖。
+   ══════════════════════════════════════════ */
+/* 页头在横屏里只留标题，别把高度吃掉 */
+html[data-xqm-land="1"] .xqm-title{font-size:19px;margin:0 0 4px;flex:0 0 auto}
+html[data-xqm-land="1"] .xqm-toast{top:10px;font-size:12.5px}
+
+/* ── 首页 / 阵容页：左棋盘 + 右栏 ──
+   横屏下别用 minmax(0,1fr) 给左列预留固定比例 —— 竖屏转横屏后
+   短边（=舞台高）才是棋盘的瓶颈，左列再宽也只是把棋盘晾在中间，
+   右边空一大片看着像少了一列。
+   改成：左列按棋盘实际需要（内容宽），右栏吃掉剩下的但封顶 320，
+   免得 6 个按钮摊成两列铺满半屏、画面发虚。 */
+html[data-xqm-land="1"] .xqm-home,
+html[data-xqm-land="1"] .xqm-lu{
+  grid-template-columns:auto minmax(0,296px);
+  justify-content:center;
+  gap:14px;margin:0;flex:1 1 auto;min-height:0;
+  align-items:stretch;
+}
+/* 左列必须能收缩：里面的提示文字和棋子列表都很长，
+   不给 min-width:0 的话 grid 子项会被内容顶开、把右栏推出画面。 */
+html[data-xqm-land="1"] .xqm-lu-left,
+html[data-xqm-land="1"] .xqm-hleft{min-width:0;overflow:hidden}
+html[data-xqm-land="1"] .xqm-lu-head{gap:8px;min-width:0}
+html[data-xqm-land="1"] .xqm-lu-head h2{font-size:15px}
+html[data-xqm-land="1"] .xqm-lu-head .tip{
+  font-size:10.5px;line-height:1.5;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+html[data-xqm-land="1"] .xqm-lu-left{height:100%;min-height:0;gap:6px}
+html[data-xqm-land="1"] .xqm-hleft{
+  min-height:0;gap:6px;justify-content:center;
+  align-items:center;height:100%;
+  /* 宽由棋盘自己决定，不反过来限制它 */
+  width:auto;max-width:none;overflow:visible;
+}
+html[data-xqm-land="1"] .xqm-hright,
+html[data-xqm-land="1"] .xqm-lu-right{
+  order:0;position:static;top:auto;
+  max-height:none;height:100%;
+  /* 上下左右都收进容器 —— 之前只写 overflow-y，
+     内容超宽时会顶出去，把舞台横向撑出 40px（棋盘右边被切掉一列）。 */
+  overflow:auto;overscroll-behavior:contain;
+  padding:10px 14px;border-radius:12px;
+  min-width:0;
+  /* 横屏是「宽而矮」的形状，右栏纵向堆到 593px 只有 376px 可视，
+     光靠滚动很难用。改成三列网格：战绩 / 资产 / 成就各占一格，
+     徽标标题横跨、按钮横跨。一屏塞下所有东西，不用滚。 */
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-auto-rows:min-content;
+  align-content:start;
+  gap:8px 12px;
+  scrollbar-width:none;
+}
+/* 成就墙在横屏下已隐藏，第三列空着 → 改成两列，资产块内部两张卡竖排 */
+html[data-xqm-land="1"] .xqm-hright{grid-template-columns:repeat(2,minmax(0,1fr))}
+html[data-xqm-land="1"] .xqm-hassets{flex-direction:column;gap:6px}
+/* 阵容页右栏是「标题 / 棋子库 / 按钮」的竖向堆叠，必须是单列 ——
+   套三列网格会把按钮挤进窄列，文字被迫竖排 */
+html[data-xqm-land="1"] .xqm-lu-right{grid-template-columns:minmax(0,1fr)}
+/* 徽标、主标题、按钮组横跨三列 */
+html[data-xqm-land="1"] .xqm-hright > .xqm-badge,
+html[data-xqm-land="1"] .xqm-hright > h1,
+html[data-xqm-land="1"] .xqm-lu-right > .xqm-badge,
+html[data-xqm-land="1"] .xqm-lu-right > h1,
+html[data-xqm-land="1"] .xqm-hbtns{grid-column:1 / -1}
+/* 竖排那些子块在横屏下就是普通网格项，宽度交给 grid */
+html[data-xqm-land="1"] .xqm-hright > *,
+html[data-xqm-land="1"] .xqm-lu-right > *{max-width:100%;min-width:0;width:auto}
+html[data-xqm-land="1"] .xqm-hright h1{font-size:19px;margin:0}
+html[data-xqm-land="1"] .xqm-hright .xqm-sub{display:none}
+/* 按钮组：右栏已经两列了，组内必须单列 ——
+   每格只有 137px，两列放按钮的话 4 个汉字会被压成竖排（旋转后尤其明显）。 */
+html[data-xqm-land="1"] .xqm-hbtns{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;
+}
+html[data-xqm-land="1"] .xqm-hbtns > .xqm-btn:first-child{grid-column:1 / -1}
+html[data-xqm-land="1"] .xqm-hach{display:none}
+html[data-xqm-land="1"] .xqm-hstat .bar{margin:5px 0 4px}
+html[data-xqm-land="1"] .xqm-hbtns .xqm-btn{
+  padding:8px 10px;font-size:12.5px;min-width:0;
+  justify-content:space-between;gap:6px;border-radius:9px;
+  white-space:nowrap;
+}
+html[data-xqm-land="1"] .xqm-hbtns .xqm-btn .arr{display:none}
+html[data-xqm-land="1"] .xqm-hbtns .xqm-tag{font-size:10px;padding:1px 6px}
+/* 舞台是固定高度的 flex 列，子区域必须自己滚 —— 否则内容被 .xqm{overflow:hidden} 裁掉。
+   两栏页还要把行高钉死（grid-template-rows:minmax(0,1fr)），
+   不然 auto 行会被内容撑高，height:100% 解析不出确定值，overflow 就失效。 */
+html[data-xqm-land="1"] .xqm-home,
+html[data-xqm-land="1"] .xqm-lu{grid-template-rows:minmax(0,1fr)}
+html[data-xqm-land="1"] .xqm-hright,
+html[data-xqm-land="1"] .xqm-lu-right,
+html[data-xqm-land="1"] .xqm-set,
+html[data-xqm-land="1"] .xqm-rbox,
+html[data-xqm-land="1"] .xqm-ltp,
+html[data-xqm-land="1"] .xqm-mbox,
+html[data-xqm-land="1"] .xqm-cdx,
+html[data-xqm-land="1"] .xqm-rp,
+html[data-xqm-land="1"] .xqm-cdx-info,
+html[data-xqm-land="1"] .xqm-demo,
+html[data-xqm-land="1"] .xqm-szn-hist{
+  min-height:0;overflow-y:auto;overscroll-behavior:contain}
+html[data-xqm-land="1"] .xqm-hnote{font-size:11.5px;line-height:1.6}
+html[data-xqm-land="1"] .xqm-stats{gap:6px}
+html[data-xqm-land="1"] .xqm-stats .g{padding:7px 8px}
+html[data-xqm-land="1"] .xqm-stats .v{font-size:18px}
+html[data-xqm-land="1"] .xqm-stats .k{font-size:10.5px}
+/* 战绩/资产块在右栏被切成了 1/3 宽，30px 大数字和 pill 标签都会撑破格子 */
+html[data-xqm-land="1"] .xqm-hstat .big{font-size:20px}
+html[data-xqm-land="1"] .xqm-hstat .row{gap:6px;margin-bottom:5px}
+html[data-xqm-land="1"] .xqm-hstat,
+html[data-xqm-land="1"] .xqm-hassets,
+html[data-xqm-land="1"] .xqm-hach{padding:8px 9px;margin-bottom:0}
+html[data-xqm-land="1"] .xqm-hach{gap:4px}
+html[data-xqm-land="1"] .xqm-hach .b{padding:3px 7px;font-size:10px;gap:3px}
+html[data-xqm-land="1"] .xqm-hassets .g,
+html[data-xqm-land="1"] .xqm-stats .g{padding:5px 6px}
+
+/* ── 对局页：横屏的主战场 ── */
+html[data-xqm-land="1"] .xqm-bt{
+  --btnav:0px;--btbot:0px;
+  flex:1 1 auto;
+  height:auto;min-height:0;
+  display:grid;
+  /* 顶栏/底栏压到最薄，把纵向空间全留给棋盘 —— 横屏 390px 里
+     每省 10px，棋子就能大一圈 */
+  grid-template-rows:auto minmax(0,1fr) auto;
+  gap:4px;
+}
+html[data-xqm-land="1"] .xqm-bt-top,
+html[data-xqm-land="1"] .xqm-bt-bot{
+  padding:2px 8px;gap:7px;border-radius:8px;flex-wrap:nowrap;min-width:0;
+}
+html[data-xqm-land="1"] .xqm-bt-top .xqm-sideinfo{flex:1 1 auto;min-width:0}
+html[data-xqm-land="1"] .xqm-bt-top .xqm-trays{flex:0 1 auto;max-width:84px}
+html[data-xqm-land="1"] .xqm-bt-top .xqm-nm{max-width:88px;font-size:11.5px;line-height:1.2}
+html[data-xqm-land="1"] .xqm-bt-top .xqm-rt{font-size:10px;line-height:1.2}
+html[data-xqm-land="1"] .xqm-bt-top .xqm-btn-sm{padding:3px 7px;font-size:11px;white-space:nowrap}
+html[data-xqm-land="1"] .xqm-bt-top #xqmSfxBtn{display:inline-flex}
+html[data-xqm-land="1"] .xqm-round{padding:2px 7px;font-size:11px}
+/* 关键：横屏下必须是「左棋盘 + 右栏」两列，不能塌成一列。
+   右栏给 200px 就够 —— 再宽就把棋盘挤小了。 */
+html[data-xqm-land="1"] .xqm-bt-mid{
+  grid-template-columns:minmax(0,1fr) 200px;
+  grid-template-rows:minmax(0,1fr);
+  gap:6px;min-height:0;
+}
+html[data-xqm-land="1"] .xqm-boardwrap{
+  min-height:0;overflow:hidden;
+  height:100%;   /* 不给高度就按棋盘内容收缩，fitBoard 拿到的是上一轮的旧高度 */
+}
+html[data-xqm-land="1"] .xqm-col{
+  flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior:contain;
+  gap:6px;min-height:0;
+  scrollbar-width:none;
+}
+html[data-xqm-land="1"] .xqm-col .xqm-panel{padding:6px 8px;min-width:0}
+html[data-xqm-land="1"] .xqm-col .xqm-panel h4{font-size:10.5px;margin:0 0 4px}
+html[data-xqm-land="1"] .xqm-turn{padding:4px 8px;font-size:11.5px}
+html[data-xqm-land="1"] .xqm-ap{margin-top:4px;gap:4px}
+html[data-xqm-land="1"] .xqm-apdot{width:11px;height:11px}
+html[data-xqm-land="1"] .xqm-aptxt{font-size:10.5px}
+html[data-xqm-land="1"] .xqm-log{max-height:none;font-size:10.5px;line-height:1.55}
+html[data-xqm-land="1"] .xqm-panel-log{position:static;max-height:none;box-shadow:none;display:flex}
+html[data-xqm-land="1"] .xqm-ava{width:26px;height:26px;font-size:12px}
+html[data-xqm-land="1"] .xqm-ringwrap{width:30px;height:30px}
+html[data-xqm-land="1"] .xqm-ringwrap .xqm-ava{font-size:10px;inset:2px}
+html[data-xqm-land="1"] .xqm-ringnum{bottom:-8px;font-size:8.5px;padding:0 3px}
+html[data-xqm-land="1"] .xqm-trays{max-width:92px;min-height:14px;gap:2px}
+html[data-xqm-land="1"] .xqm-trays .xqm-tray{width:13px;height:13px;font-size:7px}
+html[data-xqm-land="1"] .xqm-nm{max-width:88px;font-size:11.5px;line-height:1.2}
+html[data-xqm-land="1"] .xqm-rt{font-size:10px}
+html[data-xqm-land="1"] .xqm-tug-txt{font-size:10px;gap:6px;margin-top:2px}
+html[data-xqm-land="1"] .xqm-tug-bar{height:9px}
+html[data-xqm-land="1"] .xqm-hintbar{
+  display:none;   /* 横屏高度紧张，图例让位给棋盘；设置页有完整说明 */
+}
+html[data-xqm-land="1"] .xqm-tut{padding:9px 11px}
+html[data-xqm-land="1"] .xqm-tut h5{margin-bottom:4px;font-size:12.5px}
+html[data-xqm-land="1"] .xqm-tut p{margin-bottom:9px;font-size:11px;line-height:1.6}
+html[data-xqm-land="1"] .xqm-tut .st{margin-bottom:7px}
+html[data-xqm-land="1"] .xqm-tut .acts .xqm-btn{padding:6px 10px;font-size:12px}
+html[data-xqm-land="1"] .xqm-towarn{top:4px;font-size:12px;padding:6px 13px;margin-bottom:6px}
+
+/* ── 图鉴 / 抽赏 / 巅峰榜 / 匹配 / 设置 / 结算：横屏两栏或更宽 ── */
+/* 图鉴：左边是棋盘预览（窄），右边是棋子网格（宽）。
+   反过来给宽度，网格会被挤到溢出 —— 卡片一多就横向撑破。 */
+/* 图鉴首页的真实结构是「返回 + 抽赏条 + 标题 + #xqmCdxGrid」单列，
+   .xqm-cdx-main 只出现在点开棋子后的详情层里 —— 别搞混。 */
+html[data-xqm-land="1"] #xqmCdxHome{
+  display:flex;flex-direction:column;flex:1 1 auto;min-height:0;width:100%;
+  overflow:hidden;
+}
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-head,
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-promo{flex:0 0 auto}
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-head{margin-bottom:6px}
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-head h1{font-size:17px}
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-promo{
+  padding:8px 12px;gap:10px;margin-bottom:6px;border-radius:12px}
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-promo b{font-size:13px}
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-promo span{font-size:10.5px;margin-top:1px}
+html[data-xqm-land="1"] #xqmCdxHome > .xqm-promo em{font-size:9.5px;margin-top:3px}
+/* 网格列表：吃掉剩余高度，卡片超出时自己滑。
+   注意真正承载卡片的是 JS 生成的 <div class="xqm-cdx-grid">，
+   #xqmCdxGrid 只是外层壳 —— 两层都得管，壳负责给高度，内层负责排版。 */
+html[data-xqm-land="1"] #xqmCdxGrid{
+  flex:1 1 auto;min-height:0;width:100%;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+html[data-xqm-land="1"] #xqmCdxGrid > .xqm-cdx-grid{
+  flex:1 1 auto;min-height:0;
+  display:grid;align-content:start;
+  grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:7px;
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+}
+html[data-xqm-land="1"] #xqmCdxGrid > .xqm-cdx-grid::-webkit-scrollbar{width:0;height:0;display:none}
+html[data-xqm-land="1"] #xqmCdxGrid > .xqm-cdx-grid > .xqm-cdx-card{padding:7px 6px;min-width:0}
+/* 棋子详情层：两栏并排，左说明右试锋 */
+html[data-xqm-land="1"] #xqmCdxDetail{
+  display:flex;flex-direction:column;flex:1 1 auto;min-height:0;width:100%;overflow:hidden;
+}
+html[data-xqm-land="1"] #xqmCdxDetail > .xqm-head{flex:0 0 auto;margin-bottom:5px}
+html[data-xqm-land="1"] .xqm-cdx{
+  display:flex;flex-direction:column;flex:1 1 auto;min-height:0;width:100%;overflow:hidden;
+}
+html[data-xqm-land="1"] .xqm-cdx-main{
+  grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr);
+  gap:10px;align-items:stretch;
+  flex:1 1 auto;min-height:0;width:100%;
+}
+html[data-xqm-land="1"] .xqm-cdx-info{
+  min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+  padding:12px;
+}
+html[data-xqm-land="1"] .xqm-cdx-info h1{font-size:17px;margin-bottom:6px}
+html[data-xqm-land="1"] .xqm-cdx-info p{font-size:11.5px;line-height:1.7}
+html[data-xqm-land="1"] .xqm-demo{min-width:0;min-height:0;overflow:hidden}
+html[data-xqm-land="1"] .xqm-cdx-card .nm{font-size:12px}
+html[data-xqm-land="1"] .xqm-cdx-card .st{font-size:10px}
+/* 横屏态下的演示盘 / 迷你棋盘尺寸。
+   ⚠️ 下面那行「硬改 .xqm-cell」是**必需的**，别照上面那句话把它删掉：
+   窄屏媒体查询里有一条 `.xqm-mb .xqm-cell{width:29px;height:29px}`，
+   和基础规则同权重但位置更靠后 —— 不写一条更高权重的规则压住它，
+   横屏下格子会掉回 29px，而 --sz 还是 33px，棋子会溢出格子。
+   --cw/--ch 也要跟着写成 38/37：格线背景和棋子尺寸都引用它，
+   变量和实际格宽不一致的话，格线间距对不上。 */
+html[data-xqm-land="1"] .xqm-mb{--cw:38px;--ch:37px;--bpx:9px;--bpy:8px;border-radius:10px;padding:var(--bpy) var(--bpx)}
+html[data-xqm-land="1"] .xqm-mb .xqm-cell{width:38px;height:37px}
+html[data-xqm-land="1"] .xqm-mb .xqm-pc{--sz:33px}
+html[data-xqm-land="1"] .xqm-cdx-card{gap:6px}
+html[data-xqm-land="1"] .xqm-szn{grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:6px}
+html[data-xqm-land="1"] .xqm-stats{grid-template-columns:repeat(auto-fit,minmax(78px,1fr))}
+/* 设置页：竖屏是一列长列表，横屏必须并成两列，否则 390px 高度装不下。
+   .xqm-set 本身是 flex column（子项是 .it 卡片），这里改成 grid。 */
+html[data-xqm-land="1"] .xqm-set{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px 8px;max-width:none;width:100%;
+  align-content:start;min-height:0;
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+}
+html[data-xqm-land="1"] .xqm-set > .it{
+  gap:8px;padding:7px 9px;min-width:0;align-items:center;
+}
+html[data-xqm-land="1"] .xqm-set .tx{min-width:0}
+html[data-xqm-land="1"] .xqm-set .nm{font-size:12px;line-height:1.3}
+html[data-xqm-land="1"] .xqm-set .ds{font-size:10px;line-height:1.4}
+html[data-xqm-land="1"] .xqm-set-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+html[data-xqm-land="1"] .xqm-set-row{padding:7px 9px}
+html[data-xqm-land="1"] .xqm-set-desc{font-size:10.5px}
+html[data-xqm-land="1"] .xqm-match .xqm-mbox{max-width:none;padding:8px}
+/* 匹配页那个 96px 的大等待圆环。必须带父级限定 ——
+   裸 .xqm-ring 也会命中对局页头像外圈的进度环，
+   把它从 30px 撑成 96px，就会在棋盘左上角糊出一圈。 */
+html[data-xqm-land="1"] .xqm-mbox > .xqm-ring{width:88px;height:88px;margin:0 auto 10px}
+html[data-xqm-land="1"] .xqm-mbox > .xqm-ring .r2{inset:11px}
+html[data-xqm-land="1"] .xqm-mbox > .xqm-ring .r3{inset:22px}
+html[data-xqm-land="1"] .xqm-mtitle{font-size:18px;margin-bottom:6px}
+html[data-xqm-land="1"] .xqm-msub{font-size:12px;min-height:0;line-height:1.6}
+html[data-xqm-land="1"] .xqm-head{margin-bottom:6px}
+
+/* ══ 通用骨架：返回按钮和页头占固定行，其余内容撑满并自己滚 ══
+   .xqm 已经是 flex column。页头必须 flex:0 0 auto，
+   否则它会被拉伸吃掉纵向空间，真正要滚的内容区就没高度了。 */
+html[data-xqm-land="1"] .xqm > .xqm-head{flex:0 0 auto}
+html[data-xqm-land="1"] .xqm > *{flex:1 1 auto;min-height:0}
+html[data-xqm-land="1"] .xqm > .xqm-head{flex:0 0 auto}
+/* 页头压薄 */
+html[data-xqm-land="1"] .xqm-head h1{font-size:18px}
+
+   竖屏是一列长条，390px 高度下必然撑破舞台。
+   统一给根容器 max-width:none + 内部滚动，页面本体不再产生滚动条。 */
+html[data-xqm-land="1"] .xqm-szn{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:6px;
+  max-width:none;width:100%;
+}
+html[data-xqm-land="1"] .xqm-ltp{
+  max-width:none;width:100%;height:100%;min-height:0;
+  display:flex;flex-direction:column;gap:6px;
+}
+html[data-xqm-land="1"] .xqm-ltp > .xqm-ltp-stage{flex:1 1 auto;min-height:0}
+html[data-xqm-land="1"] .xqm-ltp > .xqm-ltp-bar{flex:0 0 auto}
+html[data-xqm-land="1"] .xqm-ltp > .xqm-ltp-odds{flex:0 0 auto;font-size:9.5px;line-height:1.6}
+html[data-xqm-land="1"] .xqm-ltp-stage{
+  display:grid;grid-template-columns:minmax(0,1fr) 232px;
+  gap:10px;min-height:0;flex:1 1 auto;
+}
+html[data-xqm-land="1"] .xqm-ltp-right{
+  overflow-y:auto;overscroll-behavior:contain;min-height:0;scrollbar-width:none;
+  padding:10px;
+}
+html[data-xqm-land="1"] .xqm-rbox{
+  max-width:none;width:100%;height:100%;
+  display:flex;flex-direction:column;justify-content:center;gap:8px;
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+}
+html[data-xqm-land="1"] .xqm-rbox h1{font-size:22px;margin-bottom:4px}
+html[data-xqm-land="1"] .xqm-ryizhu{font-size:11.5px;line-height:1.7}
+html[data-xqm-land="1"] .xqm-racts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+/* 排行榜：行由 JS 直接写进 #xqmRankTbl（.xqm-trow），中间没有 .xqm-tbl 那层。
+   #xqmRankTbl 自己滚，页面本体不留滚动条。 */
+html[data-xqm-land="1"] .xqm-szn{flex:0 0 auto !important}
+html[data-xqm-land="1"] #xqmRankTbl{
+  width:100%;flex:1 1 auto;min-height:0;
+  /* 原本 .xqm-tbl 是 overflow:hidden，这里要改成能滚，
+     specificity 得比 .xqm-tbl 高 —— 用 html[...] 前缀已经够，
+     但显式写 !important 免得以后有人加横屏规则时被覆盖 */
+  overflow-y:auto !important;overflow-x:hidden;
+  overscroll-behavior:contain;scrollbar-width:none;
+}
+html[data-xqm-land="1"] #xqmRankTbl::-webkit-scrollbar{width:0;height:0;display:none}
+html[data-xqm-land="1"] #xqmRankTbl > .xqm-trow{
+  padding:5px 9px;font-size:11px;gap:8px;
+  min-width:0;overflow:hidden;
+}
+html[data-xqm-land="1"] #xqmRankTbl > .xqm-trow > .rk{font-size:11px;min-width:20px;flex:0 0 auto}
+html[data-xqm-land="1"] #xqmRankTbl > .xqm-trow > .nm{
+  font-size:11.5px;min-width:0;flex:1 1 auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+html[data-xqm-land="1"] #xqmRankTbl > .xqm-trow > .xqm-trow-r{
+  flex:0 0 auto;font-size:11px;font-variant-numeric:tabular-nums;
+}
+html[data-xqm-land="1"] .xqm-skel-row{height:28px;margin-bottom:5px}
+html[data-xqm-land="1"] .xqm-skel-card{height:60px}
+/* 抽赏页的射线是 position:absolute 装饰，故意铺满并溢出，不参与布局 */
+/* 抽赏开卡的光晕射线是 width:160% 的 absolute 装饰，故意画大再靠 mask 裁圆。
+   裁切要加在承载它的 .xqm-ltp-stage 上，加在射线自己身上没用。 */
+html[data-xqm-land="1"] .xqm-ltp-stage{overflow:hidden;border-radius:14px}
+/* 匹配页：竖排居中，横屏压扁到一屏内 */
+html[data-xqm-land="1"] .xqm-match{
+  height:100%;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:0;
+}
+html[data-xqm-land="1"] .xqm-match .xqm-mbox{
+  max-width:none;width:100%;padding:6px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:0;max-height:100%;
+}
+
+</style>
+<script>
+(function(){
+  try{
+    var r = document.documentElement;
+    r.setAttribute('data-xqm-motion', localStorage.getItem('xqm_motion') === '0' ? '0' : '1');
+    r.setAttribute('data-xqm-cracks', localStorage.getItem('xqm_cracks') === '0' ? '0' : '1');
+  }catch(e){}
+})();
+</script>
+
+<style>
+/* ══════════════════════════════════════════
+   强制横屏舞台
+   移动端一律按横屏尺寸排版，不做竖屏分支。
+   html[data-xqm-land="1"] 时把 .xqm 钉成一个横屏矩形，
+   竖着放不下就整体旋转 90° 铺满视口 —— 视觉上永远是横屏，
+   设备实际朝哪边不用管，也没有「请旋转设备」那一套。
+   --ls / --lw 是 JS 算出来的舞台逻辑宽高（横屏值）
+   ══════════════════════════════════════════ */
+html[data-xqm-land="1"]{overflow:hidden;background:#0d0b09}
+html[data-xqm-land="1"] body{
+  overflow:hidden;min-height:0;padding-bottom:0 !important;
+  /* 舞台是固定参考尺寸再缩放的，四周可能留白 —— 底色跟页面一致，
+     看起来是「整体留了边」，而不是「没铺满屏幕」。 */
+  background:var(--bg);
+}
+html[data-xqm-land="1"] .nav,
+html[data-xqm-land="1"] .mono-bottom-nav,
+html[data-xqm-land="1"] #installBar,
+html[data-xqm-land="1"] #pageLoadBar{display:none !important}
+html[data-xqm-land="1"] #toast,
+html[data-xqm-land="1"] .toast{display:none !important}
+
+html[data-xqm-land="1"] .xqm{
+  --ls:844px;--lw:390px;
+  position:fixed;
+  left:50%;top:50%;
+  width:var(--ls);height:var(--lw);
+  max-width:none;min-height:0;margin:0;
+  box-sizing:border-box;
+  /* 安全区：刘海 / 圆角 / 手势条。旋转 90° 后上下左右都可能撞系统切边，四边都留。 */
+  padding:calc(var(--sat,0px) + 6px)
+          calc(var(--sar,0px) + 8px)
+          calc(var(--sab,0px) + 6px)
+          calc(var(--sal,0px) + 8px);
+  display:flex;flex-direction:column;
+  transform:translate(-50%,-50%);
+  transform-origin:center center;
+  overflow:hidden;
+  border-radius:0;
+  border-top:0;border-bottom:0;
+  box-shadow:none;
+  background:
+    radial-gradient(1100px 520px at 50% -8%, rgba(201,162,39,.15), transparent 68%),
+    repeating-linear-gradient(135deg, rgba(122,90,40,.03) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg,#F8F2E6 0%,#F1E7D5 46%,#E9DBC2 100%);
+}
+/* 舞台旋转态：整块转 90° 铺满视口。播放器被挪到画面下缘并半透明处理，
+   不占舞台空间（占的话棋盘要小一圈，不划算）。 */
+html[data-xqm-land="1"][data-xqm-rot="1"] .xqm{
+  transform:translate(-50%,-50%) rotate(90deg) scale(var(--lsf,1));
+}
+/* 设备本来就是横屏（不旋转）时同样要缩放 —— 舞台是固定的 844×390，
+   不缩的话在 640×360 的小屏上直接超出屏幕。 */
+html[data-xqm-land="1"][data-xqm-rot="0"] .xqm{
+  transform:translate(-50%,-50%) scale(var(--lsf,1));
+}
+html[data-xqm-land="1"] .xqm::before{display:none}
+/* .xqm 已经是 flex 列容器，.wrap 撑满剩余高度即可（别再写 height:100%，
+   那会把 padding 也算进去，横向溢出 40px就是这么来的） */
+html[data-xqm-land="1"] .wrap{
+  max-width:none;width:100%;margin:0;padding:0;
+  flex:1 1 auto;min-height:0;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+html[data-xqm-land="1"] .xqm > *{min-width:0;max-width:100%}
+/* 兜底：布局容器（flex/grid）的子项不许把舞台撑宽。
+   舞台是旋转出来的，一旦有元素超过 --ls，旋转后溢出量会
+   直接吃掉画面另一侧的棋盘。只给布局容器的**直接子项**加，
+   别写成 .xqm * 通配 —— 那会误伤棋谱、战法列表这类要横向滚的。 */
+html[data-xqm-land="1"] .xqm-home > *,
+html[data-xqm-land="1"] .xqm-lu > *,
+html[data-xqm-land="1"] .xqm-hleft > *,
+html[data-xqm-land="1"] .xqm-hright > *,
+html[data-xqm-land="1"] .xqm-lu-left > *,
+html[data-xqm-land="1"] .xqm-lu-right > *,
+html[data-xqm-land="1"] .xqm-bt > *,
+html[data-xqm-land="1"] .xqm-bt-mid > *,
+html[data-xqm-land="1"] .xqm-bt-top > *,
+html[data-xqm-land="1"] .xqm-bt-bot > *,
+html[data-xqm-land="1"] .xqm-col > *{min-width:0;max-width:100%}
+html[data-xqm-land="1"] .monoPlayerCard{display:none}
+/* 舞台旋转态：整块转 90°，靠 scale 把长边缩进视口 */
+html[data-xqm-land="1"][data-xqm-rot="1"] .xqm *{
+  transform-origin:center center;
+}
+/* 旋转态里横向的滚动条一律不要 */
+html[data-xqm-land="1"][data-xqm-rot="1"] .xqm,
+html[data-xqm-land="1"][data-xqm-rot="1"] .xqm *{overscroll-behavior:none}
+/* 横屏要求「无滚动条」：侧栏内容装不下时仍然能滑，但看不见条。
+   触摸板和滚轮都不受影响，只是视觉上干净。 */
+html[data-xqm-land="1"] .xqm *{scrollbar-width:none}
+html[data-xqm-land="1"] .xqm *::-webkit-scrollbar{width:0;height:0;display:none}
+/* 兜底：grid / flex 子项默认 min-width:auto，内容一长就把容器顶开、
+   整页横向溢出。逐个列出布局容器（不用 :where()，老 Safari 不认），
+   只放开它们的直接子项收缩 —— 棋盘那种靠 --cw 定宽的元素不能被干扰。 */
+html[data-xqm-land="1"] .xqm-home > *,
+html[data-xqm-land="1"] .xqm-lu > *,
+html[data-xqm-land="1"] .xqm-cdx-main > *,
+html[data-xqm-land="1"] .xqm-bt > *,
+html[data-xqm-land="1"] .xqm-bt-mid > *,
+html[data-xqm-land="1"] .xqm-bt-top > *,
+html[data-xqm-land="1"] .xqm-bt-bot > *,
+html[data-xqm-land="1"] .xqm-col > *,
+html[data-xqm-land="1"] .xqm-hleft > *,
+html[data-xqm-land="1"] .xqm-lu-left > *,
+html[data-xqm-land="1"] .xqm-cdx-info > *,
+html[data-xqm-land="1"] .xqm-cdx-grid > *,
+html[data-xqm-land="1"] .xqm-ltp-stage > *,
+html[data-xqm-land="1"] .xqm-ltp-right > *,
+html[data-xqm-land="1"] .xqm-match > *,
+html[data-xqm-land="1"] .xqm-rbox > *,
+html[data-xqm-land="1"] .xqm-set > *,
+html[data-xqm-land="1"] .xqm-set-list > *,
+html[data-xqm-land="1"] .xqm-szn > *,
+html[data-xqm-land="1"] .xqm-rank-tbl > *,
+html[data-xqm-land="1"] .xqm-mb > *,
+html[data-xqm-land="1"] .xqm-stats > *{min-width:0;max-width:100%}
+html[data-xqm-land="1"] .xqm img,
+html[data-xqm-land="1"] .xqm svg{max-width:100%}
+/* 文字类元素超出时截断而不是撑开容器 */
+html[data-xqm-land="1"] .xqm h1,
+html[data-xqm-land="1"] .xqm h2,
+html[data-xqm-land="1"] .xqm h4,
+html[data-xqm-land="1"] .xqm h5,
+html[data-xqm-land="1"] .xqm p,
+html[data-xqm-land="1"] .xqm .nm,
+html[data-xqm-land="1"] .xqm .st,
+html[data-xqm-land="1"] .xqm .ds,
+html[data-xqm-land="1"] .xqm .tip{overflow-wrap:anywhere;word-break:break-word}
+</style>
+
+<div class="xqm">
+{% block xqm_content %}{% endblock %}
+</div>
+<script>
+(function(){
+  try{
+    var w = document.querySelector('.wrap');
+    if(w) w.classList.add('xqm-wide');
+  }catch(e){}
+})();
+</script>
+<script>
+/* 强制横屏：不管设备现在朝哪边，界面一律按横屏尺寸渲染。
+   桌面浏览器不参与（指针设备下旋转整站没有意义）。 */
+window.XQM_LAND = (function(){
+  var root = document.documentElement;
+
+  function isMobile(){
+    var vw = window.innerWidth, vh = window.innerHeight;
+    if (Math.min(vw, vh) > 620) return false;
+    if (vw > 900) return false;
+    try{
+      return window.matchMedia('(pointer:coarse)').matches;
+    }catch(e){ return false; }
+  }
+
+  function landOn(){
+    try{ return localStorage.getItem('xqm_land') !== '0'; }catch(e){ return true; }
+  }
+
+  function stage(){
+    if (!landOn() || !isMobile()){ root.removeAttribute('data-xqm-land'); return; }
+    var vw = window.innerWidth, vh = window.innerHeight;
+
+    var landscape = vw >= vh;
+
+    /* 舞台用**固定参考尺寸**（844×390），而不是设备实际横屏尺寸。
+       原因：页面里所有布局都是按这个尺寸用固定 px 写的 —— 字号、间距、
+       棋盘留白都不会跟着舞台缩。舞台一旦变矮（小屏 360×640 只剩 640×360），
+       内容就被挤爆、显示不全。
+       改成固定参考 + 整体 scale：布局永远按 844×390 设计，
+       大屏整体放大、小屏整体缩小，任何尺寸都完整显示。 */
+    var ls = 844;   /* 舞台宽（长边） */
+    var lw = 390;   /* 舞台高（短边） */
+
+    root.setAttribute('data-xqm-land', '1');
+    root.style.setProperty('--ls', ls + 'px');
+    root.style.setProperty('--lw', lw + 'px');
+    root.setAttribute('data-xqm-rot', landscape ? '0' : '1');
+
+    /* 缩放到视口里：竖屏设备整块旋转 90°，包围盒是 lw×ls */
+    var s = landscape ? Math.min(vw / ls, vh / lw)
+                      : Math.min(vw / lw, vh / ls);
+    root.style.setProperty('--lsf', s.toFixed(5));
+  }
+
+  /* 安全区探针：把 env() 的真实值写进 --sat，供上面的舞台计算用 */
+  function probeSafe(){
+    try{
+      var p = document.createElement('div');
+      p.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;' +
+        'padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right);' +
+        'padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);';
+      document.body.appendChild(p);
+      var cs = getComputedStyle(p);
+      document.documentElement.style.setProperty(
+        '--sat', (parseFloat(cs.paddingTop) || 0) + 'px');
+      document.documentElement.style.setProperty(
+        '--sar', (parseFloat(cs.paddingRight) || 0) + 'px');
+      document.documentElement.style.setProperty(
+        '--sab', (parseFloat(cs.paddingBottom) || 0) + 'px');
+      document.documentElement.style.setProperty(
+        '--sal', (parseFloat(cs.paddingLeft) || 0) + 'px');
+      p.remove();
+    }catch(e){}
+  }
+
+  function apply(){ probeSafe(); stage(); notify(); }
+
+  apply();
+  window.addEventListener('resize', apply, { passive: true });
+  window.addEventListener('orientationchange', function(){ setTimeout(apply, 240); });
+  window.visualViewport && window.visualViewport.addEventListener('resize', apply, { passive: true });
+
+  /* 尺寸变了要通知页内那些靠 getBoundingClientRect 算棋盘的代码重排 */
+  function notify(){
+    try{ window.dispatchEvent(new Event('xqmland')); }catch(e){}
+    /* 外壳（音乐播放器）要跟着一起转，得告诉它当前舞台状态 */
+    try{
+      if (window.parent !== window){
+        window.parent.postMessage({ type:'xqm_land_state',
+          land: root.getAttribute('data-xqm-land') === '1',
+          rot: root.getAttribute('data-xqm-rot') === '1' }, '*');
+      }
+    }catch(e){}
+  }
+  var last = '';
+  function watcher(){
+    var sig = window.innerWidth + 'x' + window.innerHeight + ':' + root.getAttribute('data-xqm-rot');
+    if (sig !== last){ last = sig; notify(); }
+    setTimeout(watcher, 300);
+  }
+  watcher();
+
+  /* ── 沉浸式：全屏 + 隐藏系统 UI + 屏幕常亮 ──
+     浏览器规定这些必须由用户手势触发，不能在 load 里自动调。
+     所以挂到首次触摸/点击上，且只做一次。 */
+  var tried = false;
+  function enterImmersive(){
+    if (tried) return;
+    tried = true;
+    try{ if (!isMobile()) return; }catch(e){ return; }
+    keepAwake();
+  }
+  function keepAwake(){
+    try{
+      if ('wakeLock' in navigator && navigator.wakeLock.request){
+        navigator.wakeLock.request('screen').then(function(s){
+          window.__xqmWake = s;
+          s.addEventListener && s.addEventListener('release', function(){
+            setTimeout(function(){ try{ navigator.wakeLock.request('screen').then(function(x){ window.__xqmWake = x; }); }catch(e){} }, 300);
+          });
+        }).catch(function(){});
+      }
+    }catch(e){}
+  }
+  ['touchstart','pointerdown','click','keydown'].forEach(function(ev){
+    document.addEventListener(ev, enterImmersive, { once: true, passive: true });
+  });
+  /* 已经进全屏（用户之前手动进过）就把常亮补上 */
+  document.addEventListener('fullscreenchange', function(){
+    root.setAttribute('data-xqm-fs', document.fullscreenElement ? '1' : '0');
+    if (document.fullscreenElement) keepAwake();
+  });
+  if (document.fullscreenElement) root.setAttribute('data-xqm-fs', '1');
+
+  return { apply: apply, isMobile: isMobile, notify: notify, landOn: landOn,
+           enterImmersive: enterImmersive, keepAwake: keepAwake };
+})();
+
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.XQM = (function(){
+'use strict';
+
+var GLYPH = {grain:['粮','粮'],lord:['君','君'],king:['帅','帅'],advisor:['仕','仕'],elephant:['相','相'],horse:['马','马'],
+             chariot:['车','车'],cannon:['炮','炮'],pawn:['兵','兵'],
+             zu:['卒','卒'],min:['民','民'],shi:['矢','矢'],pai:['牌','牌'],tan:['探','探'],huo:['火','火'],
+             dun:['盾','盾'],gong:['弓','弓'],nu:['弩','弩'],mao:['矛','矛'],fu:['斧','斧'],chui:['锤','锤'],
+             qi:['旗','旗'],gu:['鼓','鼓'],zhen:['阵','阵'],yao:['药','药'],chi:['斥','斥'],ci:['刺','刺'],
+             jing:['镜','镜'],
+             hu:['虎','虎'],bao:['豹','豹'],ying:['鹰','鹰'],lang:['狼','狼'],yi:['医','医'],
+             jiang:['匠','匠'],di:['帝','帝'],long:['龙','龙'],
+             yi2:['移','移'],wei:['卫','卫'],xu:['蓄','蓄'],biao:['标','标'],
+             duan:['断','断'],can:['残','残'],bian:['鞭','鞭'],teng:['藤','藤']};
+var PD = {
+  grain:{name:'粮',hp:130,atk:0,trait:'补济',tdesc:'相邻友方每回合恢复 30 血量',grade:'legend',
+        lore:'掌馈粮草济三军，储给足则士卒不竭。',
+        nt:{name:'振饱',desc:'两格范围内的友方获得 20% 减伤'}},
+  lord:{name:'君',hp:500,atk:100,trait:'守玺',tdesc:'全军受到的伤害降低 10%',grade:'mythic',
+        lore:'秉王命以御六师，一倾则全军瓦解。',
+        nt:{name:'天威',desc:'每阵亡一名己方棋子，全军攻击提升 8%（上限 40%）'}},
+  king:{name:'帅',hp:300,atk:30,trait:'坐镇',tdesc:'九宫范围内的己方棋子受到伤害降低 40%',grade:'legend',
+        lore:'居九宫而驭全军，一身存亡系全局',
+        nt:{name:'御敌',desc:'与敌方将帅处于同一直线且无遮挡时，敌方全部棋子攻击降低 20%'}},
+  advisor:{name:'仕',hp:120,atk:25,trait:'护主',tdesc:'相邻的九宫内友方棋子受到攻击时，替其分担 20% 伤害',grade:'rare',
+        lore:'拱卫帅帐，斜步不出宫阙，危难以身相挡',
+        nt:{name:'死卫',desc:'被消灭的瞬间，对击杀者施加攻击降低 30% 的打击，持续 1 回合'}},
+  elephant:{name:'相',hp:140,atk:25,trait:'守垒',tdesc:'受到的远程伤害（车 / 炮）额外减少 25%',grade:'rare',
+        lore:'田字飞渡，静守腹地，卸敌千里之势',
+        nt:{name:'掠阵',desc:'身处敌方半场时，周围 1 格敌方棋子攻击降低 20%'}},
+  horse:{name:'马',hp:110,atk:55,trait:'踏营',tdesc:'本回合先移动、再攻击时，伤害 +20%',grade:'epic',
+        lore:'日字腾跃，越阻突袭，动而后击其锋自锐',
+        nt:{name:'八面威',desc:'周围两格内每存在一名敌方棋子，自身攻击提升 15%'}},
+  chariot:{name:'车',hp:150,atk:60,trait:'破甲',tdesc:'攻击时无视目标 25% 的减伤效果',grade:'legend',
+        lore:'长驱直入，所向披靡，破敌坚甲如裂竹',
+        nt:{name:'横扫',desc:'攻击命中时，对目标同直线相邻一格的敌方单位造成 30% 伤害'}},
+  cannon:{name:'炮',hp:100,atk:70,trait:'轰击',tdesc:'对目标身后 1 格造成 40% 的溅射伤害',grade:'legend',
+        lore:'隔山叩敌，殃及其后，不发则已一发惊人',
+        nt:{name:'重炮',desc:'攻击时若炮架是己方棋子，本次攻击伤害提升 30%'}},
+  pawn:{name:'兵',hp:80,atk:35,trait:'死战',tdesc:'越过河界后伤害增加 30%',grade:'common',
+        lore:'渡河而前，锋出三路，微末之躯亦可倾国',
+        nt:{name:'浴血',desc:'越过河界后，单次受到的伤害不超过自身生命上限的 25%'}},
+  zu:{name:'卒',hp:70,atk:30,trait:'老卒',tdesc:'越过河界后攻击翻倍',grade:'common',
+        lore:'一卒渡河，只进不退，微躯亦可换敌一将。',
+        nt:{name:'锐卒',desc:'越过河界后额外提升 30% 攻击'}},
+  min:{name:'民',hp:90,atk:30,trait:'征召',tdesc:'阵亡时相邻友军回复 15 血量',grade:'common',
+        lore:'耕夫应召，荷锄为兵，死亦护乡邻周全。',
+        nt:{name:'乡勇',desc:'阵亡时全军回复 5 血量'}},
+  shi:{name:'矢',hp:60,atk:35,trait:'齐射',tdesc:'与另一个矢相邻时攻击 +30%',grade:'common',
+        lore:'矢集如雨，并肩成排，方显齐射之威。',
+        nt:{name:'箭雨',desc:'攻击时对目标相邻的敌人造成半伤'}},
+  pai:{name:'牌',hp:100,atk:30,trait:'掩护',tdesc:'相邻友军受到的溅射伤害减半',grade:'common',
+        lore:'木牌当胸，替人挡下四溅的杀机。',
+        nt:{name:'重牌',desc:'相邻友军受到的伤害降低 8%'}},
+  tan:{name:'探',hp:80,atk:35,trait:'游走',tdesc:'每回合可以移动两次',grade:'common',
+        lore:'轻骑出哨，往来如风，一探再探不倦。',
+        nt:{name:'轻骑',desc:'移动后可再攻击一次（每回合一次）'}},
+  huo:{name:'火',hp:70,atk:40,trait:'纵火',tdesc:'攻击附带 10 点溅射，自身也受伤 5 点',grade:'common',
+        lore:'纵火焚营，玉石俱焚，连自己也搭进去。',
+        nt:{name:'燎原',desc:'纵火的溅射伤害提升 8 点'}},
+  dun:{name:'盾',hp:140,atk:30,trait:'铁壁',tdesc:'每回合受到的第一次伤害减半',grade:'epic',
+        lore:'铁壁横身，首当其冲者先折其半。',
+        nt:{name:'磐石',desc:'相邻友军受到的伤害降低 10%'}},
+  gong:{name:'弓',hp:90,atk:55,trait:'劲射',tdesc:'攻击距离 3 格，但打不到相邻的敌人',grade:'epic',
+        lore:'弓张满月，取远不取近，近了反倒无用。',
+        nt:{name:'连珠',desc:'攻击后若未击杀，追加一次半伤'}},
+  nu:{name:'弩',hp:100,atk:50,trait:'穿透',tdesc:'攻击同时伤害路径上的第二个目标',grade:'epic',
+        lore:'一矢贯两，余势不减，重弩尤甚。',
+        nt:{name:'重弩',desc:'穿透伤害不再衰减'}},
+  mao:{name:'矛',hp:130,atk:45,trait:'拒马',tdesc:'被攻击时，攻击者受到 30% 反伤',grade:'epic',
+        lore:'拒马横阵，刺人之时，先伤己手。',
+        nt:{name:'枪阵',desc:'相邻友军也获得一半反伤'}},
+  fu:{name:'斧',hp:120,atk:65,trait:'劈山',tdesc:'攻击无视目标的一切减伤',grade:'epic',
+        lore:'劈山开石，甲坚如铁亦不足恃。',
+        nt:{name:'开山',desc:'攻击附带目标当前生命 15% 的真实伤害'}},
+  chui:{name:'锤',hp:130,atk:50,trait:'震击',tdesc:'命中后目标下回合不能移动',grade:'epic',
+        lore:'一击震骨，令敌寸步难移。',
+        nt:{name:'碎地',desc:'震击同时使目标相邻的敌人也不能移动'}},
+  qi:{name:'旗',hp:110,atk:0,trait:'号令',tdesc:'相邻友军攻击 +10%',grade:'epic',
+        lore:'旌旗所指，三军争锋，旗不倒则气不衰。',
+        nt:{name:'大纛',desc:'全军攻击 +5%，旗在场上才生效'}},
+  gu:{name:'鼓',hp:110,atk:0,trait:'催战',tdesc:'相邻友军每回合可多行动一次',grade:'epic',
+        lore:'战鼓催人，一鼓作气，再动一回合。',
+        nt:{name:'战鼓',desc:'全军每回合都可多行动一次'}},
+  zhen:{name:'阵',hp:130,atk:0,trait:'结阵',tdesc:'相邻友军减伤 12%',grade:'epic',
+        lore:'结阵相倚，互为唇齿，阵与阵合则愈坚。',
+        nt:{name:'方圆',desc:'阵与阵相邻时，结阵效果翻倍'}},
+  yao:{name:'药',hp:110,atk:0,trait:'施药',tdesc:'回合结束时，相邻友军回复 15 血量',grade:'epic',
+        lore:'药囊随身，缓急之间救得性命。',
+        nt:{name:'良方',desc:'全军每回合回复 8 血量'}},
+  chi:{name:'斥',hp:90,atk:40,trait:'侦察',tdesc:'显示敌方棋子的攻击范围',grade:'epic',
+        lore:'斥候先出，敌之锋镝尽在眼底。',
+        nt:{name:'先机',desc:'先手方首回合行动点 +1'}},
+  ci:{name:'刺',hp:100,atk:60,trait:'暗杀',tdesc:'对生命低于 40% 的目标伤害翻倍',grade:'epic',
+        lore:'刺客藏锋，专候敌人气衰命薄之时。',
+        nt:{name:'影袭',desc:'击杀后潜行，下回合免疫一次攻击'}},
+  jing:{name:'镜',hp:120,atk:40,trait:'反照',tdesc:'受到攻击时，反弹 25% 伤害给攻击者',grade:'epic',
+        lore:'明镜照人，刀锋所至，血亦溅回持刀者。',
+        nt:{name:'明镜',desc:'反弹提升到 45%，且反弹无视减伤'}},
+  hu:{name:'虎',hp:150,atk:80,trait:'猛扑',tdesc:'击杀后立即再行动一次',grade:'legend',
+        lore:'猛虎出柙，一击毙敌，爪下不留余喘。',
+        nt:{name:'百兽',desc:'连续击杀时攻击提升 20%（可叠加）'}},
+  bao:{name:'豹',hp:130,atk:65,trait:'疾行',tdesc:'每回合可以行动两次',grade:'legend',
+        lore:'疾行如电，去留无迹，动则影随。',
+        nt:{name:'残影',desc:'移动后，本回合受到的第一次攻击无效'}},
+  ying:{name:'鹰',hp:130,atk:70,trait:'翱翔',tdesc:'移动时无视阻挡',grade:'legend',
+        lore:'盘桓高天，敛翼而下，阻隔形同虚设。',
+        nt:{name:'鹰眼',desc:'攻击时无视目标 20% 的减伤'}},
+  lang:{name:'狼',hp:140,atk:60,trait:'群猎',tdesc:'相邻友军每有 1 个，攻击提升 8%',grade:'legend',
+        lore:'群狼相倚，孤则怯、众则悍。',
+        nt:{name:'头狼',desc:'相邻友军攻击提升 12%'}},
+  yi:{name:'医',hp:150,atk:0,trait:'回春',tdesc:'主动行动可治疗相邻友军，回复其 25% 生命上限',grade:'legend',
+        lore:'悬壶随军，一囊草药续人残喘。',
+        nt:{name:'妙手',desc:'治疗的溢出部分转为护盾'}},
+  jiang:{name:'匠',hp:150,atk:0,trait:'铸兵',tdesc:'相邻友军攻击提升 15%',grade:'legend',
+        lore:'锻兵铸刃，匠气所至，锋镝自利。',
+        nt:{name:'神工',desc:'己方所有棋子攻击提升 8%'}},
+  di:{name:'帝',hp:320,atk:60,trait:'御驾',tdesc:'全军每回合行动点 +1',grade:'mythic',
+        lore:'御驾亲临，旌旗所指，三军争先。',
+        nt:{name:'亲征',desc:'帝在场时，己方所有棋子攻击提升 15%'}},
+  long:{name:'龙',hp:300,atk:110,trait:'龙威',tdesc:'攻击时无视目标 30% 的减伤',grade:'mythic',
+        lore:'龙腾九霄，云从风随，坚甲不足恃。',
+        nt:{name:'腾云',desc:'每回合可以无视阻挡移动一次'}},
+  yi2:{name:'移',hp:95,atk:0,trait:'移形',tdesc:'可与相邻友军交换位置',grade:'rare',
+        lore:'阵形不是死的 —— 把该在前面的换上去，该藏起来的换回来。',
+        nt:{name:'挪移',desc:'可与 2 格内的友军交换位置'}},
+  wei:{name:'卫',hp:110,atk:26,trait:'替死',tdesc:'相邻友军将受到致命伤害时，由它代受（一场一次）',grade:'rare',
+        lore:'刀落下来的那一瞬，站到别人身前去。',
+        nt:{name:'死士',desc:'代受之后自己回复 30% 生命'}},
+  xu:{name:'蓄',hp:90,atk:30,trait:'蓄势',tdesc:'本回合不攻击，则下回合攻击翻倍',grade:'rare',
+        lore:'弦拉满了才放，一箭抵两箭。',
+        nt:{name:'满弓',desc:'蓄力后的那一击不会被闪避'}},
+  biao:{name:'标',hp:95,atk:34,trait:'标记',tdesc:'被它攻击过的敌人，友军对其伤害提升 15%',grade:'rare',
+        lore:'一箭钉在谁身上，全军的刀就往谁身上去。',
+        nt:{name:'军令',desc:'标记持续 2 回合'}},
+  duan:{name:'断',hp:100,atk:32,trait:'断粮',tdesc:'命中后目标下回合不能回血',grade:'rare',
+        lore:'不砍人，砍的是它的粮道。',
+        nt:{name:'断援',desc:'目标下回合无法获得任何增益'}},
+  can:{name:'残',hp:85,atk:36,trait:'残兵',tdesc:'阵亡时以 30% 生命复活（一场一次）',grade:'rare',
+        lore:'倒下一次，还能再站起来一次。',
+        nt:{name:'不屈',desc:'复活时生命提升到 50%'}},
+  bian:{name:'鞭',hp:92,atk:34,trait:'缠斗',tdesc:'命中后目标下回合移动格数 -1',grade:'rare',
+        lore:'软鞭缠身，不伤皮肉，只缚手脚。',
+        nt:{name:'铁鞭',desc:'缠斗同时使目标攻击降低 10%'}},
+  teng:{name:'藤',hp:95,atk:30,trait:'缠绕',tdesc:'己方回合结束时，相邻敌人损失 6 点生命',grade:'rare',
+        lore:'藤蔓缠足，走一步便多流一分血。',
+        nt:{name:'荆棘',desc:'缠绕的伤害提升到 12 点'}}
+};
+var GRADE = {
+  mythic:{zh:'神话',c:'#D92027'},
+  legend:{zh:'传说',c:'#E07B10'},
+  epic:{zh:'卓越',c:'#8E3FD6'},
+  rare:{zh:'优良',c:'#2C6FE0'},
+  common:{zh:'普通',c:'#3B9A5F'}
+};
+function gradeHTML(g){
+  var d = GRADE[g];
+  if(!d) return '';
+  return '<span class="xqm-grade" style="color:'+d.c+';border-color:'+d.c+'55;background:'+d.c+'14">'+d.zh+'</span>';
+}
+var ORDER = ['grain','lord','king','advisor','elephant','horse','chariot','cannon','pawn',
+  'zu','min','shi','pai','tan','huo',
+  'dun','gong','nu','mao','fu','chui','qi','gu','zhen','yao','chi','ci','jing',
+  'hu','bao','ying','lang','yi','jiang','di','long',
+  'yi2','wei','xu','biao','duan','can','bian','teng'];
+var MV_DESC = {grain:'直线 1~2 格，可过河（不可攻击）',lord:'九宫内横竖斜 1 格，可攻击相邻格',king:'九宫内横竖斜 1 格',advisor:'九宫内斜 1 格',elephant:'田字（不塞象眼、可过河）',
+  horse:'日字（不蹩马腿）',chariot:'直线任意格',cannon:'直线任意格',pawn:'前 1 格 / 过河后前三',
+  zu:'四方向相邻 1 格',min:'四方向相邻 1 格',shi:'四方向相邻 1 格',pai:'四方向相邻 1 格',
+  tan:'四方向直线 1~2 格',huo:'四方向相邻 1 格',
+  dun:'四方向相邻 1 格',gong:'四方向相邻 1 格',nu:'四方向相邻 1 格',mao:'四方向直线 1~2 格',
+  fu:'四方向相邻 1 格',chui:'四方向相邻 1 格',qi:'四方向相邻 1 格（不可攻击）',gu:'四方向相邻 1 格（不可攻击）',
+  zhen:'四方向相邻 1 格（不可攻击）',yao:'四方向相邻 1 格（不可攻击）',chi:'四方向直线 1~3 格',
+  ci:'四方向相邻 1 格，另可斜走 1 格',jing:'四方向相邻 1 格',
+  hu:'四方向直线 1~2 格',bao:'四方向直线 1~2 格，另可斜走 1 格',
+  ying:'四方向直线 1~3 格（可越过棋子）',lang:'四方向直线 1~2 格',
+  yi:'四方向相邻 1 格（不可攻击）',jiang:'四方向相邻 1 格（不可攻击）',
+  di:'九宫内横竖斜 1 格，可攻击相邻格',long:'四方向直线 1~3 格（腾云时可越子）',
+  yi2:'四方向相邻 1 格（不可攻击）',wei:'四方向相邻 1 格',xu:'四方向相邻 1 格',
+  biao:'四方向直线 1~2 格',duan:'四方向直线 1~2 格',can:'四方向相邻 1 格',
+  bian:'四方向直线 1~2 格',teng:'四方向相邻 1 格'};
+var RNG_DESC = {grain:'不可攻击',lord:'九宫内 1 格',king:'九宫内 1 格',advisor:'斜 1 格',elephant:'田字',horse:'日字（可越子）',
+  chariot:'直线 3 格内',cannon:'隔 1 子直线',pawn:'同移动',
+  zu:'四方向相邻 1 格',min:'四方向相邻 1 格',shi:'直线 2 格内的第一个敌人',pai:'四方向相邻 1 格',
+  tan:'四方向相邻 1 格',huo:'四方向相邻 1 格',
+  dun:'四方向相邻 1 格',gong:'直线 3 格内的第一个敌人（打不到相邻）',nu:'直线 2 格内的第一个敌人（穿透到第二个）',
+  mao:'直线 2 格内的第一个敌人',fu:'四方向相邻 1 格',chui:'四方向相邻 1 格',
+  qi:'不可攻击',gu:'不可攻击',zhen:'不可攻击',yao:'不可攻击',
+  chi:'四方向相邻 1 格',ci:'四方向相邻 1 格（斜向只走不打）',jing:'四方向相邻 1 格',
+  hu:'四方向相邻 1 格',bao:'四方向相邻 1 格（斜向只走不打）',
+  ying:'四方向相邻 1 格',lang:'四方向相邻 1 格',
+  yi:'不可攻击（可治疗相邻友军，回复其 25% 生命上限）',jiang:'不可攻击',
+  di:'九宫内 1 格',long:'直线 3 格内的第一个敌人（穿透到第二个）',
+  yi2:'不可攻击',wei:'四方向相邻 1 格',xu:'四方向相邻 1 格',
+  biao:'直线 2 格内的第一个敌人',duan:'四方向相邻 1 格',can:'四方向相邻 1 格',
+  bian:'四方向相邻 1 格',teng:'四方向相邻 1 格'};
+/* ── 走子 / 伤害规则：与服务端 xqmaster.py 保持一致 ── */
+var DIR4=[[-1,0],[1,0],[0,-1],[0,1]],
+    KMV=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],
+    ADV=[[-1,-1],[-1,1],[1,-1],[1,1]], ELE=[[-2,-2],[-2,2],[2,-2],[2,2]],
+    HMV=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+/* 走法与攻击的约定（与服务端 xqmaster.py 完全一致）：
+   「直线 N」=四方向最多 N 格、遇子停；「相邻」=四方向 1 格；
+   攻击「直线 N 格」=四方向上距离 ≤N 的第一个棋子，不穿子。 */
+var NOATK = {grain:1,qi:1,gu:1,zhen:1,yao:1,yi:1,jiang:1,yi2:1};
+var SPLIT = {chariot:1,cannon:1,shi:1,nu:1,gong:1,mao:1,tan:1,chi:1,ci:1,
+             hu:1,bao:1,ying:1,lang:1,long:1,
+             biao:1,duan:1,bian:1};
+
+function ok(r,c){ return r>=0 && r<=9 && c>=0 && c<=8; }
+function inPal(side,r,c){ return c>=3 && c<=5 && (side==='red'?r>=7:r<=2); }
+function crossed(side,r){ return side==='red'?r<=4:r>=5; }
+function at(board,r,c){ return ok(r,c)?board[r][c]:null; }
+
+/* 返回 {mv, rng, heal}。heal 只给医·回春用，里面是己方棋子占住的格。 */
+function targetsOf(board,r,c,ply){
+  var p=at(board,r,c), mv={}, rng={}, heal={};
+  if(!p) return {mv:mv, rng:rng, heal:heal};
+  var t=p.t, side=p.s, fwd=(side==='red'?-1:1);
+  function amv(a,cc){ if(ok(a,cc)) mv[a+','+cc]=1; }
+  function arg(a,cc){ if(ok(a,cc)) rng[a+','+cc]=1; }
+  function aheal(a,cc){ if(ok(a,cc)) heal[a+','+cc]=1; }
+  /* 走法：沿方向最多 n 格，遇子停 */
+  function walk(dr,dc,n){
+    for(var k=1;k<=n;k++){ var a=r+dr*k, b=c+dc*k;
+      if(!ok(a,b) || board[a][b]) return; amv(a,b); }
+  }
+  /* 攻击：沿方向距离 minK~n 的第一个棋子 */
+  function firstFoe(dr,dc,n,minK){
+    for(var k=1;k<=n;k++){ var a=r+dr*k, b=c+dc*k;
+      if(!ok(a,b)) return;
+      if(board[a][b]){ if(k>=minK) arg(a,b); return; } }
+  }
+  if(t==='king'||t==='lord'||t==='di') KMV.forEach(function(d){ if(inPal(side,r+d[0],c+d[1])){ amv(r+d[0],c+d[1]); arg(r+d[0],c+d[1]); } });
+  else if(t==='grain'){
+    DIR4.forEach(function(d){ for(var k=1;k<=2;k++){ var a=r+d[0]*k, cc=c+d[1]*k;
+      if(!ok(a,cc) || board[a][cc]) break; amv(a,cc); } });
+  }
+  else if(t==='advisor') ADV.forEach(function(d){ if(inPal(side,r+d[0],c+d[1])) amv(r+d[0],c+d[1]); });
+  else if(t==='elephant') ELE.forEach(function(d){ amv(r+d[0],c+d[1]); });
+  else if(t==='horse') HMV.forEach(function(d){ amv(r+d[0],c+d[1]); });
+  else if(t==='chariot'){
+    DIR4.forEach(function(d){ for(var k=1;k<10;k++){ var a=r+d[0]*k, cc=c+d[1]*k;
+      if(!ok(a,cc)) break; if(k<=3) arg(a,cc); if(board[a][cc]) break; amv(a,cc); } });
+  } else if(t==='cannon'){
+    DIR4.forEach(function(d){ var screen=false;
+      for(var k=1;k<10;k++){ var a=r+d[0]*k, cc=c+d[1]*k;
+        if(!ok(a,cc)) break; var occ=!!board[a][cc];
+        if(!screen){ if(occ) screen=true; else amv(a,cc); }
+        else if(occ){ arg(a,cc); break; } } });
+  } else if(t==='pawn'){
+    amv(r+fwd,c);
+    if(crossed(side,r)){ amv(r,c-1); amv(r,c+1); }
+  }
+  /* ── 扩展第一批 ── */
+  else if(t==='zu'||t==='min'||t==='pai'||t==='huo'||t==='dun'||t==='fu'||t==='chui'||t==='jing'
+          ||t==='teng'||t==='wei'||t==='xu'||t==='can'){
+    DIR4.forEach(function(d){ amv(r+d[0],c+d[1]); arg(r+d[0],c+d[1]); });
+  }
+  else if(t==='shi'||t==='nu'){
+    DIR4.forEach(function(d){ amv(r+d[0],c+d[1]); firstFoe(d[0],d[1],2,1); });
+  }
+  else if(t==='gong'){
+    DIR4.forEach(function(d){ amv(r+d[0],c+d[1]); firstFoe(d[0],d[1],3,2); });
+  }
+  else if(t==='mao'){
+    DIR4.forEach(function(d){ walk(d[0],d[1],2); firstFoe(d[0],d[1],2,1); });
+  }
+  else if(t==='tan'){
+    DIR4.forEach(function(d){ walk(d[0],d[1],2); arg(r+d[0],c+d[1]); });
+  }
+  else if(t==='chi'){
+    DIR4.forEach(function(d){ walk(d[0],d[1],3); arg(r+d[0],c+d[1]); });
+  }
+  else if(t==='ci'){
+    DIR4.forEach(function(d){ amv(r+d[0],c+d[1]); arg(r+d[0],c+d[1]); });
+    ADV.forEach(function(d){ amv(r+d[0],c+d[1]); });
+  }
+  else if(t==='qi'||t==='gu'||t==='zhen'||t==='yao'){
+    DIR4.forEach(function(d){ amv(r+d[0],c+d[1]); });
+  }
+  /* ── 扩展第二批：传说 6 ── */
+  else if(t==='hu'||t==='lang'||t==='bian'||t==='duan'){
+    DIR4.forEach(function(d){ walk(d[0],d[1],2); arg(r+d[0],c+d[1]); });
+  }
+  else if(t==='biao'){
+    /* 标：走 1~2 格，打 2 格内的第一个敌人 */
+    DIR4.forEach(function(d){ walk(d[0],d[1],2); firstFoe(d[0],d[1],2,1); });
+  }
+  else if(t==='bao'){
+    DIR4.forEach(function(d){ walk(d[0],d[1],2); arg(r+d[0],c+d[1]); });
+    ADV.forEach(function(d){ var a=r+d[0], b=c+d[1];
+      if(ok(a,b) && !board[a][b]) amv(a,b); });
+  }
+  else if(t==='ying'){
+    DIR4.forEach(function(d){
+      for(var k=1;k<=3;k++){ var a=r+d[0]*k, b=c+d[1]*k;
+        if(!ok(a,b)) break;
+        if(!board[a][b]) amv(a,b); }
+      arg(r+d[0],c+d[1]); });
+  }
+  else if(t==='yi'||t==='jiang'){
+    DIR4.forEach(function(d){ amv(r+d[0],c+d[1]); });
+  }
+  else if(t==='yi2'){
+    /* 移：只走一格、不可攻击；绿圈是「可以换位的友军」 */
+    DIR4.forEach(function(d){ amv(r+d[0],c+d[1]); });
+  }
+  /* ── 扩展第二批：神话 2 ── */
+  else if(t==='long'){
+    var fly = !!p.cl;
+    DIR4.forEach(function(d){
+      for(var k=1;k<=3;k++){ var a=r+d[0]*k, b=c+d[1]*k;
+        if(!ok(a,b)) break;
+        if(board[a][b]){ if(!fly) break; continue; }
+        amv(a,b); }
+      firstFoe(d[0],d[1],3,1); });
+  }
+  /* 医·回春：只有「受伤且没被断粮」的相邻友军才是合法目标 */
+  if(t==='yi') KMV.forEach(function(d){
+    var q=at(board,r+d[0],c+d[1]);
+    if(q && q.s===side && q.hp>0 && q.hp<q.mh
+       && !(q.nh!==undefined && q.nh!==null && (ply||0)<=q.nh)) aheal(r+d[0],c+d[1]);
+  });
+  /* 移·移形：可以和友军换位（移形 1 格 / 挪移 2 格） */
+  if(t==='yi2'){
+    var sw = p.g2 ? 2 : 1;
+    for(var dr=-sw; dr<=sw; dr++) for(var dc=-sw; dc<=sw; dc++){
+      if((!dr&&!dc) || Math.abs(dr)+Math.abs(dc)>sw) continue;
+      var a=r+dr, b=c+dc;
+      if(ok(a,b) && board[a][b] && board[a][b].s===side) aheal(a,b);
+    }
+  }
+
+  if(!SPLIT[t]){ for(var k in mv) rng[k]=1; }
+  if(NOATK[t]){ rng={}; }
+  /* 走法：被占的格子不能落子（攻击范围不受影响）—— 各分支容易漏，这里统一兜一道 */
+  for(var km in mv){ var am=km.split(','); if(board[+am[0]][+am[1]]) delete mv[km]; }
+  [mv,rng].forEach(function(set){ for(var k in set){ var a=k.split(',');
+    var q=board[+a[0]][+a[1]]; if(q && q.s===side) delete set[k]; } });
+  for(var k2 in heal){ var a2=k2.split(','); var q2=board[+a2[0]][+a2[1]];
+    if(!q2 || q2.s!==side) delete heal[k2]; }
+  /* 震击：被锁住的棋子不能移动（ply 由战斗页传入；图鉴演示不传） */
+  if(ply!==undefined && ply!==null && p.frz!==undefined && p.frz!==null && ply<=p.frz) mv={};
+  return {mv:mv, rng:rng, heal:heal};
+}
+
+function adjacentKing(board,r,c,side){
+  for(var dr=-1;dr<=1;dr++) for(var dc=-1;dc<=1;dc++){
+    if(!dr && !dc) continue;
+    var q=at(board,r+dr,c+dc);
+    if(q && q.s===side && (q.t==='king'||q.t==='lord'||q.t==='di')) return true;
+  }
+  return false;
+}
+function adjacentAdvisor(board,r,c,side){
+  for(var dr=-1;dr<=1;dr++) for(var dc=-1;dc<=1;dc++){
+    if(!dr && !dc) continue;
+    var q=at(board,r+dr,c+dc);
+    if(q && q.s===side && q.t==='advisor') return {p:q, r:r+dr, c:c+dc};
+  }
+  return null;
+}
+function halfToEven(x){
+  var f=Math.floor(x), d=x-f;
+  if(d>0.5) return f+1;
+  if(d<0.5) return f;
+  return (f%2===0)?f:f+1;
+}
+function findKingPc(board, side){
+  for(var r=0;r<10;r++) for(var c=0;c<9;c++){
+    var p=board[r][c];
+    if(p && p.s===side && (p.t==='king'||p.t==='lord'||p.t==='di')) return {p:p,r:r,c:c};
+  }
+  return null;
+}
+function openLine(board,r1,c1,r2,c2){
+  var i,lo,hi;
+  if(r1===r2){ lo=Math.min(c1,c2)+1; hi=Math.max(c1,c2);
+    for(i=lo;i<hi;i++) if(board[r1][i]) return false; return true; }
+  if(c1===c2){ lo=Math.min(r1,r2)+1; hi=Math.max(r1,r2);
+    for(i=lo;i<hi;i++) if(board[i][c1]) return false; return true; }
+  return false;
+}
+function ownNear(board,r,c,side,t,g2){
+  for(var i=-1;i<=1;i++) for(var j=-1;j<=1;j++){
+    if(!i&&!j) continue;
+    var q=at(board,r+i,c+j);
+    if(q && q.s===side && q.t===t && q.hp>0 && (!g2 || q.g2)) return q;
+  }
+  return null;
+}
+function ownCountNear(board,r,c,side,t,exId){
+  var n=0;
+  for(var i=-1;i<=1;i++) for(var j=-1;j<=1;j++){
+    if(!i&&!j) continue;
+    var q=at(board,r+i,c+j);
+    if(q && q.s===side && q.t===t && q.hp>0 && q.id!==exId) n++;
+  }
+  return n;
+}
+function hasOwn(board,side,t,g2){
+  for(var i=0;i<10;i++) for(var j=0;j<9;j++){
+    var q=board[i]&&board[i][j];
+    if(q && q.s===side && q.t===t && q.hp>0 && (!g2 || q.g2)) return true;
+  }
+  return false;
+}
+function reflectRatio(board,dfn,dr,dc){
+  if(dfn.t==='jing') return dfn.g2 ? {ratio:0.45, ignore:true} : {ratio:0.25, ignore:false};
+  if(dfn.t==='mao') return {ratio:0.30, ignore:false};
+  var q=ownNear(board,dr,dc,dfn.s,'mao',true);
+  if(q) return {ratio:0.15, ignore:false};
+  return {ratio:0, ignore:false};
+}
+function splashAdjust(board,r,c,dfn){
+  return ownNear(board,r,c,dfn.s,'pai') ? 0.5 : 1;
+}
+/* 医·回春 / 妙手：算出这次治疗实际回多少血、溢出转多少护盾 */
+function healPreview(atk, dfn){
+  var amt = Math.max(1, halfToEven(dfn.mh * 0.25));
+  var need = Math.max(0, dfn.mh - dfn.hp);
+  var real = Math.min(amt, need);
+  var over = amt - real;
+  var sh = 0;
+  if(over > 0 && atk.g2){
+    var cur = dfn.sh || 0;
+    sh = Math.min(over, Math.max(0, dfn.mh - cur));
+  }
+  return { amt: amt, heal: real, shield: sh };
+}
+function calcDamage(board,atk,ar,ac,dfn,dr,dc,ply){
+  var notes=[], base=atk.atk;
+  var ab=atk.tr||0, db=dfn.tr||0;
+  /* 降攻（仕·死卫 / 戟·钩拒）：dbf 是「生效到哪个 ply」 */
+  if(atk.dbf!==undefined && atk.dbf!==null && (ply||0) <= atk.dbf){
+    var dv = atk.dbfv || 0.30;
+    base *= 1 - dv;
+    notes.push((atk.dbfn || '死卫') + ' -' + Math.round(dv*100) + '%');
+  }
+  var dkq=findKingPc(board,dfn.s);
+  if(dkq && dkq.p.t==='king' && dkq.p.g2){
+    var aq=findKingPc(board,atk.s);
+    if(aq && openLine(board,dkq.r,dkq.c,aq.r,aq.c)){ base*=0.8; notes.push('御敌 -20%'); }
+  }
+  if(dkq && dkq.p.t==='lord'){ base*=0.9; notes.push('守玺 -10%'); }
+  /* 振饱（粮 20 级）：防守方两格范围内有粮 → 减伤 20% */
+  (function(){
+    for(var i=-2;i<=2;i++) for(var j=-2;j<=2;j++){
+      if(!i&&!j) continue;
+      var q=at(board,dr+i,dc+j);
+      if(q && q.s===dfn.s && q.t==='grain' && q.g2 && q.hp>0){
+        base*=0.8; notes.push('振饱 -20%'); return;
+      }
+    }
+  })();
+  var akq=findKingPc(board,atk.s);
+  if(akq && akq.p.t==='lord' && akq.p.g2){
+    var alive=0,rr2,cc2,qq2;
+    for(rr2=0;rr2<10;rr2++) for(cc2=0;cc2<9;cc2++){ qq2=board[rr2]&&board[rr2][cc2]; if(qq2&&qq2.s===atk.s) alive++; }
+    var lost=Math.max(0,16-alive);
+    if(lost){ var bo=Math.min(0.40,lost*0.08); base*=1+bo; notes.push('天威 +'+Math.round(bo*100)+'%'); }
+  }
+  if(atk.t==='pawn' && crossed(atk.s,ar)){ base*=1+0.30+ab; notes.push('死战 +'+Math.round((0.30+ab)*100)+'%'); }
+  if(atk.t==='horse' && atk.mv){ base*=1+0.20+ab; notes.push('踏营 +'+Math.round((0.20+ab)*100)+'%'); }
+  if(atk.t==='horse' && atk.g2){
+    var n=0,i,j,q;
+    for(i=-2;i<=2;i++) for(j=-2;j<=2;j++){
+      if(!i&&!j) continue;
+      q=at(board,ar+i,ac+j);
+      if(q && q.s!==atk.s) n++;
+    }
+    if(n){ base*=1+0.15*n; notes.push('八面威 +'+Math.round(15*n)+'%'); }
+  }
+  if(atk.t==='cannon' && atk.g2){
+    var ddr=(dr===ar?0:(dr>ar?1:-1)), ddc=(dc===ac?0:(dc>ac?1:-1));
+    var y=ar+ddr, x=ac+ddc, sc;
+    while((y!==dr||x!==dc) && y>=0&&y<10&&x>=0&&x<9){
+      sc=board[y][x];
+      if(sc){ if(sc.s===atk.s){ base*=1.3; notes.push('重炮 +30%'); } break; }
+      y+=ddr; x+=ddc;
+    }
+  }
+  /* ── 扩展第一批的进攻方修正 ── */
+  if(atk.t==='zu' && crossed(atk.s,ar)){
+    var zm=2.0*(atk.g2?1.3:1.0); base*=zm; notes.push('老卒 ×'+zm.toFixed(1));
+  }
+  if(atk.t==='shi' && ownCountNear(board,ar,ac,atk.s,'shi',atk.id)){ base*=1.30; notes.push('齐射 +30%'); }
+  if(atk.t==='ci' && dfn.mh>0 && dfn.hp < dfn.mh*0.4){ base*=2; notes.push('暗杀 ×2'); }
+  if(ownNear(board,ar,ac,atk.s,'qi')){ base*=1.10; notes.push('号令 +10%'); }
+  if(hasOwn(board,atk.s,'qi',true)){ base*=1.05; notes.push('大纛 +5%'); }
+  /* ── 扩展第二批的进攻方修正 ── */
+  if(hasOwn(board,atk.s,'di',true)){ base*=1.15; notes.push('亲征 +15%'); }
+  if(atk.t==='lang'){
+    var ln=0;
+    KMV.forEach(function(o){
+      var q=at(board,ar+o[0],ac+o[1]);
+      if(q && q.s===atk.s && q.hp>0) ln++;
+    });
+    if(ln){ base*=1+0.08*ln; notes.push('群猎 +'+Math.round(8*ln)+'%'); }
+  }
+  if(ownNear(board,ar,ac,atk.s,'lang',true)){ base*=1.12; notes.push('头狼 +12%'); }
+  if(ownNear(board,ar,ac,atk.s,'jiang')){ base*=1.15; notes.push('铸兵 +15%'); }
+  if(hasOwn(board,atk.s,'jiang',true)){ base*=1.08; notes.push('神工 +8%'); }
+  if(atk.t==='hu' && atk.g2 && atk.kb){ base*=1+0.20*atk.kb; notes.push('百兽 +'+Math.round(20*atk.kb)+'%'); }
+  /* ── 扩展第三批的进攻方修正 ── */
+  if(atk.t==='xu' && atk.ch){ base*=2; notes.push('蓄势 ×2'); }
+  if(dfn.mk!==undefined && dfn.mk!==null && (ply||0)<=dfn.mk && atk.s===dfn.mks){
+    base*=1.15; notes.push('标记 +15%');
+  }
+  var eq=null,i2,j2,q2;
+  for(i2=-1;i2<=1&&!eq;i2++) for(j2=-1;j2<=1;j2++){
+    if(!i2&&!j2) continue;
+    q2=at(board,ar+i2,ac+j2);
+    if(q2 && q2.s===dfn.s && q2.t==='elephant' && q2.g2 && crossed(dfn.s,ar+i2)){ eq=q2; break; }
+  }
+  if(eq){ base*=0.8; notes.push('掠阵 -20%'); }
+  var red=0;
+  if(dkq && (dkq.p.t==='king'||dkq.p.t==='lord') && inPal(dfn.s,dr,dc)){
+    var aura=0.40+(dkq.p.tr||0);
+    red=1-(1-red)*(1-aura); notes.push('坐镇 -'+Math.round(aura*100)+'%');
+  }
+  if(dfn.t==='elephant' && (atk.t==='chariot'||atk.t==='cannon')){
+    var arm=0.25+db;
+    red=1-(1-red)*(1-arm); notes.push('守垒 -'+Math.round(arm*100)+'%');
+  }
+  /* ── 扩展第一批的防守方修正 ── */
+  var zh=ownNear(board,dr,dc,dfn.s,'zhen');
+  if(zh){
+    var form=0.12;
+    if(zh.g2){
+      var zp=null,y2,x2,q3;
+      for(y2=0;y2<10&&!zp;y2++) for(x2=0;x2<9;x2++){ q3=board[y2][x2]; if(q3&&q3.id===zh.id){ zp=[y2,x2]; break; } }
+      if(zp && ownCountNear(board,zp[0],zp[1],dfn.s,'zhen',zh.id)) form*=2;
+    }
+    red=1-(1-red)*(1-form); notes.push('结阵 -'+Math.round(form*100)+'%');
+  }
+  if(ownNear(board,dr,dc,dfn.s,'dun',true)){ red=1-(1-red)*0.90; notes.push('磐石 -10%'); }
+  if(ownNear(board,dr,dc,dfn.s,'pai',true)){ red=1-(1-red)*0.92; notes.push('重牌 -8%'); }
+  /* ── 扩展第三批的防守方修正 ── */
+  if(dfn.nb!==undefined && dfn.nb!==null && (ply||0)<=dfn.nb){
+    if(red>0) notes.push('断援 减伤失效');
+    red=0;
+  }
+  red=Math.min(red,0.70);
+  if(atk.t==='chariot' && red>0){
+    var pc=0.25+ab;
+    red*=(1-pc); notes.push('破甲 无视'+Math.round(pc*100)+'%');
+  }
+  if(atk.t==='long' && red>0){ red*=0.70; notes.push('龙威 无视30%'); }
+  if(atk.t==='ying' && atk.g2 && red>0){ red*=0.80; notes.push('鹰眼 无视20%'); }
+  if(atk.t==='fu'){ red=0; notes.push('劈山 无视减伤'); }
+  var dmg=Math.max(1,halfToEven(base*(1-red)));
+  if(dfn.t==='dun' && atk.t!=='fu' && dfn.irn!==((ply||0)) && dmg>1){
+    dmg=Math.max(1,halfToEven(dmg*0.5)); notes.push('铁壁 -50%');
+  }
+  if(atk.t==='fu' && atk.g2){
+    var extra=Math.max(1,halfToEven(dfn.hp*0.15));
+    dmg+=extra; notes.push('开山 真实 +'+extra);
+  }
+  return { dmg:dmg, base:halfToEven(base), red:red, notes:notes };
+}
+function resolveAttack(board,ar,ac,dr,dc,ply){
+  var a=at(board,ar,ac), d=at(board,dr,dc);
+  if(!a || !d || a.s===d.s) return null;
+  var r=calcDamage(board,a,ar,ac,d,dr,dc,ply);
+  /* 影袭（刺）/ 残影（豹）：潜行中免疫一次攻击 */
+  if(ply!==undefined && ply!==null && d.gh===ply && d.ghn>0){
+    var inm = (d.t==='bao') ? '残影' : '影袭';
+    return { base:r.base, red:r.red, notes:r.notes.concat([inm+' 免疫']), miss:true,
+             missName:inm, hits:[{r:dr,c:dc,v:0,who:d,note:inm}] };
+  }
+  var hits=[{r:dr,c:dc,v:r.dmg,who:d,note:''}], share=0, adv=null;
+  if(inPal(d.s,dr,dc)){
+    adv=adjacentAdvisor(board,dr,dc,d.s);
+    if(adv){ share=Math.max(1,halfToEven(r.dmg*(0.2+(adv.p.tr||0)))); hits[0].v=r.dmg-share; }
+  }
+  /* 反伤：算在护主分摊之前，和服务端一致 */
+  var ref=reflectRatio(board,d,dr,dc);
+  if(ref.ratio>0){
+    hits.push({r:ar,c:ac,v:Math.max(1,halfToEven((ref.ignore?r.base:r.dmg)*ref.ratio)),
+               who:a,note:'反伤'});
+  }
+  /* 替死（卫）：这一下会打死人，旁边还站着没用过替死的卫 —— 伤害改记到它头上 */
+  if(d.t!=='wei' && (d.hp - hits[0].v) <= 0){
+    for(var gi=0; gi<KMV.length; gi++){
+      var gq = at(board, dr+KMV[gi][0], dc+KMV[gi][1]);
+      if(gq && gq.t==='wei' && gq.s===d.s && !gq.sd){
+        hits[0].r = dr+KMV[gi][0]; hits[0].c = dc+KMV[gi][1];
+        hits[0].who = gq; hits[0].note = '替死';
+        break;
+      }
+    }
+  }
+  /* 连珠（弓 20 级）：未击杀则追加半伤 */
+  var dead = (d.hp - hits[0].v) <= 0;
+  if(a.t==='gong' && a.g2 && !dead){
+    hits.push({r:dr,c:dc,v:Math.max(1,halfToEven(hits[0].v*0.5)),who:d,note:'连珠'});
+  }
+  /* 穿透 */
+  if(a.t==='nu'||a.t==='long'){
+    var pd=(dr===ar?0:(dr>ar?1:-1)), pe=(dc===ac?0:(dc>ac?1:-1));
+    var yy=dr+pd, xx=dc+pe, qq;
+    while(yy>=0&&yy<10&&xx>=0&&xx<9){
+      qq=board[yy][xx];
+      if(qq){ if(qq.s!==a.s) hits.push({r:yy,c:xx,
+        v:(a.t==='long'||a.g2)?hits[0].v:Math.max(1,halfToEven(hits[0].v*0.5)),who:qq,note:'穿透'}); break; }
+      yy+=pd; xx+=pe;
+    }
+  }
+  /* 箭雨 */
+  if(a.t==='shi' && a.g2){
+    var sd=Math.max(1,halfToEven(hits[0].v*0.5));
+    KMV.forEach(function(o){
+      var q=at(board,dr+o[0],dc+o[1]);
+      if(q && q.s!==a.s) hits.push({r:dr+o[0],c:dc+o[1],
+        v:Math.max(1,halfToEven(sd*splashAdjust(board,dr+o[0],dc+o[1],q))),who:q,note:'箭雨'});
+    });
+  }
+  /* 纵火：固定溅射 + 自伤 */
+  if(a.t==='huo'){
+    var hd=10+(a.g2?8:0);
+    KMV.forEach(function(o){
+      var q=at(board,dr+o[0],dc+o[1]);
+      if(q && q.s!==a.s) hits.push({r:dr+o[0],c:dc+o[1],
+        v:Math.max(1,halfToEven(hd*splashAdjust(board,dr+o[0],dc+o[1],q))),who:q,note:'溅射'});
+    });
+    hits.push({r:ar,c:ac,v:5,who:a,note:'自伤'});
+  }
+  if(a.t==='cannon'){
+    var dd=(dr===ar?0:(dr>ar?1:-1)), ee=(dc===ac?0:(dc>ac?1:-1));
+    var bh=at(board,dr+dd,dc+ee);
+    if(bh && bh.s!==a.s) hits.push({r:dr+dd,c:dc+ee,
+      v:Math.max(1,halfToEven(r.base*(0.4+(a.tr||0))*splashAdjust(board,dr+dd,dc+ee,bh))),
+      who:bh,note:'溅射'});
+  }
+  if(a.t==='chariot' && a.g2){
+    var sr=dr+(dr===ar?0:(dr>ar?1:-1)), sc=dc+(dc===ac?0:(dc>ac?1:-1));
+    var sw=at(board,sr,sc);
+    if(sw && sw.s!==a.s) hits.push({r:sr,c:sc,v:Math.max(1,halfToEven(r.base*0.3)),who:sw,note:'横扫'});
+  }
+  if(adv && share>0) hits.push({r:adv.r,c:adv.c,v:share,who:adv.p,note:'护主'});
+  /* 护盾（医·妙手）：每一下都先被护盾吸掉一部分，与服务端 _apply_damage 一致 */
+  var shLeft = {};
+  hits.forEach(function(h){
+    var q = at(board, h.r, h.c);
+    if(!q || !q.sh) return;
+    var k2 = h.r + ',' + h.c;
+    if(shLeft[k2] === undefined) shLeft[k2] = q.sh;
+    if(shLeft[k2] > 0){
+      var ab = Math.min(shLeft[k2], h.v);
+      shLeft[k2] -= ab;
+      h.v -= ab;
+      if(ab > 0) h.note = h.note ? h.note + '·盾' : '盾';
+    }
+  });
+  hits = hits.filter(function(h){ return h.v > 0; });
+  /* 浴血：过河的兵单次受到的伤害不超过生命上限的 25% */
+  hits.forEach(function(h){
+    var q=at(board,h.r,h.c);
+    if(q && q.g2 && q.t==='pawn' && crossed(q.s,h.r)){
+      var cap=Math.max(1,halfToEven(q.mh*0.25));
+      if(h.v>cap) h.v=cap;
+    }
+  });
+  return { base:r.base, red:r.red, notes:r.notes, hits:hits };
+}
+
+function toast(msg){
+  var el=document.createElement('div'); el.className='xqm-toast'; el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(function(){ el.style.transition='opacity .3s'; el.style.opacity='0';
+    setTimeout(function(){ el.remove(); },320); },1500);
+}
+function api(url, opt){
+  opt = opt || {};
+  opt.headers = Object.assign({'Content-Type':'application/json'}, opt.headers||{});
+  if(opt.body && typeof opt.body !== 'string') opt.body = JSON.stringify(opt.body);
+  return fetch(url, opt).then(function(r){
+    if(r.redirected && r.url.indexOf('/login') >= 0){
+      location.href = '/login';
+      return {ok:false, msg:'登录已过期'};
+    }
+    return r.json().catch(function(){ return {ok:false, msg:'返回格式错误'}; });
+  });
+}
+
+/* ── 裂纹（纯视觉，程序化生成）── */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0;
+  var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296; }; }
+function clampC(x,y){ var dx=x-50,dy=y-50,d=Math.hypot(dx,dy);
+  if(d<=46) return [x,y]; return [50+dx/d*46,50+dy/d*46]; }
+function crackPath(rnd,x0,y0,ang,segs,step0){
+  var x=x0,y=y0,a=ang,step=step0,d='M'+x.toFixed(1)+' '+y.toFixed(1);
+  for(var i=0;i<segs;i++){
+    a += (rnd()-.5)*0.95;
+    var nx=x+Math.cos(a)*step, ny=y+Math.sin(a)*step, cl=clampC(nx,ny);
+    nx=cl[0]; ny=cl[1];
+    d += ' L'+nx.toFixed(1)+' '+ny.toFixed(1);
+    x=nx; y=ny; step*=0.76;
+  }
+  return d;
+}
+var _crackCache = {};
+function crackSVG(seed){
+  if(_crackCache[seed]) return _crackCache[seed];
+  var rnd=mulberry32(seed), s='<svg class="xqm-cracks" viewBox="0 0 100 100">';
+  var imps=[[33,29,1],[69,57,2],[41,75,3],[67,23,4],[26,55,4]];
+  imps.forEach(function(imp){
+    var mains = imp[2]>=4?2:3;
+    for(var i=0;i<mains;i++){
+      var ang=rnd()*Math.PI*2;
+      var d1=crackPath(rnd,imp[0],imp[1],ang,3+Math.floor(rnd()*3),7+rnd()*7);
+      s += '<path class="dk" data-t="'+imp[2]+'" d="'+d1+'"/><path class="lt" data-t="'+imp[2]+'" d="'+d1+'"/>';
+      if(rnd()>0.42){
+        var ba=ang+(rnd()>.5?1:-1)*(0.55+rnd()*0.6);
+        var d2=crackPath(rnd,imp[0],imp[1],ba,2+Math.floor(rnd()*2),5+rnd()*4);
+        s += '<path class="dk" data-t="'+imp[2]+'" d="'+d2+'"/><path class="lt" data-t="'+imp[2]+'" d="'+d2+'"/>';
+      }
+    }
+  });
+  for(var i=0;i<5;i++){
+    var cx=24+rnd()*52, cy=24+rnd()*52, sz=2.2+rnd()*2.4, a0=rnd()*Math.PI*2, pts=[];
+    for(var k=0;k<3;k++){ var a=a0+k*2.09;
+      pts.push((cx+Math.cos(a)*sz).toFixed(1)+','+(cy+Math.sin(a)*sz).toFixed(1)); }
+    s += '<polygon class="chip" data-t="'+(i<2?1:i<4?2:3)+'" points="'+pts.join(' ')+'"/>';
+  }
+  s += '</svg>';
+  _crackCache[seed] = s;
+  return s;
+}
+function dmgTier(hp,mx){ var p=hp/mx;
+  return p<=0.15?4:p<=0.40?3:p<=0.70?2:p<1?1:0; }
+var _hitTier = {};
+function pcHTML(p, opts){
+  opts = opts||{};
+  var cls=['xqm-pc', p.s];
+  if(opts.sel) cls.push('xqm-sel');
+  if(opts.mine) cls.push('xqm-mine');
+  if(opts.ghost) cls.push('xqm-ghost');
+  if(_hitTier[p.id] !== undefined){
+    cls.push('xqm-cracking');
+  } else {
+    cls.push('xqm-static');
+  }
+  var zh=GLYPH[p.t][p.s==='red'?0:1];
+  var seed=(zh.charCodeAt(0)||65)*131+(p.s==='red'?7:29);
+  var tier = _hitTier[p.id] !== undefined ? _hitTier[p.id] : dmgTier(p.hp,p.mh);
+  if(p.hp > 0 && p.hp / p.mh < 0.2) cls.push('xqm-low');
+  return '<div class="'+cls.join(' ')+'" data-dmg="'+tier+'" data-id="'+p.id+'">'
+    + crackSVG(seed) + '<span class="xqm-glyph">'+zh+'</span>'
+    + (p.lv && p.lv > 1 ? '<i class="xqm-lv">'+p.lv+'</i>' : '')
+    + '</div>';
+}
+
+/* ── 刀光几何 ── */
+function bez(t,p0,p1,p2){ var u=1-t;
+  return {x:u*u*p0.x+2*u*t*p1.x+t*t*p2.x, y:u*u*p0.y+2*u*t*p1.y+t*t*p2.y}; }
+function bezTan(t,p0,p1,p2){ var u=1-t;
+  return {x:2*u*(p1.x-p0.x)+2*t*(p2.x-p1.x), y:2*u*(p1.y-p0.y)+2*t*(p2.y-p1.y)}; }
+function tapered(p0,p1,p2,maxW){
+  var N=46,L=[],R=[];
+  for(var i=0;i<=N;i++){
+    var t=i/N, pt=bez(t,p0,p1,p2), tg=bezTan(t,p0,p1,p2);
+    var len=Math.hypot(tg.x,tg.y)||1, nx=-tg.y/len, ny=tg.x/len;
+    var w=Math.pow(Math.sin(Math.PI*t),0.62)*maxW+0.45;
+    L.push([pt.x+nx*w,pt.y+ny*w]); R.push([pt.x-nx*w,pt.y-ny*w]);
+  }
+  function f(a){ return a.map(function(p){ return p[0].toFixed(1)+' '+p[1].toFixed(1); }).join(' L'); }
+  return 'M'+f(L)+' L'+f(R.reverse())+' Z';
+}
+var _flip = null;
+function setFlip(fn){ _flip = fn; }
+function flipR(r){ return _flip ? _flip.r(r) : r; }
+function flipC(c){ return _flip ? _flip.c(c) : c; }
+function cellCenter(r,c,boardEl){
+  r = flipR(r); c = flipC(c);
+  var board = boardEl || document.getElementById('xqmBoard');
+  var cell = board ? board.querySelector('.xqm-cell[data-r="'+r+'"][data-c="'+c+'"]') : null;
+  if(!cell || !board) return {x:0,y:0};
+  var cr=cell.getBoundingClientRect(), br=board.getBoundingClientRect();
+  return {x:cr.left-br.left+cr.width/2, y:cr.top-br.top+cr.height/2};
+}
+function slash(fr,fc,tr,tc){
+  var board=document.getElementById('xqmBoard'), layer=document.getElementById('xqmFx');
+  if(!board||!layer) return;
+  var P0=cellCenter(fr,fc,board), P2=cellCenter(tr,tc,board);
+  var P1={x:(P0.x+P2.x)/2, y:(P0.y+P2.y)/2-62};
+  var ns='http://www.w3.org/2000/svg', br=board.getBoundingClientRect();
+  var svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('width',br.width); svg.setAttribute('height',br.height);
+  svg.style.cssText='position:absolute;left:0;top:0;pointer-events:none;z-index:22';
+  var x0=Math.min(P0.x,P2.x)-40, w=Math.abs(P2.x-P0.x)+80;
+  var y0=Math.min(P0.y,P2.y)-110, h=Math.abs(P2.y-P0.y)+220;
+  var uid='x'+Date.now().toString(36)+Math.floor(Math.random()*1e4);
+  var defs=document.createElementNS(ns,'defs');
+  defs.innerHTML='<linearGradient id="g'+uid+'" x1="0" y1="0" x2="1" y2="0">'
+    +'<stop offset="0%" stop-color="#FFF6D8" stop-opacity=".06"/>'
+    +'<stop offset="16%" stop-color="#E4C55A" stop-opacity=".92"/>'
+    +'<stop offset="50%" stop-color="#FFF3C4" stop-opacity="1"/>'
+    +'<stop offset="84%" stop-color="#C9A227" stop-opacity=".92"/>'
+    +'<stop offset="100%" stop-color="#FFF6D8" stop-opacity=".06"/></linearGradient>'
+    +'<filter id="b'+uid+'" x="-40%" y="-40%" width="180%" height="180%">'
+    +'<feGaussianBlur stdDeviation="5.5"/></filter>'
+    +'<clipPath id="s'+uid+'"><rect x="'+x0+'" y="'+y0+'" width="0" height="'+h+'"/></clipPath>';
+  svg.appendChild(defs);
+  var g=document.createElementNS(ns,'g');
+  g.setAttribute('clip-path','url(#s'+uid+')');
+  g.style.filter='drop-shadow(0 0 10px rgba(228,197,90,.75))';
+  function mk(wd,fill,op,filt){
+    var p=document.createElementNS(ns,'path');
+    p.setAttribute('d', tapered(P0,P1,P2,wd));
+    p.setAttribute('fill',fill);
+    if(op!=null) p.setAttribute('opacity',op);
+    if(filt) p.setAttribute('filter',filt);
+    return p;
+  }
+  g.appendChild(mk(19,'#E4C55A',.45,'url(#b'+uid+')'));
+  g.appendChild(mk(9.5,'url(#g'+uid+')'));
+  g.appendChild(mk(2.8,'#FFFFFF',.95));
+  svg.appendChild(g);
+  layer.appendChild(svg);
+  var rect=svg.querySelector('#s'+uid+' rect');
+  var t0=performance.now(), DUR=185, lastSpark=0;
+  (function step(now){
+    var p=Math.min(1,(now-t0)/DUR), e=1-Math.pow(1-p,3);
+    if(rect) rect.setAttribute('width',(w*e).toFixed(1));
+    if(p-lastSpark>0.15){
+      lastSpark=p;
+      var pt=bez(p,P0,P1,P2), tg=bezTan(p,P0,P1,P2);
+      var len=Math.hypot(tg.x,tg.y)||1, nx=-tg.y/len, ny=tg.x/len;
+      for(var k=0;k<3;k++){
+        (function(side){
+          var sp=document.createElement('div');
+          var sz=2+Math.random()*3;
+          var ang=Math.atan2(ny*side,nx*side)+(Math.random()-.5)*1.1;
+          var dist=12+Math.random()*22;
+          sp.style.cssText='position:absolute;border-radius:50%;pointer-events:none;z-index:26;'
+            +'left:'+pt.x.toFixed(1)+'px;top:'+pt.y.toFixed(1)+'px;width:'+sz.toFixed(1)+'px;height:'+sz.toFixed(1)+'px;'
+            +'background:radial-gradient(circle,#FFF6D8,#E4C55A 55%,rgba(201,162,39,0) 100%);'
+            +'transition:transform .5s cubic-bezier(.2,.8,.3,1),opacity .5s ease-out;';
+          layer.appendChild(sp);
+          requestAnimationFrame(function(){
+            sp.style.transform='translate('+(Math.cos(ang)*dist).toFixed(1)+'px,'
+              +(Math.sin(ang)*dist).toFixed(1)+'px) scale(.2)';
+            sp.style.opacity='0';
+          });
+          setTimeout(function(){ sp.remove(); },560);
+        })(k%2?1:-1);
+      }
+    }
+    if(p<1) requestAnimationFrame(step);
+    else setTimeout(function(){ g.style.transition='opacity .3s ease'; g.style.opacity='0';
+      setTimeout(function(){ svg.remove(); },320); },80);
+  })(t0);
+  setTimeout(function(){
+    var burst=document.createElement('div');
+    burst.style.cssText='position:absolute;left:'+P2.x+'px;top:'+P2.y+'px;width:0;height:0;z-index:24;pointer-events:none;';
+    burst.innerHTML='<div style="position:absolute;left:-50px;top:-50px;width:100px;height:100px;border-radius:50%;'
+      +'background:radial-gradient(circle,rgba(255,243,196,.95) 0%,rgba(228,197,90,.55) 32%,rgba(201,162,39,0) 70%);'
+      +'animation:xqmBurst .42s cubic-bezier(.15,.8,.3,1) forwards;"></div>'
+      +'<div style="position:absolute;left:-32px;top:-32px;width:64px;height:64px;border-radius:50%;'
+      +'border:2.5px solid rgba(255,243,196,.9);animation:xqmRing .5s cubic-bezier(.15,.8,.3,1) forwards;"></div>';
+    for(var i=0;i<7;i++){
+      var a=(i/7)*Math.PI*2+Math.random()*0.4, dd=24+Math.random()*20;
+      burst.innerHTML+='<div style="position:absolute;left:-2px;top:-2px;width:4px;height:4px;border-radius:50%;'
+        +'background:#FFF6D8;box-shadow:0 0 6px rgba(255,230,140,.95);'
+        +'animation:xqmSpike .46s cubic-bezier(.15,.85,.3,1) forwards;'
+        +'--tx:'+(Math.cos(a)*dd).toFixed(1)+'px;--ty:'+(Math.sin(a)*dd).toFixed(1)+'px;"></div>';
+    }
+    layer.appendChild(burst);
+    board.classList.add('xqm-shake');
+    setTimeout(function(){ board.classList.remove('xqm-shake'); burst.remove(); },620);
+  },240);
+}
+function killFx(r,c,side){
+  var layer=document.getElementById('xqmFx'); if(!layer) return;
+  var board=document.getElementById('xqmBoard');
+  var cell=board?board.querySelector('.xqm-cell[data-r="'+flipR(r)+'"][data-c="'+flipC(c)+'"]'):null;
+  var pcEl=cell&&cell.querySelector('.xqm-pc');
+  var cen=cellCenter(r,c,board);
+  var size=pcEl?pcEl.getBoundingClientRect().width:40;
+  var bg=pcEl?getComputedStyle(pcEl).backgroundImage:'';
+  if(!bg){
+    bg = side==='black'
+      ? 'radial-gradient(circle at 34% 26%,#3A6B57 0%,#1E4536 44%,#0A1C16 100%)'
+      : 'radial-gradient(circle at 34% 26%,#D0483F 0%,#A52222 44%,#6E0F0F 100%)';
+  }
+  for(var i=0;i<8;i++){
+    var a0=i*45, a1=(i+1)*45, pts=['50% 50%'];
+    for(var a=a0;a<=a1;a+=9){
+      var rad=a*Math.PI/180;
+      pts.push((50+50*Math.cos(rad))+'% '+(50+50*Math.sin(rad))+'%');
+    }
+    var f=document.createElement('div');
+    f.className='xqm-frag';
+    f.style.width=size+'px'; f.style.height=size+'px';
+    f.style.left=(cen.x-size/2)+'px'; f.style.top=(cen.y-size/2)+'px';
+    f.style.background=bg;
+    f.style.clipPath='polygon('+pts.join(',')+')';
+    f.style.boxShadow='inset 0 0 0 2px rgba(201,162,39,.9)';
+    var ang=(a0+a1)/2*Math.PI/180, dist=56+Math.random()*44;
+    f.style.transition='transform .62s cubic-bezier(.2,.7,.35,1), opacity .62s ease-out';
+    layer.appendChild(f);
+    (function(el, tx, ty, rot){
+      requestAnimationFrame(function(){
+        el.style.transform='translate('+tx+'px,'+ty+'px) rotate('+rot+'deg) scale(.7)';
+        el.style.opacity='0';
+      });
+      setTimeout(function(){ el.remove(); },700);
+    })(f, Math.cos(ang)*dist, Math.sin(ang)*dist-22, (Math.random()*2-1)*180);
+  }
+}
+function dmgNum(r,c,v,splash,combo){
+  var board=document.getElementById('xqmBoard'), layer=document.getElementById('xqmFx');
+  if(!layer) return;
+  var cen=cellCenter(r,c,board);
+  var n=document.createElement('div');
+  n.className='xqm-dmg'+(splash?' splash':'')+(combo>=2?' combo':'')+(combo>=3?' combo2':'');
+  n.textContent='-'+v;
+  if(combo>=2){
+    var sc = splash ? 1.12 : 1.14;
+    if(combo===3) sc *= 1.18;
+    if(combo>=4) sc *= 1.32;
+    n.style.fontSize = Math.round((splash?17:25)*sc)+'px';
+  }
+  n.style.left=cen.x+'px'; n.style.top=(cen.y-22)+'px';
+  layer.appendChild(n);
+  setTimeout(function(){ n.remove(); },1150);
+}
+function dmgDelay(tag){ return tag==='splash' ? 260 : (tag==='sacrifice' ? 200 : 0); }
+function _rememberHitTiers(evs){
+  var board=document.getElementById('xqmBoard'); if(!board) return;
+  (evs||[]).forEach(function(ev){
+    if(ev.k!=='dmg' || ev.id===undefined) return;
+    var cell=board.querySelector('.xqm-cell[data-r="'+flipR(ev.r)+'"][data-c="'+flipC(ev.c)+'"]');
+    if(!cell) return;
+    var pc=cell.querySelector('.xqm-pc[data-id="'+ev.id+'"]');
+    if(pc) _hitTier[ev.id] = +(pc.dataset.dmg||0);
+  });
+}
+var _combo = {};
+function fxFromEvents(evs, round){
+  _rememberHitTiers(evs);
+  (evs||[]).forEach(function(ev){
+    if(ev.k==='move'){
+      var board=document.getElementById('xqmBoard'), layer=document.getElementById('xqmFx');
+      if(!layer) return;
+      var a=cellCenter(ev.fr,ev.fc,board), b=cellCenter(ev.tr,ev.tc,board);
+      for(var i=1;i<=6;i++){
+        var t=document.createElement('div'); t.className='xqm-trail';
+        var sz=34*(1-i*0.09);
+        t.style.width=sz+'px'; t.style.height=sz+'px';
+        t.style.left=(a.x+(b.x-a.x)*(i/7)-sz/2)+'px';
+        t.style.top=(a.y+(b.y-a.y)*(i/7)-sz/2)+'px';
+        t.style.background='radial-gradient(circle at 40% 35%,rgba(208,72,63,.8),rgba(110,15,15,.45))';
+        t.style.animationDelay=(i*0.026)+'s';
+        layer.appendChild(t);
+        (function(el){ setTimeout(function(){ el.remove(); },900); })(t);
+      }
+    } else if(ev.k==='attack'){
+      slash(ev.fr,ev.fc,ev.tr,ev.tc);
+    } else if(ev.k==='dmg'){
+      (function(e){
+        var cb = _combo[e.id];
+        if(!cb || cb.round !== round) cb = _combo[e.id] = {n:0, round:round};
+        cb.n++;
+        var d=dmgDelay(e.tag);
+        if(d) setTimeout(function(){ dmgNum(e.r,e.c,e.v,e.tag==='splash',cb.n); }, d);
+        else dmgNum(e.r,e.c,e.v,false,cb.n);
+      })(ev);
+    } else if(ev.k==='kill'){
+      killFx(ev.r,ev.c,ev.s);
+    }
+  });
+}
+function fxHitAfter(evs, boardData){
+  (evs||[]).forEach(function(ev){
+    if(ev.k!=='dmg') return;
+    (function(e){
+      setTimeout(function(){
+        var board=document.getElementById('xqmBoard'); if(!board) return;
+        var cell=board.querySelector('.xqm-cell[data-r="'+flipR(e.r)+'"][data-c="'+flipC(e.c)+'"]');
+        if(!cell) return;
+        var pc=cell.querySelector('.xqm-pc'); if(!pc) return;
+        pc.classList.add('xqm-hit');
+        pc.classList.add('xqm-cracking');
+        if(boardData && boardData[e.r] && boardData[e.r][e.c]){
+          pc.dataset.dmg = dmgTier(boardData[e.r][e.c].hp, boardData[e.r][e.c].mh);
+        }
+        delete _hitTier[e.id];
+        setTimeout(function(){ pc.classList.remove('xqm-hit'); },350);
+        setTimeout(function(){ pc.classList.remove('xqm-cracking'); },500);
+      }, dmgDelay(e.tag));
+    })(ev);
+  });
+}
+function loadMe(){
+  api('/api/xqm/me').then(function(r){
+    if(!r.ok) return;
+    var meEl=document.getElementById('xqmMe');
+    if(meEl){
+      meEl.style.display='';
+      meEl.innerHTML='积分 <b>'+r.rating+'</b>　·　'
+        +r.wins+' 胜 '+r.losses+' 负 '+r.draws+' 和'
+        +(r.total?('　·　胜率 '+r.rate+'%'):'')
+        +'　·　弈铢 <b>'+r.yizhu+'</b>';
+    }
+    var st=document.getElementById('xqmStats');
+    if(st){
+      st.innerHTML=
+        '<div class="g"><div class="k">积分</div><div class="v">'+r.rating+'</div></div>'
+        +'<div class="g"><div class="k">总对局</div><div class="v">'+r.total+'</div></div>'
+        +'<div class="g"><div class="k">胜</div><div class="v" style="color:var(--xqm-hp-full)">'+r.wins+'</div></div>'
+        +'<div class="g"><div class="k">负</div><div class="v" style="color:var(--xqm-red-lt)">'+r.losses+'</div></div>'
+        +'<div class="g"><div class="k">和</div><div class="v" style="color:var(--xqm-gold-dk)">'+r.draws+'</div></div>'
+        +'<div class="g"><div class="k">胜率</div><div class="v">'+r.rate+'%</div></div>';
+    }
+  }).catch(function(){});
+}
+
+function fitHboard(el){
+  if(!el) return;
+  var wrap = el.closest ? el.closest('.wrap') : null;
+  if(wrap) wrap.classList.add('xqm-wide');
+  function fit(){
+    var land = document.documentElement.getAttribute('data-xqm-land') === '1';
+    var isHalf = el.classList.contains('xqm-hboard');
+    var rows = isHalf ? 5 : 10;
+    var ph = 0, lw = 0, ls = 0;
+    if (land){
+      lw = parseFloat(idoc_getVar('--lw')) || 0;
+      if (lw) ph = lw;
+    }
+    if (!ph){
+      var stage = document.querySelector('.xqm');
+      ph = stage ? stage.clientHeight : 0;
+    }
+
+    var pw;
+    if (land){
+      ls = parseFloat(idoc_getVar('--ls')) || 0;
+      /* 舞台宽 − 右栏 296 − 栏间距 14 − 舞台内边距 16 */
+      pw = (ls || 844) - 326;
+    } else {
+      pw = el.parentElement ? el.parentElement.clientWidth : 0;
+    }
+    if (pw < 60) pw = 60;
+
+    var bpx = land ? 13 : 18;
+    var cw = Math.floor((pw - bpx*2) / 9);
+    if(cw > 88) cw = 88;
+    if(ph > 0){
+      var reserve = land ? 34 : (isHalf ? 96 : 120);
+      var byH = Math.floor((ph - reserve) / rows / 0.94);
+      if(cw > byH) cw = byH;
+    }
+    if(cw < 20) cw = 20;
+    el.style.setProperty('--cw', cw + 'px');
+    el.style.setProperty('--ch', Math.round(cw*0.94) + 'px');
+    el.style.setProperty('--bpx', bpx + 'px');
+    el.style.setProperty('--bpy', (land ? Math.max(9, Math.round(cw*0.14)) : Math.max(10, Math.round(cw*0.2))) + 'px');
+  }
+  function idoc_getVar(name){
+    try{
+      return getComputedStyle(document.documentElement).getPropertyValue(name);
+    }catch(e){ return 0; }
+  }
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('xqmland', fit);
+}
+
+var Sfx = (function(){
+  var ctx = null, master = null, enabled = true;
+  try{ enabled = localStorage.getItem('xqm_sfx') !== '0'; }catch(e){}
+  function ac(){
+    if(ctx) return ctx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    try{ ctx = new AC(); }catch(e){ return null; }
+    master = ctx.createGain();
+    master.gain.value = 0.42;
+    master.connect(ctx.destination);
+    return ctx;
+  }
+  function unlock(){
+    var c = ac(); if(!c) return;
+    if(c.state === 'suspended' && c.resume) c.resume();
+  }
+  function tone(f, dur, opt){
+    opt = opt || {};
+    var c = ac(); if(!c || !enabled) return;
+    var t = c.currentTime + (opt.delay || 0);
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = opt.type || 'sine';
+    o.frequency.setValueAtTime(f, t);
+    if(opt.to) o.frequency.exponentialRampToValueAtTime(Math.max(20, opt.to), t + dur);
+    var peak = opt.gain == null ? 0.2 : opt.gain;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + (opt.atk || 0.006));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  function noise(dur, opt){
+    opt = opt || {};
+    var c = ac(); if(!c || !enabled) return;
+    var t = c.currentTime + (opt.delay || 0);
+    var n = Math.max(1, Math.floor(c.sampleRate * dur));
+    var buf = c.createBuffer(1, n, c.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i=0;i<n;i++) d[i] = (Math.random()*2 - 1) * (1 - i/n);
+    var src = c.createBufferSource(); src.buffer = buf;
+    var f = c.createBiquadFilter();
+    f.type = opt.type || 'bandpass';
+    f.frequency.setValueAtTime(opt.f || 900, t);
+    if(opt.to) f.frequency.exponentialRampToValueAtTime(Math.max(40, opt.to), t + dur);
+    f.Q.value = opt.q == null ? 1.1 : opt.q;
+    var g = c.createGain();
+    g.gain.setValueAtTime(opt.gain == null ? 0.22 : opt.gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.03);
+  }
+  return {
+    on: function(){ return enabled; },
+    set: function(v){
+      enabled = !!v;
+      try{ localStorage.setItem('xqm_sfx', enabled ? '1' : '0'); }catch(e){}
+      if(enabled){ unlock(); this.turn(); }
+    },
+    unlock: unlock,
+    click:  function(){ tone(1250, 0.045, {type:'triangle', gain:0.05}); noise(0.03, {f:2600, gain:0.045}); },
+    move:   function(){ noise(0.05, {f:520, q:0.9, gain:0.15}); tone(190, 0.09, {gain:0.15, to:120}); },
+    swing:  function(){ noise(0.17, {f:340, to:2600, q:0.7, gain:0.13}); },
+    hit:    function(){ noise(0.06, {f:1900, q:1.4, gain:0.22}); tone(240, 0.1, {type:'square', gain:0.09, to:150}); },
+    hurt:   function(){ tone(96, 0.14, {gain:0.2, to:64}); noise(0.05, {f:300, gain:0.11}); },
+    die:    function(){ tone(320, 0.42, {type:'sawtooth', gain:0.15, to:72});
+                        noise(0.3, {f:800, to:180, gain:0.13, delay:0.03}); },
+    turn:   function(){ tone(660, 0.09, {gain:0.11}); tone(880, 0.12, {gain:0.1, delay:0.08}); },
+    found:  function(){ [784,1046,1318].forEach(function(f,i){ tone(f, 0.22, {type:'triangle', gain:0.13, delay:i*0.075}); }); },
+    tick:   function(){ tone(1500, 0.04, {type:'square', gain:0.065}); },
+    win:    function(){ [523,659,784,1046].forEach(function(f,i){ tone(f, 0.26, {type:'triangle', gain:0.15, delay:i*0.11}); }); },
+    lose:   function(){ [440,370,294].forEach(function(f,i){ tone(f, 0.34, {type:'triangle', gain:0.13, delay:i*0.14}); }); },
+    error:  function(){ tone(180, 0.13, {type:'square', gain:0.1, to:130}); }
+  };
+})();
+['pointerdown','keydown','touchstart'].forEach(function(ev){
+  document.addEventListener(ev, function(){ Sfx.unlock(); }, {once:true});
+});
+document.addEventListener('click', function(e){
+  var b = e.target && e.target.closest ? e.target.closest('.xqm-btn,.xqm-cdx-tab,.xqm-demo-tab,.tool') : null;
+  if(b && !b.disabled) Sfx.click();
+}, true);
+
+var Bgm = (function(){
+  var el = null, cur = null, unlocked = false, inFrame = false;
+  try{ inFrame = window.parent !== window; }catch(e){ inFrame = true; }
+  function tell(msg){ try{ if(inFrame) window.parent.postMessage(msg, '*'); }catch(e){} }
+  function on(){ try{ return localStorage.getItem('xqm_bgm') !== '0'; }catch(e){ return true; } }
+  function vol(){ try{ var v = parseInt(localStorage.getItem('xqm_bgm_vol'), 10);
+    return isNaN(v) ? 45 : Math.max(0, Math.min(100, v)); }catch(e){ return 45; } }
+  function stop(){
+    if(el){ try{ el.pause(); }catch(e){} }
+    el = null; cur = null;
+    tell({ type:'xqm_bgm', on:false });
+  }
+  function play(kind){
+    if(!on()){ stop(); return; }
+    if(cur === kind) return;
+    cur = kind;
+    if(inFrame){ tell({ type:'xqm_bgm', track:kind, vol:vol(), on:true }); return; }
+    if(el){ try{ el.pause(); }catch(e){} }
+    el = new Audio('/static/xqm/bgm-' + kind + '.ogg');
+    el.loop = true;
+    el.volume = vol() / 100;
+    el.play().catch(function(){});
+  }
+  function unlock(){
+    if(unlocked) return;
+    unlocked = true;
+    if(inFrame){ if(cur) tell({ type:'xqm_bgm', track:cur, vol:vol(), on:on() }); return; }
+    if(on() && el && el.paused) el.play().catch(function(){});
+  }
+  ['pointerdown','touchstart','keydown'].forEach(function(ev){
+    window.addEventListener(ev, unlock, { once:true, passive:true });
+  });
+  function setOn(v){ if(v) play(cur || 'idle'); else stop(); }
+  function setVol(v){
+    var n = Math.max(0, Math.min(100, v));
+    if(inFrame) tell({ type:'xqm_bgm', track:cur, vol:n, on:on() });
+    else if(el) el.volume = n / 100;
+  }
+  setTimeout(function(){ if(!cur) play('idle'); }, 0);
+  /* 离开象棋页面时把 BGM 停掉。
+     BGM 现在跑在外壳层（跨页不断），页面自己不吭声的话，
+     人都回首页了音乐还在响 —— 用户反馈过。 */
+  window.addEventListener('pagehide', function(){ stop(); });
+  return { play:play, stop:stop, setOn:setOn, setVol:setVol, isOn:on, vol:vol };
+})();
+
+return { bgm:Bgm, sfx:Sfx, GLYPH:GLYPH, PD:PD, GRADE:GRADE, gradeHTML:gradeHTML, ORDER:ORDER, MV_DESC:MV_DESC, RNG_DESC:RNG_DESC,
+         toast:toast, api:api, pcHTML:pcHTML, ok:ok, at:at, inPal:inPal, crossed:crossed,
+         targetsOf:targetsOf, calcDamage:calcDamage, resolveAttack:resolveAttack,
+         ownNear:ownNear, ownCountNear:ownCountNear, hasOwn:hasOwn,
+         reflectRatio:reflectRatio, splashAdjust:splashAdjust, healPreview:healPreview, A8:KMV,
+         adjacentKing:adjacentKing,
+         cellCenter:cellCenter, fxFromEvents:fxFromEvents, fxHitAfter:fxHitAfter, slash:slash,
+         killFx:killFx, dmgNum:dmgNum, loadMe:loadMe, crackSVG:crackSVG,
+         setFlip:setFlip, flipR:flipR, flipC:flipC, fitHboard:fitHboard };
+})();
+</script>
+{% block xqm_scripts %}{% endblock %}
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "_admin_base.html" %}
+{% block title %}管理员操作日志 · 管理后台{% endblock %}
+{% block admin_icon %}📜{% endblock %}
+{% block admin_heading %}管理员操作日志{% endblock %}
+{% block admin_desc %}记录所有管理动作，用于事后追责与审计 · 仅超级管理员可见{% endblock %}
+
+{% block admin_content %}
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>操作记录</h3>
+    <span class="adm-hint">按时间倒序 · 共 {{ logs|length }} 条</span>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:70px;">ID</th>
+          <th style="width:130px;">管理员</th>
+          <th style="width:130px;">动作</th>
+          <th style="width:150px;">对象</th>
+          <th>详情</th>
+          <th style="width:160px;">时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in logs %}
+        <tr>
+          <td class="adm-id">{{ l.id }}</td>
+          <td><b>{{ l.admin_name }}</b></td>
+          <td><span class="adm-pill">{{ l.action }}</span></td>
+          <td>{{ l.target or '—' }}</td>
+          <td class="adm-wrap">{{ l.detail or '—' }}</td>
+          <td class="adm-nowrap adm-id">{{ l.created_at|fmttime }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">
+            <div class="adm-empty">
+              <div class="adm-empty-ico">📜</div>
+              <div class="adm-empty-text">暂无操作日志</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

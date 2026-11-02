@@ -1,0 +1,762 @@
+{% extends "base.html" %}
+{% block title %}扫雷 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+
+<style>
+  #mn{--mn-gray:#bfbfbf;--mn-dark:#7a7a7a;--mn-lite:#e6e6e6;}
+  .mn-head{
+    border:1px solid var(--line);border-radius:16px;background:var(--card);
+    padding:18px 20px;margin-bottom:14px;
+  }
+  .mn-head h1{margin:0 0 6px;font-size:20px;letter-spacing:-.3px;}
+  .mn-head p{margin:0;color:var(--fg-2);font-size:13px;line-height:1.8;}
+  .mn-modes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .mn-mode{
+    flex:1;min-width:120px;cursor:pointer;text-align:center;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    padding:11px 10px;transition:border-color .15s,background .15s;
+  }
+  .mn-mode:hover{border-color:var(--accent);}
+  .mn-mode.on{border-color:var(--accent);background:var(--soft);}
+  .mn-mode .nm{font-size:14px;font-weight:600;color:var(--fg);}
+  .mn-mode .sub{font-size:11.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums;}
+  .mn-layout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;align-items:start;}
+  .mn-panel{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:16px;}
+  .mn-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .mn-num{
+    font-family:ui-monospace,Consolas,monospace;font-size:17px;font-weight:600;
+    background:#2b2b2b;color:#e8e8e8;border-radius:6px;padding:4px 10px;
+    min-width:66px;text-align:center;letter-spacing:1px;
+  }
+  .mn-face{
+    font-size:22px;line-height:1;cursor:pointer;border:1px solid var(--line);
+    border-radius:10px;background:var(--bg-elev);padding:6px 12px;
+    transition:transform .1s;
+  }
+  .mn-face:active{transform:scale(.92);}
+  .mn-flagbtn{
+    font-size:13px;padding:7px 13px;border-radius:9px;cursor:pointer;
+    border:1px solid var(--line);background:var(--bg-elev);color:var(--fg);
+  }
+  .mn-flagbtn.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600;}
+  /* ⚠️ 不能用 justify-content:center —— 内容超宽时它会裁掉左边且滑不回去。
+     用子元素 margin:auto 居中，溢出时两边都能滑到。 */
+  .mn-stage{display:flex;overflow:auto;-webkit-overflow-scrolling:touch;
+    max-height:72vh;border-radius:10px;}
+  /* ⚠️ base.css 有全局 `img,video,canvas{max-width:100%}` ——
+     它会把 canvas 永远夹到容器宽度，格子尺寸怎么调都没用。这里必须放开。 */
+  .mn-stage canvas{margin:auto;max-width:none;height:auto;
+    /* ⚠️ 反馈 #47「中高级无法缩放/移动」：
+       原来 pointerdown 里 preventDefault + setPointerCapture 把滚动全杀了 ✗
+       这里放开让浏览器自己管平移 ✓ 手指一划就能滚动 ✓
+       点格子仍然能点 —— 浏览器只在真的开始平移时才取消点击 ✓ */
+    touch-action:pan-x pan-y;}
+  .mn-panhint{display:none;text-align:center;font-size:12px;color:var(--muted);
+    margin-bottom:8px;letter-spacing:.04em;}
+  .mn-panhint.on{display:block;}
+  /* ⚠️ 原来是 touch-action:none ✗ —— 它是 ID 选择器，优先级比
+     `.mn-stage canvas` 高 ✗ 会把我加的 pan-x pan-y 压掉 ✗
+     结果就是棋盘明明 overflow:auto 却划不动（反馈 #47）✗
+     改成允许平移：手指能滚棋盘，点格子照样能点（浏览器只在真的平移时才取消点击）✓ */
+  #mnCanvas{display:block;touch-action:pan-x pan-y;border-radius:6px;}
+  .mn-tip{margin-top:11px;font-size:12px;color:var(--muted);line-height:1.85;text-align:center;}
+  .mn-rank h3{margin:0 0 10px;font-size:14px;font-weight:600;color:var(--fg);}
+  .mn-rank ol{margin:0;padding:0;list-style:none;}
+  .mn-rank li{
+    display:flex;align-items:center;gap:9px;padding:7px 0;
+    border-top:1px solid var(--soft);font-size:13px;
+  }
+  .mn-rank li:first-child{border-top:0;}
+  .mn-rank .rk{
+    flex:0 0 22px;height:22px;line-height:22px;text-align:center;border-radius:50%;
+    background:var(--soft);color:var(--fg-2);font-size:11.5px;font-weight:600;
+  }
+  .mn-rank li:nth-child(1) .rk{background:#d4a017;color:#fff;}
+  .mn-rank li:nth-child(2) .rk{background:#a8a8a8;color:#fff;}
+  .mn-rank li:nth-child(3) .rk{background:#b87333;color:#fff;}
+  .mn-rank .un{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg);}
+  .mn-rank .tm{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--fg-2);font-variant-numeric:tabular-nums;}
+  .mn-rank .me .un{font-weight:600;color:var(--accent);}
+  .mn-rank .empty{color:var(--muted);font-size:12.5px;padding:10px 0;}
+  .mn-toast{
+    margin-top:10px;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.7;display:none;
+  }
+  .mn-toast.on{display:block;}
+  .mn-toast.win{background:rgba(29,158,117,.14);color:#0f6e56;border:1px solid rgba(29,158,117,.35);}
+  .mn-toast.lose{background:rgba(226,75,74,.12);color:#a32d2d;border:1px solid rgba(226,75,74,.32);}
+  .mn-toast.best{background:rgba(212,160,23,.16);color:#7a5b00;border:1px solid rgba(212,160,23,.4);}
+  @media (max-width:760px){
+    /* minmax(0,1fr) 而不是 1fr —— 1fr 的下限是 auto（内容宽度），
+       棋盘一超宽就把整列撑开，页面跟着横向溢出。 */
+    .mn-layout{grid-template-columns:minmax(0,1fr);}
+    .mn-mode{min-width:0;flex:1 1 30%;padding:9px 6px;}
+    .mn-mode .nm{font-size:13px;}
+    .mn-mode .sub{font-size:10.5px;}
+  }
+</style>
+
+<div id="mn">
+  <div class="mn-head">
+    <h1>💣 扫雷</h1>
+    <p>经典扫雷，三种难度各自独立排行。左键翻开，右键插旗（手机长按插旗）。首次点击必定安全。</p>
+  </div>
+
+  <div class="mn-modes" id="mnModes">
+    {% for key, m in modes.items() %}
+    <div class="mn-mode" data-mode="{{ key }}">
+      <div class="nm">{{ m.label }}</div>
+      <div class="sub">{{ m.cols }}×{{ m.rows }} · {{ m.mines }} 雷</div>
+      <div class="sub">我的最佳 {{ format_ms(user[m.field]) }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mn-layout">
+    <div class="mn-panel">
+      <div class="mn-bar">
+        <div class="mn-num" id="mnMines">010</div>
+        <div class="mn-face" id="mnFace" title="重开">🙂</div>
+        <div class="mn-num" id="mnTime">0:00.00</div>
+        <div style="flex:1"></div>
+        <button type="button" class="mn-flagbtn" id="mnFlagBtn">🚩 旗标模式</button>
+      </div>
+      <div class="mn-panhint" id="mnPanHint"></div>
+      <div class="mn-stage"><canvas id="mnCanvas"></canvas></div>
+      <div class="mn-tip" id="mnTip">左键翻开 · 右键插旗 · 在已翻开的数字上点一下可以快速展开周围</div>
+    </div>
+
+    <div class="mn-panel mn-rank">
+      <h3 id="mnRankTitle">排行榜</h3>
+      <ol id="mnRankList"></ol>
+      <div class="mn-toast" id="mnToast"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var MODES = {{ modes|tojson }};
+  var BEST = {
+    beginner: {{ user.mine_best_ms_beginner|default(0) or 0 }},
+    intermediate: {{ user.mine_best_ms_intermediate|default(0) or 0 }},
+    expert: {{ user.mine_best_ms_expert|default(0) or 0 }}
+  };
+
+  var canvas = document.getElementById('mnCanvas');
+  var ctx = canvas.getContext('2d');
+  var elMines = document.getElementById('mnMines');
+  var elTime = document.getElementById('mnTime');
+  var elFace = document.getElementById('mnFace');
+  var elTip = document.getElementById('mnTip');
+  var elRankList = document.getElementById('mnRankList');
+  var elRankTitle = document.getElementById('mnRankTitle');
+  var elToast = document.getElementById('mnToast');
+  var elFlagBtn = document.getElementById('mnFlagBtn');
+
+  var COLORS = ['', '#1a45d8', '#1a7a2e', '#d81a1a', '#101a80', '#801010', '#0e7a7a', '#1a1a1a', '#707070'];
+  var mode = 'beginner';
+  var cfg = MODES[mode];
+  var cols = cfg.cols, rows = cfg.rows, mineTotal = cfg.mines;
+  var grid = [], cells = [];
+  var status = 'ready';
+  var flags = 0, opened = 0;
+  var flagsPlaced = 0;      // 本局累计插旗次数（拔掉也算插过，成就「不插旗」用）
+  var t0 = 0, elapsed = 0, raf = null;
+  /* 服务端复算用：布雷结果 + 有效操作序列 */
+  var mineIdx = [], opLog = [];
+
+  window.MONO_GAME = { game: 'mine', sub: 'beginner', kind: 'time' };
+  window.MONO_GAME_RENDER = function(s, el){
+    var og = grid, oc = cells, os = status, of = flags, oo = opened, oe = elapsed;
+    var om = mode, ocfg = cfg, ocols = cols, orows = rows, omt = mineTotal;
+    var ocanvas = canvas, octx = ctx, ocell = cell;
+    window.__monoReplay = true;
+
+    mode = s.m; cfg = MODES[mode] || cfg;
+    cols = cfg.cols; rows = cfg.rows; mineTotal = cfg.mines;
+    grid = s.g; cells = s.c; status = 'playing';
+    flags = s.f; opened = s.o; elapsed = s.e;
+
+    el.innerHTML = '';
+    var nc = document.createElement('canvas');
+    nc.width = ocanvas.width; nc.height = ocanvas.height;
+    nc.style.maxWidth = '100%';
+    nc.style.borderRadius = '8px';
+    el.appendChild(nc);
+    canvas = nc; ctx = nc.getContext('2d');
+    draw();
+
+    canvas = ocanvas; ctx = octx; cell = ocell;
+    mode = om; cfg = ocfg; cols = ocols; rows = orows; mineTotal = omt;
+    grid = og; cells = oc; status = os;
+    flags = of; opened = oo; elapsed = oe;
+    window.__monoReplay = false;
+  };
+  var flagMode = false;
+  var cell = 24;
+  var pressT = 0, pressCell = null, longFired = false;
+
+  function newBoard(){
+    cols = cfg.cols; rows = cfg.rows; mineTotal = cfg.mines;
+    grid = [];
+    if (window.MONO_GAME) window.MONO_GAME.sub = mode;
+    if (window.MONO_REC) window.MONO_REC.start();
+    cells = [];
+    for (var y = 0; y < rows; y++){
+      var rowG = [], rowC = [];
+      for (var x = 0; x < cols; x++){
+        rowG.push({ mine: false, adj: 0 });
+        rowC.push({ open: false, flag: false });
+      }
+      grid.push(rowG); cells.push(rowC);
+    }
+    status = 'ready';
+    flags = 0; opened = 0; flagsPlaced = 0;
+    elapsed = 0;
+    mineIdx = []; opLog = [];   // 服务端复算：新局重置（等首击布雷）
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    elTime.textContent = '0:00.00';
+    elFace.textContent = '🙂';
+    hideToast();
+    layout();
+    updateMines();
+    draw();
+  }
+
+  function placeMines(sx, sy){
+    var safe = {};
+    for (var dy = -1; dy <= 1; dy++){
+      for (var dx = -1; dx <= 1; dx++){
+        var nx = sx + dx, ny = sy + dy;
+        if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) safe[ny * cols + nx] = true;
+      }
+    }
+    var pool = [];
+    for (var i = 0; i < cols * rows; i++) if (!safe[i]) pool.push(i);
+    if (pool.length < mineTotal){
+      pool = [];
+      for (var j = 0; j < cols * rows; j++) if (j !== sy * cols + sx) pool.push(j);
+    }
+    for (var k = pool.length - 1; k > 0; k--){
+      var r = Math.floor(Math.random() * (k + 1));
+      var tmp = pool[k]; pool[k] = pool[r]; pool[r] = tmp;
+    }
+    for (var m = 0; m < mineTotal && m < pool.length; m++){
+      var p = pool[m];
+      grid[Math.floor(p / cols)][p % cols].mine = true;
+    }
+    for (var y = 0; y < rows; y++){
+      for (var x = 0; x < cols; x++){
+        if (grid[y][x].mine) continue;
+        var n = 0;
+        for (var dy2 = -1; dy2 <= 1; dy2++){
+          for (var dx2 = -1; dx2 <= 1; dx2++){
+            var ax = x + dx2, ay = y + dy2;
+            if (ax >= 0 && ax < cols && ay >= 0 && ay < rows && grid[ay][ax].mine) n++;
+          }
+        }
+        grid[y][x].adj = n;
+      }
+    }
+    /* 服务端复算：快照雷位（线性索引），本局有效操作清零 */
+    mineIdx = [];
+    for (var my = 0; my < rows; my++)
+      for (var mx = 0; mx < cols; mx++)
+        if (grid[my][mx].mine) mineIdx.push(my * cols + mx);
+    opLog = [];
+  }
+
+  function startTimer(){
+    t0 = performance.now();
+    var tick = function(){
+      elapsed = performance.now() - t0;
+      elTime.textContent = fmtMs(elapsed);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  }
+
+  function stopTimer(){
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+  }
+
+  function fmtMs(ms){
+    if (!ms || ms < 0) ms = 0;
+    var t = ms / 1000, m = Math.floor(t / 60), s = t - m * 60;
+    return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2);
+  }
+
+  function updateMines(){
+    var left = mineTotal - flags;
+    elMines.textContent = (left < 0 ? '-' : '') + ('00' + Math.abs(left)).slice(-3);
+  }
+
+  function layout(){
+    var stage = canvas.parentElement;
+    var avail = Math.max(200, stage.clientWidth - 4);
+    var c = Math.floor(avail / cols);
+    if (c > 30) c = 30;
+    // 手机端别把格子缩到点不准：高级 30 列会被压成 12px，手指点下去就是一片。
+    // 宁可让棋盘超出屏幕、用手指拖动，也别缩到看不清。
+    var minCell = (window.innerWidth <= 760) ? 24 : 11;
+    if (c < minCell) c = minCell;
+    cell = c;
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = cols * cell * dpr;
+    canvas.height = rows * cell * dpr;
+    canvas.style.width = (cols * cell) + 'px';
+    canvas.style.height = (rows * cell) + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // 棋盘比可视区大 → 提示可以拖动
+    var hint = document.getElementById('mnPanHint');
+    if (hint){
+      var wide = canvas.offsetWidth > stage.clientWidth + 2;
+      var tall = canvas.offsetHeight > stage.clientHeight + 2;
+      hint.classList.toggle('on', wide || tall);
+      hint.textContent = (wide && tall) ? '↔ ↕ 拖动查看全部棋盘'
+        : (wide ? '↔ 左右拖动查看全部棋盘' : '↕ 上下拖动查看全部棋盘');
+    }
+  }
+
+  function bevel(x, y, w, h, up){
+    ctx.fillStyle = '#bfbfbf';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = up ? '#e6e6e6' : '#7a7a7a';
+    ctx.fillRect(x, y, w, 3);
+    ctx.fillRect(x, y, 3, h);
+    ctx.fillStyle = up ? '#7a7a7a' : '#e6e6e6';
+    ctx.fillRect(x, y + h - 3, w, 3);
+    ctx.fillRect(x + w - 3, y, 3, h);
+  }
+
+  function kbdDrawHook(){ try { kbdDraw(); } catch(e){} }
+  function draw(){
+    kbdDrawHook();
+    if (window.MONO_REC && window.MONO_REC.active){
+      window.MONO_REC.snap({
+        m: mode,
+        g: JSON.parse(JSON.stringify(grid)),
+        c: JSON.parse(JSON.stringify(cells)),
+        f: flags, o: opened, e: elapsed
+      });
+    }
+    var w = cols * cell, h = rows * cell;
+    ctx.clearRect(0, 0, w, h);
+    for (var y = 0; y < rows; y++){
+      for (var x = 0; x < cols; x++){
+        var px = x * cell, py = y * cell;
+        var c = cells[y][x], g = grid[y][x];
+        if (!c.open){
+          bevel(px, py, cell, cell, true);
+          if (c.flag){
+            drawFlag(px, py);
+          } else if (status === 'lost' && g.mine){
+            ctx.fillStyle = '#e6e6e6';
+            ctx.fillRect(px + 3, py + 3, cell - 6, cell - 6);
+            drawMine(px, py, '#262626');
+          }
+        } else {
+          ctx.fillStyle = '#e6e6e6';
+          ctx.fillRect(px, py, cell, cell);
+          ctx.strokeStyle = '#adadad';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px + .5, py + .5, cell - 1, cell - 1);
+          if (g.mine){
+            ctx.fillStyle = '#3a3a3a';
+            ctx.fillRect(px + 2, py + 2, cell - 4, cell - 4);
+            drawMine(px, py, '#f2f2f2');
+          } else if (g.adj > 0){
+            ctx.fillStyle = COLORS[g.adj];
+            ctx.font = '600 ' + Math.round(cell * 0.62) + 'px ui-monospace,Consolas,monospace';
+            ctx.fillText(String(g.adj), px + cell / 2, py + cell / 2 + 1);
+          }
+        }
+      }
+    }
+    if (status === 'lost' && pressCell){
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(pressCell.x * cell + 1, pressCell.y * cell + 1, cell - 2, cell - 2);
+    }
+  }
+
+  function drawFlag(px, py){
+    var s = cell;
+    ctx.fillStyle = '#262626';
+    ctx.fillRect(px + s * 0.45, py + s * 0.22, Math.max(2, s * 0.08), s * 0.56);
+    ctx.beginPath();
+    ctx.moveTo(px + s * 0.53, py + s * 0.24);
+    ctx.lineTo(px + s * 0.80, py + s * 0.38);
+    ctx.lineTo(px + s * 0.53, py + s * 0.52);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(px + s * 0.28, py + s * 0.74, s * 0.44, Math.max(2, s * 0.08));
+  }
+
+  function drawMine(px, py, color){
+    var cx = px + cell / 2, cy = py + cell / 2, r = cell * 0.22;
+    ctx.strokeStyle = color || '#262626';
+    ctx.lineWidth = Math.max(1, cell * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 1.6, cy); ctx.lineTo(cx + r * 1.6, cy);
+    ctx.moveTo(cx, cy - r * 1.6); ctx.lineTo(cx, cy + r * 1.6);
+    ctx.moveTo(cx - r * 1.15, cy - r * 1.15); ctx.lineTo(cx + r * 1.15, cy + r * 1.15);
+    ctx.moveTo(cx - r * 1.15, cy + r * 1.15); ctx.lineTo(cx + r * 1.15, cy - r * 1.15);
+    ctx.stroke();
+    ctx.fillStyle = color || '#262626';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = (color === '#f2f2f2') ? '#3a3a3a' : '#fff';
+    ctx.fillRect(cx - r * 0.42, cy - r * 0.5, Math.max(1, r * 0.34), Math.max(1, r * 0.34));
+  }
+
+  function inBounds(x, y){ return x >= 0 && x < cols && y >= 0 && y < rows; }
+
+  function open(x, y){
+    if (!inBounds(x, y)) return;
+    var c = cells[y][x];
+    if (c.open || c.flag) return;
+    if (status === 'ready'){
+      placeMines(x, y);
+      status = 'playing';
+      startTimer();
+      elFace.textContent = '🙂';
+    }
+    if (status !== 'playing') return;
+    var g = grid[y][x];
+    if (g.mine){
+      c.open = true;
+      pressCell = { x: x, y: y };
+      lose();
+      return;
+    }
+    flood(x, y);
+    opLog.push({t: 'o', i: y * cols + x});   // 服务端复算：有效开格
+    checkWin();
+  }
+
+  function flood(x, y){
+    var stack = [[x, y]];
+    while (stack.length){
+      var p = stack.pop();
+      var px = p[0], py = p[1];
+      if (!inBounds(px, py)) continue;
+      var c = cells[py][px];
+      if (c.open || c.flag) continue;
+      if (grid[py][px].mine) continue;
+      c.open = true;
+      opened++;
+      if (grid[py][px].adj === 0){
+        for (var dy = -1; dy <= 1; dy++){
+          for (var dx = -1; dx <= 1; dx++){
+            if (dx || dy) stack.push([px + dx, py + dy]);
+          }
+        }
+      }
+    }
+  }
+
+  function chord(x, y){
+    var c = cells[y][x];
+    if (!c.open || grid[y][x].adj === 0) return;
+    var n = 0;
+    for (var dy = -1; dy <= 1; dy++){
+      for (var dx = -1; dx <= 1; dx++){
+        var ax = x + dx, ay = y + dy;
+        if (inBounds(ax, ay) && cells[ay][ax].flag) n++;
+      }
+    }
+    if (n !== grid[y][x].adj) return;
+    for (var dy2 = -1; dy2 <= 1; dy2++){
+      for (var dx2 = -1; dx2 <= 1; dx2++){
+        var bx = x + dx2, by = y + dy2;
+        if (!inBounds(bx, by)) continue;
+        var nc = cells[by][bx];
+        if (nc.open || nc.flag) continue;
+        if (grid[by][bx].mine){
+          nc.open = true;
+          pressCell = { x: bx, y: by };
+          lose();
+          return;
+        }
+      }
+    }
+    for (var dy3 = -1; dy3 <= 1; dy3++){
+      for (var dx3 = -1; dx3 <= 1; dx3++){
+        var cx = x + dx3, cy = y + dy3;
+        if (!inBounds(cx, cy)) continue;
+        if (!cells[cy][cx].open && !cells[cy][cx].flag) flood(cx, cy);
+      }
+    }
+    checkWin();
+    opLog.push({t: 'c', i: y * cols + x});   // 服务端复算：chord（触发成功展开）
+  }
+
+  function toggleFlag(x, y){
+    if (!inBounds(x, y) || status === 'won' || status === 'lost') return;
+    var c = cells[y][x];
+    if (c.open) return;
+    if (!c.flag && flags >= mineTotal) return;
+    c.flag = !c.flag;
+    flags += c.flag ? 1 : -1;
+    if (c.flag) flagsPlaced++;
+    opLog.push({t: 'f', i: y * cols + x});   // 服务端复算：插旗/拔旗切换
+    updateMines();
+    draw();
+  }
+
+  function checkWin(){
+    if (opened === cols * rows - mineTotal){
+      status = 'won';
+      stopTimer();
+      elFace.textContent = '😎';
+
+      // 成就：高级通关且全程一个旗都没插（下面的自动插旗不算）
+      if (mode === 'expert' && flagsPlaced === 0) {
+        fetch('/api/game/ach_flag', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({field: 'mine_noflag_expert', value: 1})
+        }).catch(function(){});
+      }
+      for (var y = 0; y < rows; y++){
+        for (var x = 0; x < cols; x++){
+          if (grid[y][x].mine && !cells[y][x].flag){ cells[y][x].flag = true; flags++; }
+        }
+      }
+      updateMines();
+      draw();
+      submit();
+    }
+  }
+
+  function lose(){
+    status = 'lost';
+    stopTimer();
+    elFace.textContent = '😵';
+    for (var y = 0; y < rows; y++){
+      for (var x = 0; x < cols; x++){
+        if (grid[y][x].mine) cells[y][x].open = true;
+      }
+    }
+    draw();
+    showToast('踩到雷了，按笑脸重来', 'lose');
+  }
+
+  function showToast(msg, kind){
+    elToast.className = 'mn-toast on ' + kind;
+    elToast.textContent = msg;
+  }
+
+  function hideToast(){
+    elToast.className = 'mn-toast';
+    elToast.textContent = '';
+  }
+
+  function submit(){
+    var ms = Math.round(elapsed);
+    if (window.MONO_REC) window.MONO_REC.finish(ms);
+    fetch('/api/game/submit/mine', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: mode, ms: ms,
+        seq: {mode: mode, mines: mineIdx, ops: opLog}
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (!d.ok){
+        showToast('通关！用时 ' + fmtMs(ms) + '（成绩未记录：' + (d.msg || '未知原因') + '）', 'win');
+        return;
+      }
+      if (d.new_best){
+        BEST[mode] = ms;
+        refreshBestLabel();
+        showToast('🎉 新纪录！' + MODES[mode].label + ' ' + fmtMs(ms), 'best');
+      } else {
+        showToast('通关！用时 ' + fmtMs(ms) + '，我的最佳 ' + fmtMs(BEST[mode]), 'win');
+      }
+      renderRank(d.rank_list);
+    }).catch(function(){
+      showToast('通关！用时 ' + fmtMs(ms), 'win');
+    });
+  }
+
+  function refreshBestLabel(){
+    var nodes = document.querySelectorAll('.mn-mode');
+    Array.prototype.forEach.call(nodes, function(n){
+      var k = n.dataset.mode;
+      n.querySelectorAll('.sub')[1].textContent = '我的最佳 ' + fmtMs(BEST[k]);
+    });
+  }
+
+  function renderRank(list){
+    elRankTitle.textContent = MODES[mode].label + ' 排行榜';
+    if (!list || !list.length){
+      elRankList.innerHTML = '<div class="empty">还没有人上榜，你可以是第一个</div>';
+      return;
+    }
+    var me = {{ (user.username or '')|tojson }};
+    var html = '';
+    for (var i = 0; i < list.length; i++){
+      var it = list[i];
+      html += '<li' + (it.username === me ? ' class="me"' : '') + '>'
+           + '<span class="rk">' + (i + 1) + '</span>'
+           + '<span class="un">' + esc(it.username) + '</span>'
+           + '<span class="tm">' + fmtMs(it.best_ms) + '</span></li>';
+    }
+    elRankList.innerHTML = html;
+  }
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function loadRank(){
+    elRankTitle.textContent = MODES[mode].label + ' 排行榜';
+    elRankList.innerHTML = '<div class="empty">加载中…</div>';
+    fetch('/api/mine_rank/' + mode)
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if (d.ok) renderRank(d.rank_list); })
+      .catch(function(){ elRankList.innerHTML = '<div class="empty">加载失败</div>'; });
+  }
+
+  function cellAt(ev){
+    var r = canvas.getBoundingClientRect();
+    var x = Math.floor((ev.clientX - r.left) / (r.width / cols));
+    var y = Math.floor((ev.clientY - r.top) / (r.height / rows));
+    if (!inBounds(x, y)) return null;
+    return { x: x, y: y };
+  }
+
+  /* ---- 键盘操作：方向键移动光标，空格翻开，F 插旗，R 重开 ---- */
+  var kx = -1, ky = -1, kbdOn = false;
+  function kbdDraw(){
+    if (!kbdOn || kx < 0 || !cells[ky] || !cells[ky][kx]) return;
+    var r = canvas.getBoundingClientRect();
+    var cw = r.width / cols, ch = r.height / rows;
+    var px = (kx + 0.5) * cw * (canvas.width / r.width);
+    var py = (ky + 0.5) * ch * (canvas.height / r.height);
+    ctx.save();
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = Math.max(2, cell * 0.09);
+    ctx.setLineDash([cell * 0.22, cell * 0.14]);
+    ctx.strokeRect(px - cell * 0.46, py - cell * 0.46, cell * 0.92, cell * 0.92);
+    ctx.restore();
+  }
+  function kbdFocus(){
+    if (!kbdOn){
+      kbdOn = true;
+      if (kx < 0 || ky < 0){ kx = Math.floor(cols / 2); ky = rows - 1; }
+      draw();
+    }
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    var k = e.key;
+    if (k === 'ArrowUp' || k === 'w' || k === 'W'){
+      e.preventDefault(); kbdFocus(); ky = Math.max(0, ky - 1); draw(); return;
+    }
+    if (k === 'ArrowDown' || k === 's' || k === 'S'){
+      e.preventDefault(); kbdFocus(); ky = Math.min(rows - 1, ky + 1); draw(); return;
+    }
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A'){
+      e.preventDefault(); kbdFocus(); kx = Math.max(0, kx - 1); draw(); return;
+    }
+    if (k === 'ArrowRight' || k === 'd' || k === 'D'){
+      e.preventDefault(); kbdFocus(); kx = Math.min(cols - 1, kx + 1); draw(); return;
+    }
+    if (k === ' ' || k === 'Enter'){
+      if (!kbdOn) return;
+      e.preventDefault();
+      if (cells[ky][kx].open) chord(kx, ky); else open(kx, ky);
+      draw(); return;
+    }
+    if (k === 'f' || k === 'F'){
+      if (!kbdOn) return;
+      e.preventDefault(); toggleFlag(kx, ky); draw(); return;
+    }
+    if (k === 'r' || k === 'R'){
+      e.preventDefault(); newBoard(); draw(); return;
+    }
+  });
+
+  canvas.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  canvas.addEventListener('pointerdown', function(e){
+    // ⚠️ 这里原来有 e.preventDefault() ✗ 它会让手指无法滚动棋盘 ✗
+    //    （反馈 #47：扫雷中高级棋盘比屏幕大，结果划不动）
+    //    改成不拦默认行为，滚动交给浏览器（canvas 上配了 touch-action）✓
+    var p = cellAt(e);
+    if (!p) return;
+    if (e.button === 2 || flagMode){
+      toggleFlag(p.x, p.y);
+      return;
+    }
+    if (status === 'won' || status === 'lost') return;
+    pressCell = p;
+    pressT = performance.now();
+    longFired = false;
+    // ⚠️ 原来这里 setPointerCapture ✗ 指针被 canvas 抓死，父容器再也滚不动 ✗
+    //    长按标旗靠上面的 setTimeout 就够，不需要捕获指针 ✓
+    var timer = setTimeout(function(){
+      if (pressT && !longFired){
+        longFired = true;
+        toggleFlag(p.x, p.y);
+      }
+    }, 380);
+    canvas._lp = timer;
+  });
+
+  canvas.addEventListener('pointerup', function(e){
+    if (canvas._lp) { clearTimeout(canvas._lp); canvas._lp = null; }
+    if (longFired || flagMode || e.button === 2) { longFired = false; return; }
+    var p = cellAt(e);
+    if (!p) { pressT = 0; return; }
+    pressT = 0;
+    if (cells[p.y][p.x].open) chord(p.x, p.y);
+    else open(p.x, p.y);
+    draw();
+  });
+
+  canvas.addEventListener('pointercancel', function(){
+    if (canvas._lp) { clearTimeout(canvas._lp); canvas._lp = null; }
+    longFired = false;
+  });
+
+  elFace.addEventListener('click', function(){ newBoard(); loadRank(); });
+
+  elFlagBtn.addEventListener('click', function(){
+    flagMode = !flagMode;
+    elFlagBtn.classList.toggle('on', flagMode);
+    elTip.textContent = flagMode
+      ? '旗标模式已开：点击格子插旗，再点一次取消'
+      : '左键翻开 · 右键插旗 · 在已翻开的数字上点一下可以快速展开周围';
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.mn-mode'), function(n){
+    n.addEventListener('click', function(){
+      if (n.dataset.mode === mode) return;
+      mode = n.dataset.mode;
+      cfg = MODES[mode];
+      Array.prototype.forEach.call(document.querySelectorAll('.mn-mode'), function(o){
+        o.classList.toggle('on', o === n);
+      });
+      newBoard();
+      loadRank();
+    });
+  });
+
+  document.querySelector('.mn-mode[data-mode="beginner"]').classList.add('on');
+  newBoard();
+  loadRank();
+
+  window.addEventListener('resize', function(){ layout(); draw(); });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}排行榜 - MONO 社区{% endblock %}
+{% set active = 'ranking' %}
+
+{% block content %}
+<style>
+  .rk-wrap{max-width:960px;margin:0 auto;}
+  .rk-hero{
+    border:1px solid var(--line);border-radius:16px;padding:28px 34px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);margin-bottom:30px;
+  }
+  .rk-hero h1{font-size:26px;margin:0 0 6px;font-weight:700;letter-spacing:-0.3px;}
+  .rk-hero p{margin:0;color:var(--fg-2);font-size:13.5px;}
+  .rk-sec{margin-bottom:34px;}
+  .rk-sec h2{font-size:18px;margin:0 0 14px;font-weight:700;display:flex;align-items:baseline;gap:10px;}
+  .rk-sec h2 small{font-size:11.5px;color:var(--muted);font-weight:500;}
+  .rk-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);}
+  .rk-row{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .rk-row:last-child{border-bottom:0;}
+  .rk-row.me{background:rgba(201,162,39,.08);}
+  .rk-no{width:34px;flex:none;font-weight:800;font-variant-numeric:tabular-nums;font-size:15px;color:var(--muted);}
+  .rk-no.top1{color:#d4a017;}.rk-no.top2{color:#9aa0a6;}.rk-no.top3{color:#b08d57;}
+  .rk-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+  .rk-v{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums;}
+  .rk-tag{font-size:10.5px;color:#8a6d12;background:rgba(201,162,39,.16);padding:2px 9px;border-radius:99px;font-weight:700;flex:none;}
+  .rk-game{font-size:11.5px;color:var(--muted);flex:none;}
+  .rk-cnt{font-size:11px;color:var(--muted);flex:none;}
+  .rk-empty{padding:26px;text-align:center;color:var(--muted);font-size:13px;}
+  .rk-rec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+  .rk-rec{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card);}
+  .rk-rec .g{font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+  .rk-rec .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .rk-rec .w{font-size:11px;color:var(--muted);margin-top:4px;}
+  .rk-rec a{color:inherit;text-decoration:none;}
+  .rk-rec a:hover .v{color:#c9a227;}
+</style>
+
+<div class="rk-wrap">
+  <div class="rk-hero">
+    <h1>🏆 排行榜</h1>
+    <p>成就总分跨游戏统一计量；各游戏纪录保持者一览，点进去看完整榜单。</p>
+  </div>
+
+  <div class="rk-sec">
+    <h2>成就总分榜 <small>按已解锁成就累计积分 · <a href="{{ url_for('achievements_page') }}">去解锁成就 →</a></small></h2>
+    <div class="rk-card">
+      {% for r in ach_rows %}
+      <div class="rk-row {% if r.me %}me{% endif %}">
+        <div class="rk-no {% if loop.index <= 3 %}top{{ loop.index }}{% endif %}">
+          {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</div>
+        <div class="rk-name">{{ r.username }}</div>
+        <span class="rk-tag">{{ r.title }}</span>
+        <span class="rk-cnt">{{ r.cnt }} 项成就</span>
+        <div class="rk-v">{{ r.score }}</div>
+      </div>
+      {% else %}
+      <div class="rk-empty">还没有人解锁成就，快去当第一名</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="rk-sec">
+    <h2>💰 积分榜 <small>按当前持有积分 · 签到/发帖/游戏/活动都能赚 · <a href="{{ url_for('points_center') }}">去积分中心 →</a></small></h2>
+    <div class="rk-card">
+      {% for r in points_rows %}
+      <div class="rk-row {% if me and r.id == me['id'] %}me{% endif %}">
+        <div class="rk-no {% if loop.index <= 3 %}top{{ loop.index }}{% endif %}">
+          {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</div>
+        <div class="rk-name">{{ r.username }}</div>
+        <div class="rk-v">{{ r.coins }}</div>
+      </div>
+      {% else %}
+      <div class="rk-empty">还没有人有积分，快去赚第一笔</div>
+      {% endfor %}
+    </div>
+    {% if me and me['id'] not in points_rows|map(attribute='id') %}
+    <p class="rk-my" style="margin:10px 4px 0;font-size:13px;color:var(--muted);">
+      我的排名：第 {{ my_rank }} 名 · 持有 {{ my_points }} 积分{% if my_rank > 20 %}（未进前 20）{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="rk-sec">
+    <h2>各游戏纪录 <small>点击查看完整榜单</small></h2>
+    <div class="rk-rec-grid">
+      {% for r in records %}
+      <a class="rk-rec" href="{{ r.url }}">
+        <div class="g">{{ r.game }}</div>
+        <div class="v">{{ r.v }}</div>
+        <div class="w">保持者：{{ r.who }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

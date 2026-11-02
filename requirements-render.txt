@@ -1,0 +1,17 @@
+# Render/Linux 云端部署依赖（Python 3.11）
+# 与 requirements.txt 的差别：额外锁死 flask 2.2.5 的传递依赖。
+# 新 Python 上 pip 默认会拉 Werkzeug 3.x / blinker 1.9+，flask 2.2.5 不兼容，必须锁旧版。
+flask==2.2.5
+flask-socketio==5.3.6
+python-socketio==5.11.0
+python-engineio==4.9.1
+waitress==2.1.2
+requests==2.31.0
+werkzeug==2.3.8
+jinja2==3.1.4
+markupsafe==3.0.2
+itsdangerous==2.2.0
+click==8.1.8
+blinker==1.7.0
+# 远程快照（Neon / PostgreSQL）依赖；未配置 DSN 时不启用，不影响主流程
+psycopg2-binary==2.9.10

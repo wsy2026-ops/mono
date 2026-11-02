@@ -1,0 +1,715 @@
+{% extends "base.html" %}
+{% block title %}24点挑战 - MONO 社区</div>
+{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="games-page">
+<style>
+<style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .games-page {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            gap: 30px;
+        }
+
+        .top-bar {
+            position: fixed;
+            top: 76px;
+            left: 30px;
+            font-size: 14px;
+        }
+        .top-bar a {
+            color: #222;
+            text-decoration: none;
+            border-bottom: 1px solid #000;
+        }
+
+        .user-bar {
+            position: fixed;
+            top: 76px;
+            right: 30px;
+            background: #fff;
+            border: 1px solid #000;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        .user-bar .high-score {
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .game-container {
+            position: relative;
+            background: #fff;
+            border: 2px solid #000;
+            padding: 30px;
+            max-width: 520px;
+            width: 100%;
+        }
+
+        .rank-container {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 25px;
+            width: 280px;
+            height: fit-content;
+        }
+
+        .rank-title {
+            font-size: 22px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 2px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #000;
+            margin-bottom: 15px;
+        }
+
+        .rank-list {
+            list-style: none;
+        }
+
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 16px;
+        }
+
+        .rank-item:last-child {
+            border-bottom: none;
+        }
+
+        .rank-item.self {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .rank-num {
+            width: 30px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .rank-name {
+            flex: 1;
+            padding: 0 10px;
+        }
+
+        .rank-score {
+            font-weight: bold;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #000;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 4px;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            padding: 12px 20px;
+            border: 1px solid #000;
+        }
+
+        .info-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .operators {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .op-btn {
+            width: 55px;
+            height: 55px;
+            border: 1px solid #000;
+            background: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .op-btn:hover:not(:disabled) {
+            background: #eee;
+        }
+
+        .op-btn.selected {
+            background: #000;
+            color: #fff;
+        }
+
+        .op-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .numbers {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            min-height: 100px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .num-card {
+            width: 80px;
+            height: 100px;
+            border: 1px solid #000;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #000;
+            cursor: pointer;
+            transition: background 0.1s ease;
+            user-select: none;
+        }
+
+        .num-card:hover {
+            background: #f0f0f0;
+        }
+
+        .num-card.selected {
+            background: #ddd;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .reset-btn,
+        .skip-btn {
+            flex: 1;
+            padding: 14px;
+            font-size: 16px;
+            border: 2px solid #000;
+            background: #fff;
+            color: #000;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .reset-btn:hover,
+        .skip-btn:hover:not(:disabled) {
+            background: #000;
+            color: #fff;
+        }
+
+        .skip-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .result-msg {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            height: 24px;
+        }
+
+        .correct { color: #27ae60; }
+        .wrong { color: #e74c3c; }
+        .tip { color: #666; font-weight: normal; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 40px;
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+        }
+
+        .modal h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #000;
+            letter-spacing: 2px;
+        }
+
+        .modal p {
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .new-record {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .final-score {
+            font-size: 36px;
+            font-weight: bold;
+            color: #000;
+            margin: 20px 0;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .restart-btn, .back-btn {
+            padding: 12px 24px;
+            font-size: 15px;
+            border: 2px solid #000;
+            background: #fff;
+            color: #000;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .restart-btn:hover, .back-btn:hover {
+            background: #000;
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            .games-page {
+                flex-direction: column;
+                gap: 20px;
+                padding-top: 70px;
+            }
+            .rank-container {
+                width: 100%;
+                max-width: 520px;
+            }
+            .user-bar {
+                top: 10px;
+                right: 10px;
+            }
+            .top-bar {
+                top: 10px;
+                left: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .game-container { padding: 20px 15px; }
+            .num-card { width: 65px; height: 85px; font-size: 26px; }
+            .op-btn { width: 48px; height: 48px; font-size: 20px; }
+        }
+    </style>
+
+    <div class="top-bar">
+        <a href="{{ url_for('games_center') }}">← 返回大厅</a>
+    </div>
+
+    <div class="user-bar">
+        {{ user.username }}
+        <span>最高分：<span class="high-score" id="userHighScore">{{ user.high_score_24 }}</span></span>
+    </div>
+
+    <div class="game-container">
+        <div class="header">
+            <h1>24点</h1>
+        </div>
+
+        <div class="info-bar">
+            <div class="info-item">
+                <div class="info-label">倒计时</div>
+                <div class="info-value" id="timeDisplay">02:00</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">当前得分</div>
+                <div class="info-value" id="scoreDisplay">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">剩余跳过</div>
+                <div class="info-value" id="skipDisplay">3</div>
+            </div>
+        </div>
+
+        <div class="operators">
+            <button class="op-btn" data-op="+" onclick="selectOp('+')">+</button>
+            <button class="op-btn" data-op="-" onclick="selectOp('-')">−</button>
+            <button class="op-btn" data-op="*" onclick="selectOp('*')">×</button>
+            <button class="op-btn" data-op="/" onclick="selectOp('/')">÷</button>
+        </div>
+
+        <div class="numbers" id="numbersContainer"></div>
+
+        <div class="btn-group">
+            <button class="reset-btn" onclick="resetCurrent()">重置本题</button>
+            <button class="skip-btn" id="skipBtn" onclick="skipQuestion()">跳过题目</button>
+        </div>
+
+        <div class="result-msg" id="resultMsg">请先点击选择第一个数字</div>
+    </div>
+
+    <div class="rank-container">
+        <h3 class="rank-title">排行榜</h3>
+        <ul class="rank-list" id="rankList">
+            {% for item in rank_list %}
+            <li class="rank-item {% if item.username == user.username %}self{% endif %}">
+                <span class="rank-num">{{ loop.index }}</span>
+                <span class="rank-name">{{ item.username }}</span>
+                <span class="rank-score">{{ item.score }}</span>
+            </li>
+            {% endfor %}
+            {% if user_rank > 10 %}
+            <li class="rank-item self">
+                <span class="rank-num">{{ user_rank }}</span>
+                <span class="rank-name">{{ user.username }}</span>
+                <span class="rank-score">{{ user.high_score_24 }}</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal">
+            <h2>时间到</h2>
+            <p>挑战结束</p>
+            <div class="new-record" id="newRecordTip" style="display:none;">🎉 新纪录！</div>
+            <div class="final-score" id="finalScore">0</div>
+            <div class="modal-btns">
+                <button class="back-btn" onclick="location.href='{{ url_for('games_center') }}'">返回大厅</button>
+                <button class="restart-btn" onclick="restartGame()">再来一局</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let score = 0;
+        let correctCount = 0;
+        let timeLeft = 120;
+        let timer = null;
+        let skipLeft = 3;
+        let originalNums = [];
+        let currentNums = [];
+        let selectedIndex = -1;
+        let selectedOp = null;
+        let step = 0;
+        let submitted = false;
+        /* 服务端复算用：每题 nums + 本題运算序列 */
+        let roundLog = [];
+        let roundOps = null;
+
+        window.MONO_GAME = { game: '24', sub: '', kind: 'score' };
+        window.MONO_GAME_RENDER = function(s, el){
+            const o = {sc: score, cc: correctCount, tl: timeLeft, sk: skipLeft,
+                       on: originalNums, cn: currentNums, si: selectedIndex, so: selectedOp, st: step};
+            window.__monoReplay = true;
+            score = s.sc; correctCount = s.cc; timeLeft = s.tl; skipLeft = s.sk;
+            originalNums = s.on.slice(); currentNums = s.cn.slice();
+            selectedIndex = s.si; selectedOp = s.so; step = s.st;
+            renderNumbers();
+            const c = document.getElementById('numbersContainer').cloneNode(true);
+            c.style.pointerEvents = 'none';
+            el.innerHTML = '';
+            el.appendChild(c);
+            score = o.sc; correctCount = o.cc; timeLeft = o.tl; skipLeft = o.sk;
+            originalNums = o.on; currentNums = o.cn;
+            selectedIndex = o.si; selectedOp = o.so; step = o.st;
+            renderNumbers();
+            window.__monoReplay = false;
+        };
+
+        function initGame() {
+            if (window.MONO_REC) window.MONO_REC.start();
+            score = 0;
+            correctCount = 0;
+            timeLeft = 120;
+            skipLeft = 3;
+            submitted = false;
+            updateDisplay();
+            newQuestion();
+            startTimer();
+            document.getElementById('gameOverModal').style.display = 'none';
+            document.getElementById('newRecordTip').style.display = 'none';
+        }
+
+        function startTimer() {
+            if (timer) clearInterval(timer);
+            timer = setInterval(() => {
+                timeLeft--;
+                updateTimeDisplay();
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    gameOver();
+                }
+            }, 1000);
+        }
+
+        function updateTimeDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.getElementById('timeDisplay').textContent = 
+                String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+        }
+
+        function updateDisplay() {
+            document.getElementById('scoreDisplay').textContent = score;
+            document.getElementById('skipDisplay').textContent = skipLeft;
+            updateTimeDisplay();
+            document.getElementById('skipBtn').disabled = skipLeft <= 0;
+        }
+
+        function hasSolution(nums) {
+            if (nums.length === 1) return Math.abs(nums[0] - 24) < 1e-6;
+            for (let i = 0; i < nums.length; i++) {
+                for (let j = 0; j < nums.length; j++) {
+                    if (i === j) continue;
+                    let rest = [];
+                    for (let k = 0; k < nums.length; k++) {
+                        if (k !== i && k !== j) rest.push(nums[k]);
+                    }
+                    const a = nums[i], b = nums[j];
+                    if (hasSolution([...rest, a + b])) return true;
+                    if (hasSolution([...rest, a * b])) return true;
+                    if (hasSolution([...rest, a - b])) return true;
+                    if (Math.abs(b) > 1e-6 && hasSolution([...rest, a / b])) return true;
+                }
+            }
+            return false;
+        }
+
+        function newQuestion() {
+            while (true) {
+                const nums = [];
+                for (let i = 0; i < 4; i++) {
+                    nums.push(Math.floor(Math.random() * 20) + 1);
+                }
+                if (hasSolution(nums)) {
+                    originalNums = [...nums];
+                    currentNums = [...nums];
+                    roundOps = [];                       // 服务端复算：本题运算序列
+                    roundLog.push({nums: [...nums], ops: roundOps});
+                    resetSelection();
+                    renderNumbers();
+                    showMsg('请先点击选择第一个数字', 'tip');
+                    break;
+                }
+            }
+        }
+
+        function renderNumbers() {
+            if (window.MONO_REC && window.MONO_REC.active){
+                window.MONO_REC.snap({
+                    sc: score, cc: correctCount, tl: timeLeft, sk: skipLeft,
+                    on: originalNums.slice(), cn: currentNums.slice(),
+                    si: selectedIndex, so: selectedOp, st: step
+                });
+            }
+            const container = document.getElementById('numbersContainer');
+            container.innerHTML = '';
+            currentNums.forEach((num, index) => {
+                const card = document.createElement('div');
+                card.className = 'num-card';
+                card.textContent = Number.isInteger(num) ? num : num.toFixed(2);
+                if (index === selectedIndex) card.classList.add('selected');
+                card.onclick = () => selectNumber(index);
+                container.appendChild(card);
+            });
+
+            document.querySelectorAll('.op-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.dataset.op === selectedOp) btn.classList.add('selected');
+                btn.disabled = step === 0;
+            });
+        }
+
+        function resetSelection() {
+            selectedIndex = -1;
+            selectedOp = null;
+            step = 0;
+        }
+
+        function selectNumber(index) {
+            if (step === 0) {
+                selectedIndex = index; step = 1;
+                renderNumbers(); showMsg('请选择运算符', 'tip');
+            } else if (step === 1) {
+                if (index === selectedIndex) {
+                    selectedIndex = -1; step = 0;
+                    renderNumbers(); showMsg('请先点击选择第一个数字', 'tip');
+                } else {
+                    selectedIndex = index;
+                    renderNumbers(); showMsg('请选择运算符', 'tip');
+                }
+            } else if (step === 2) {
+                if (index === selectedIndex) { showMsg('请选择不同的数字', 'wrong'); return; }
+                calculate(selectedIndex, index, selectedOp);
+            }
+        }
+
+        function selectOp(op) {
+            if (step === 0) return;
+            if (step === 2 && selectedOp === op) {
+                selectedOp = null; step = 1;
+                renderNumbers(); showMsg('请选择运算符', 'tip');
+            } else {
+                selectedOp = op; step = 2;
+                renderNumbers(); showMsg('请选择第二个数字', 'tip');
+            }
+        }
+
+        function calculate(i1, i2, op) {
+            const a = currentNums[i1], b = currentNums[i2];
+            let result;
+            switch (op) {
+                case '+': result = a + b; break;
+                case '-': result = a - b; break;
+                case '*': result = a * b; break;
+                case '/':
+                    if (Math.abs(b) < 1e-6) {
+                        showMsg('除数不能为0', 'wrong');
+                        resetSelection(); renderNumbers(); return;
+                    }
+                    result = a / b; break;
+            }
+            if (roundOps) roundOps.push({a: i1, b: i2, op: op});   // 服务端复算
+
+            const newNums = [];
+            for (let i = 0; i < currentNums.length; i++) {
+                if (i !== i1 && i !== i2) newNums.push(currentNums[i]);
+            }
+            newNums.push(result);
+            currentNums = newNums;
+            resetSelection(); renderNumbers();
+
+            if (currentNums.length === 1) {
+                if (Math.abs(currentNums[0] - 24) < 1e-6) {
+                    score += 10; correctCount++;
+                    updateDisplay(); showMsg('回答正确！+10分', 'correct');
+                    setTimeout(() => newQuestion(), 1000);
+                } else {
+                    const res = Number.isInteger(currentNums[0]) ? currentNums[0] : currentNums[0].toFixed(2);
+                    showMsg('结果是 ' + res + '，不是24，可重置重试', 'wrong');
+                }
+            } else {
+                showMsg('请继续选择第一个数字', 'tip');
+            }
+        }
+
+        function resetCurrent() {
+            currentNums = [...originalNums];
+            resetSelection();
+            renderNumbers();
+            showMsg('已重置本题，请重新计算', 'tip');
+        }
+
+        function skipQuestion() {
+            if (skipLeft <= 0) return;
+            skipLeft--;
+            updateDisplay();
+            newQuestion();
+        }
+
+        function showMsg(text, type) {
+            const msgEl = document.getElementById('resultMsg');
+            msgEl.textContent = text;
+            msgEl.className = 'result-msg ' + type;
+        }
+
+        function gameOver() {
+            if (submitted) return;
+            submitted = true;
+            if (window.MONO_REC) window.MONO_REC.finish(score);
+
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverModal').style.display = 'flex';
+
+            fetch('/api/game/submit/24', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({score: score, seq: {rounds: roundLog}})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) {
+                    if (data.new_best) {
+                        document.getElementById('newRecordTip').style.display = 'block';
+                        document.getElementById('userHighScore').textContent = score;
+                    }
+                    const rankList = document.getElementById('rankList');
+                    rankList.innerHTML = '';
+                    data.rank_list.forEach((item, idx) => {
+                        const li = document.createElement('li');
+                        li.className = 'rank-item' + (item.username === {{ user.username|tojson }} ? ' self' : '');
+                        li.innerHTML = `
+                            <span class="rank-num">${idx + 1}</span>
+                            <span class="rank-name">${item.username}</span>
+                            <span class="rank-score">${item.score}</span>
+                        `;
+                        rankList.appendChild(li);
+                    });
+                }
+            });
+        }
+
+        function restartGame() {
+            initGame();
+        }
+
+        window.onload = initGame;
+    </script>
+{% endblock %}

@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title }} - {{ tr('brand') }}{% endblock %}
+{% set active = 'forum' %}
+{% block content %}
+<style>
+.p-tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:10px;background:var(--soft);color:var(--fg-2);margin-right:4px;}
+.tag.essence{background:#fff7e0;color:#b8860b;border-color:#e6c66a;}
+.tag.locked{background:#fbecec;color:#c0392b;border-color:#e0b4b4;}
+.tag.edited{background:var(--soft);color:var(--muted);border-color:#ddd;}
+.lock-banner{padding:10px 14px;background:#fbecec;border:1px solid #e0b4b4;border-radius:10px;font-size:13px;color:#c0392b;margin:12px 0;}
+.comment-reply{margin-left:44px;margin-top:8px;border-left:2px solid #eee;padding-left:12px;}
+.c-actions{display:flex;gap:12px;margin-top:6px;align-items:center;font-size:12px;}
+.c-actions a, .c-actions .clike{color:var(--muted);cursor:pointer;text-decoration:none;}
+.c-actions a:hover, .c-actions .clike:hover{color:#111;}
+.clike.liked{color:#e0245e;}
+.reply-form{margin-top:8px;display:none;}
+.reply-form.show{display:block;}
+.admin-ops{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;padding:10px;background:var(--soft);border:1px dashed #ddd;border-radius:10px;}
+.c-deleted{color:var(--muted);font-style:italic;}
+.inline-report{display:inline-flex;gap:4px;align-items:center;}
+
+/* 061 相关讨论 */
+.related-box{margin:22px 0 6px;padding:14px 16px;border-radius:12px;background:var(--bg-elev);border:1px solid var(--line);}
+.related-h{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--fg-2);}
+.related-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 10px;border-radius:8px;text-decoration:none;transition:background .15s;}
+.related-item:hover{background:rgba(0,0,0,.045);}
+.ri-title{font-size:14px;font-weight:600;color:var(--fg-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ri-meta{font-size:11px;color:var(--fg-3);flex:0 0 auto;}
+</style>
+<div class="post-item" style="margin-bottom:24px;">
+  {% if get_user_effect(post) %}
+  <div class="post-cover-effect {{ get_user_effect(post) }}"></div>
+  {% endif %}
+  <div class="post-header">
+    <img src="{{ get_avatar_url(post) }}" alt="" class="avatar">
+    <div>
+      <div style="font-size:15px;font-weight:600;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+        {{ post.username }}
+        {% if post.is_admin %}<span class="tag admin">{{ tr('post.staff') }}</span>{% endif %}
+        {{ badges_html(post) }}
+      </div>
+      <div class="muted" style="font-size:12px;">发布于 {{ post.created_at|fmttime }} · {{ post.section_name or '综合闲聊区' }}</div>
+    </div>
+    <span style="margin-left:auto;display:flex;gap:4px;">
+      {% if post.is_pinned %}<span class="tag on">{{ tr('post.pinned') }}</span>{% endif %}
+      {% if post.is_essence %}<span class="tag essence">{{ tr('post.featured') }}</span>{% endif %}
+      {% if post.is_locked %}<span class="tag locked">{{ tr('forum.locked') }}</span>{% endif %}
+      {% if post.edited %}<span class="tag edited">{{ tr('forum.edited') }}</span>{% endif %}
+    </span>
+  </div>
+  <h1 style="font-size:22px;margin:12px 0;">{{ post.title }}</h1>
+  {% if post_tags or post_thread %}
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    {% if post_thread %}
+    <a href="{{ url_for('thread_page', thread_id=post_thread.id) }}"
+       style="font-size:12px;padding:3px 11px;border-radius:99px;border:1px solid var(--line);
+              background:var(--bg-elev);color:var(--fg-2);text-decoration:none;">
+      📌 {{ post_thread.name }}</a>
+    {% endif %}
+    {% for t in post_tags %}
+    <a href="{{ url_for('tag_page', name=t) }}"
+       style="font-size:12px;padding:3px 11px;border-radius:99px;border:1px solid rgba(201,162,39,.45);
+              background:rgba(201,162,39,.10);color:#8a6d12;text-decoration:none;">
+      #{{ t }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="post-content md-content" id="postContent" data-raw="{{ post.content|e }}">{{ post.content }}</div>
+
+  {% if post.is_locked %}
+  <div class="lock-banner">{{ tr('post.locked_banner') }}</div>
+  {% endif %}
+  {% if post.recycle %}
+  <div class="lock-banner">{{ tr('post.recycled') }}</div>
+  {% endif %}
+
+  <div class="post-meta" style="margin-top:20px;">
+    <span>👁 {{ post.view_count }} 浏览</span>
+    <span class="like-btn {% if liked %}liked{% endif %}" onclick="toggleLike({{ post.id }})">
+      ❤️ <span class="like-count">{{ post.likes }}</span>
+    </span>
+    <span>💬 {{ comments|selectattr('is_deleted','equalto',0)|list|length }} 评论</span>
+    <span data-share-card
+          data-title="{{ post.title }}"
+          data-summary="{{ post.summary or (post.content[:120]) }}"
+          data-author="{{ post.username }}"
+          data-avatar="{{ get_avatar_url(post) }}"
+          data-url="{{ request.url }}"
+          style="cursor:pointer;" title="{{ tr('post.share_card') }}">{{ tr('post.share') }}</span>
+    {% if current_user %}
+    <span class="like-btn {% if favorited %}liked{% endif %}" onclick="toggleFavorite({{ post.id }})" id="fav-btn">
+      {% if favorited %}⭐ 已收藏{% else %}☆ 收藏{% endif %}
+    </span>
+    {% endif %}
+    {% if current_user and (post.user_id == current_user.id or current_user.is_admin) %}
+    {% if not post.is_locked or current_user.is_admin %}
+    <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn sm ghost">{{ tr('post.edit') }}</a>
+    {% endif %}
+    <form method="post" action="{{ url_for('delete_post', post_id=post.id) }}" style="display:inline;" onsubmit="return confirm(__('确定将此帖移入回收站？'));">
+      <button type="submit" class="btn sm ghost">{{ tr('post.delete') }}</button>
+    </form>
+    {% endif %}
+    {% if current_user and post.user_id != current_user.id %}
+    <form method="post" action="{{ url_for('submit_report', target_type='post', target_id=post.id) }}" class="inline-report" onsubmit="return confirm(__('确定举报该帖子？'));">
+      <select name="category" style="width:auto;padding:2px 4px;font-size:11px;">
+        <option>{{ tr('post.report_ad') }}</option><option>{{ tr('post.report_abuse') }}</option><option>{{ tr('post.report_illegal') }}</option><option>{{ tr('post.report_flood') }}</option><option>{{ tr('post.report_malware') }}</option><option>{{ tr('post.report_other') }}</option>
+      </select>
+      <button type="submit" class="report-btn">{{ tr('post.report') }}</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if poll %}
+  <div class="card" style="margin-top:24px;">
+    <h3>📊 {{ poll.p.title }}</h3>
+    <div class="muted" style="font-size:12px;margin-bottom:12px;">
+      {{ '单选' if poll.p.mode=='single' else '多选' }}{% if poll.p.anonymous %} · 匿名投票{% endif %}
+      {% if poll.p.deadline > 0 %}· 截止 {{ poll.p.deadline|fmttime('%m-%d %H:%M') }}{% endif %}
+      {% if poll.closed %}· <span style="color:#f5576c;">{{ tr('post.poll_closed') }}</span>{% else %}· 已有 {{ poll.total }} 人投票{% endif %}
+    </div>
+    {% if poll.voted or poll.closed %}
+      {% for o in poll.opts %}
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">
+          <span>{{ o.text }}</span>
+          <span class="muted">{{ o.votes }} 票（{% if poll.total %}{{ (o.votes*100//poll.total) }}{% else %}0{% endif %}%）</span>
+        </div>
+        <div style="height:10px;background:var(--soft);border-radius:6px;overflow:hidden;">
+          <div style="height:100%;background:#111;width:{% if poll.total %}{{ (o.votes*100//poll.total) }}{% else %}0{% endif %}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <form method="post" action="{{ url_for('poll_vote', poll_id=poll.p.id) }}" id="pollForm-{{ poll.p.id }}">
+        {% for o in poll.opts %}
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:1px solid var(--line);">
+          <input type="{{ 'radio' if poll.p.mode=='single' else 'checkbox' }}" name="options" value="{{ o.id }}">
+          <span>{{ o.text }}</span>
+        </label>
+        {% endfor %}
+        <button type="submit" class="btn sm" style="margin-top:12px;">{{ tr('post.poll_submit') }}</button>
+      </form>
+    {% endif %}
+    {% if current_user and current_user.is_admin and not poll.closed %}
+    <form method="post" action="{{ url_for('poll_close', poll_id=poll.p.id) }}" style="display:inline;margin-top:8px;">
+      <button type="submit" class="btn sm ghost">{{ tr('post.poll_force_close') }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if current_user and current_user.is_admin %}
+  <div class="admin-ops">
+    <b style="font-size:12px;color:var(--muted);">{{ tr('post.admin_ops') }}</b>
+    <form method="post" action="{{ url_for('pin_post', post_id=post.id) }}" style="display:inline;">
+      <button type="submit" class="btn sm ghost">{% if post.is_pinned %}取消置顶{% else %}置顶{% endif %}</button>
+    </form>
+    <form method="post" action="{{ url_for('essence_post', post_id=post.id) }}" style="display:inline;">
+      <button type="submit" class="btn sm ghost">{% if post.is_essence %}取消精华{% else %}设为精华{% endif %}</button>
+    </form>
+    <form method="post" action="{{ url_for('lock_post', post_id=post.id) }}" style="display:inline;">
+      <button type="submit" class="btn sm ghost">{% if post.is_locked %}解锁{% else %}锁定{% endif %}</button>
+    </form>
+    <form method="post" action="{{ url_for('move_post', post_id=post.id) }}" style="display:inline-flex;gap:4px;align-items:center;">
+      <select name="section_id" style="width:auto;padding:2px 6px;font-size:12px;">
+        {% for s in get_sections() %}
+        <option value="{{ s.id }}" {% if s.id == post.section_id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn sm ghost">{{ tr('post.move') }}</button>
+    </form>
+    <form method="post" action="{{ url_for('admin_clear_comments', post_id=post.id) }}" style="display:inline;" onsubmit="return confirm(__('确定清空该帖全部评论？此操作不可恢复'));">
+      <button type="submit" class="btn sm ghost">{{ tr('post.clear_comments') }}</button>
+    </form>
+    {% if post.recycle %}
+    <form method="post" action="{{ url_for('restore_post', post_id=post.id) }}" style="display:inline;">
+      <button type="submit" class="btn sm">{{ tr('post.restore') }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if related_posts %}
+<div class="related-box">
+  <div class="related-h">{{ tr('post.related') }}</div>
+  {% for r in related_posts %}
+  <a class="related-item" href="{{ url_for('view_post', post_id=r.id) }}">
+    <span class="ri-title">{{ r.title }}</span>
+    <span class="ri-meta">{{ r.username }} · 💬 {{ r.real_comment_count }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h3>评论 ({{ comments|selectattr('is_deleted','equalto',0)|list|length }})</h3>
+{% if current_user %}
+  {% if post.is_locked and not current_user.is_admin %}
+  <p class="muted" style="margin:16px 0;">{{ tr('post.locked_no_comment') }}</p>
+  {% else %}
+  <form method="post" action="{{ url_for('comment_post', post_id=post.id) }}" style="margin:16px 0 32px;">
+    <textarea name="content" placeholder="{{ tr('post.comment_ph') }}" rows="3"></textarea>
+    <div style="margin-top:8px;text-align:right;">
+      <button type="submit" class="btn sm">{{ tr('post.comment') }}</button>
+    </div>
+  </form>
+  {% endif %}
+{% else %}
+<p class="muted" style="margin:16px 0;">{{ tr('post.need_login_pre') }}<a href="{{ url_for('login') }}" style="text-decoration:underline;">{{ tr('nav.login') }}</a>{{ tr('post.need_login_post') }}</p>
+{% endif %}
+
+{% macro render_comment(c, is_reply=false) %}
+<div class="comment {% if is_reply %}comment-reply{% endif %}" id="comment-{{ c.id }}">
+  <img src="{{ get_avatar_url(c) }}" alt="" class="avatar sm">
+  <div class="comment-content">
+    <div class="comment-header">
+      <span style="font-weight:600;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+        {{ c.username }}
+        {% if c.is_admin %}<span class="tag admin">{{ tr('post.staff') }}</span>{% endif %}
+        {{ badges_html(c) }}
+      </span>
+      <span class="muted" style="font-size:12px;">{{ c.created_at|timeago }}</span>
+    </div>
+    <div class="comment-text {% if c.is_deleted %}c-deleted{% endif %} md-content" data-raw="{{ c.content|e }}">{{ c.content }}</div>
+    {% if not c.is_deleted %}
+    <div class="c-actions">
+      {% if current_user %}
+      <span class="clike {% if c.id in comment_liked %}liked{% endif %}" onclick="toggleCommentLike({{ c.id }}, this)">👍 <span class="cl-count">{{ c.like_count }}</span></span>
+      {% if not (post.is_locked and not current_user.is_admin) %}
+      <a href="javascript:void(0)" onclick="toggleReply({{ c.id }})">{{ tr('post.reply') }}</a>
+      {% endif %}
+      {% if c.user_id == current_user.id or current_user.is_admin %}
+      <a href="javascript:void(0)" onclick="editComment({{ c.id }}, this)">{{ tr('post.edit') }}</a>
+      <form method="post" action="{{ url_for('delete_comment', comment_id=c.id) }}" style="display:inline;" onsubmit="return confirm(__('确定删除该评论？'));">
+        <button type="submit" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;padding:0;">{{ tr('post.delete') }}</button>
+      </form>
+      {% endif %}
+      {% if c.user_id != current_user.id %}
+      <form method="post" action="{{ url_for('submit_report', target_type='comment', target_id=c.id) }}" class="inline-report" onsubmit="return confirm(__('确定举报该评论？'));">
+        <select name="category" style="width:auto;padding:1px 3px;font-size:11px;">
+          <option>{{ tr('post.report_ad') }}</option><option>{{ tr('post.report_abuse') }}</option><option>{{ tr('post.report_illegal') }}</option><option>{{ tr('post.report_flood') }}</option><option>{{ tr('post.report_other') }}</option>
+        </select>
+        <button type="submit" class="report-btn">{{ tr('post.report') }}</button>
+      </form>
+      {% endif %}
+      {% else %}
+      <span class="muted">👍 {{ c.like_count }}</span>
+      {% endif %}
+    </div>
+    {% if current_user and not (post.is_locked and not current_user.is_admin) %}
+    <form method="post" action="{{ url_for('comment_post', post_id=post.id) }}" class="reply-form" id="reply-{{ c.id }}">
+      <input type="hidden" name="parent_id" value="{{ c.id }}">
+      <textarea name="content" rows="2" placeholder="{{ tr('post.reply_ph', name=c.username) }}" data-uploader data-upload-api="/api/upload-image"></textarea>
+      <div style="margin-top:4px;text-align:right;">
+        <button type="submit" class="btn sm">{{ tr('post.reply') }}</button>
+      </div>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+<div class="comment-list">
+  {% for c in top_comments %}
+    {{ render_comment(c) }}
+    {% set kids = children.get(c.id, []) %}
+    {% for r in kids[:3] %}
+      {{ render_comment(r, true) }}
+    {% endfor %}
+    {% if kids|length > 3 %}
+    <div class="kids-more" data-root="{{ c.id }}">
+      <button type="button" class="btn sm ghost" onclick="toggleKids(this, {{ c.id }})">
+        展开更多 {{ kids|length - 3 }} 条回复 ▾</button>
+    </div>
+    <div id="kids-rest-{{ c.id }}" style="display:none;">
+      {% for r in kids[3:] %}
+        {{ render_comment(r, true) }}
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% else %}
+  <p class="muted center" style="padding:20px;">{{ tr('post.no_comments') }}</p>
+  {% endfor %}
+</div>
+<script>
+function toggleKids(btn, rootId){
+  var box = document.getElementById('kids-rest-' + rootId);
+  if (!box) return;
+  var open = box.style.display !== 'none';
+  box.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? ('展开更多 ' + box.children.length + ' 条回复 ▾')
+                         : '收起回复 ▴';
+  btn.parentElement.style.display = open ? '' : 'none';
+}
+</script>
+
+<div style="margin-top:24px;">
+  <a href="{{ url_for('forum') }}{% if post.section_id %}?section={{ post.section_id }}{% endif %}" class="btn ghost sm">{{ tr('post.back') }}</a>
+</div>
+
+{% if related %}
+<div style="margin-top:26px;border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--card);">
+  <div style="font-size:13px;font-weight:700;margin-bottom:12px;">{{ tr('post.same_tags') }}</div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    {% for r in related %}
+    <a href="{{ url_for('view_post', post_id=r.id) }}" style="font-size:13.5px;color:var(--fg);text-decoration:none;display:flex;gap:10px;align-items:baseline;">
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.title }}</span>
+      <span class="muted" style="font-size:11.5px;flex:none;margin-left:auto;">{{ r.username }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/share_card.js') }}"></script>
+<script src="{{ url_for('static', filename='js/img_uploader.js') }}"></script>
+<script>
+const contentEl = document.getElementById('postContent');
+if (contentEl) {
+  const raw = contentEl.getAttribute('data-raw') || contentEl.textContent;
+  renderMarkdownInto(contentEl, raw);
+}
+function renderComments(){
+  document.querySelectorAll('.comment-text').forEach(el => {
+    if (el.classList.contains('c-deleted')) return;
+    const raw = el.getAttribute('data-raw') || el.textContent;
+    renderMarkdownInto(el, raw);
+  });
+}
+renderComments();
+
+function toggleReply(id){
+  const f = document.getElementById('reply-'+id);
+  if (f) f.classList.toggle('show');
+}
+function toggleCommentLike(id, el){
+  fetch('/like-comment/'+id, {method:'POST'}).then(r=>r.json()).then(d=>{
+    if (d.error) return;
+    el.classList.toggle('liked', d.liked);
+    el.querySelector('.cl-count').textContent = d.likes;
+  });
+}
+function editComment(id, el){
+  const commentDiv = document.getElementById('comment-'+id);
+  const textEl = commentDiv ? commentDiv.querySelector('.comment-text') : null;
+  if (!textEl) return;
+  const oldText = textEl.getAttribute('data-raw') || textEl.textContent;
+  const newText = prompt(__('编辑评论内容：'), oldText);
+  if (newText === null) return;
+  const trimmed = newText.trim();
+  if (!trimmed){ alert(__('内容不能为空')); return; }
+  const body = new URLSearchParams({content: trimmed});
+  fetch('/edit-comment/' + id, {
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body: body.toString()
+  }).then(r=>r.json()).then(d=>{
+    if (d.ok){
+      textEl.setAttribute('data-raw', trimmed);
+      renderMarkdownInto(textEl, trimmed);
+      if (!textEl.querySelector('.edit-mark')){
+        const mark = document.createElement('span');
+        mark.className = 'edit-mark';
+        mark.style.cssText = 'font-size:11px;color:var(--muted);margin-left:6px;';
+        mark.textContent = '（已编辑）';
+        textEl.appendChild(mark);
+      }
+    } else {
+      alert(d.error || __('编辑失败'));
+    }
+  }).catch(err => alert(__('网络异常：') + err.message));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+{% block title %}与 {{ target.username }} 私聊 - MONO 社区{% endblock %}
+{% set active = 'friends' %}
+{% block content %}
+<style>
+  .read-mark{font-size:11px;margin-left:6px;color:var(--muted);}
+  .read-mark.on{color:#10b981;}
+  .pc-typing{font-size:12.5px;color:var(--muted);min-height:19px;margin:2px 0 6px;padding-left:2px;}
+  .pc-typing.on{color:#10b981;}
+  .pc-pending{opacity:.6;}
+  .pc-failed .read-mark{color:#c0392b;}
+  .pc-failed .body{opacity:.75;}
+  .pc-in{animation:pcIn .24s cubic-bezier(.22,.9,.3,1) both;}
+  @keyframes pcIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  .pc-newline{text-align:center;font-size:11.5px;color:var(--muted);margin:10px 0;letter-spacing:.1em;}
+  .pc-day{text-align:center;font-size:11.5px;color:var(--muted);margin:14px 0 8px;letter-spacing:.12em;}
+  .msg.cont{margin-top:-7px;}
+  .msg.cont .avatar{visibility:hidden;}
+  .msg.cont .head .name{display:none;}
+  .msg.cont .head{margin-bottom:2px;}
+  .pc-tools{display:flex;gap:5px;margin-top:4px;opacity:0;transition:opacity .16s ease;}
+  .msg:hover .pc-tools{opacity:1;}
+  .pc-tool{background:none;border:none;color:var(--muted);font-size:11.5px;cursor:pointer;
+    padding:2px 7px;border-radius:6px;font-family:inherit;}
+  .pc-tool:hover{background:var(--soft);color:var(--fg);}
+  .pc-edited{font-size:11px;color:var(--muted);margin-left:6px;}
+  @media (hover: none){ .pc-tools{opacity:1;} }
+  /* 本人消息靠右、对方靠左：整行反向（头像翻到右边），头部和气泡一起右对齐。
+     .msg 在 base.css 里是 display:flex，这里只加 row-reverse，别去改 base.css。 */
+  .msg.me{flex-direction:row-reverse;}
+  .msg.me .msg-content{display:flex;flex-direction:column;align-items:flex-end;}
+  .msg.me .head{justify-content:flex-end;}
+  .msg.me .body{text-align:left;}
+  .msg.me .pc-tools{justify-content:flex-end;}
+</style>
+<h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">与 {{ target.username }} 的私聊
+  <button type="button" id="pmSearchBtn" class="pc-tool" style="opacity:1;font-size:12.5px;padding:4px 12px;border:1px solid var(--line);border-radius:99px;">🔍 搜索记录</button>
+</h2>
+<div id="pmSearchPanel" style="display:none;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:var(--card);">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <input id="pmSearchQ" type="text" placeholder="搜索与 TA 的聊天记录关键词" maxlength="50"
+           style="flex:1;min-width:200px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg-elev);color:var(--fg);font-size:13px;">
+    <button id="pmSearchGo" class="btn sm">搜索</button>
+  </div>
+  <div id="pmSearchMeta" style="font-size:11.5px;color:var(--muted);margin-top:8px;"></div>
+  <div id="pmSearchRes" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto;"></div>
+</div>
+<style>
+  .pm-hit{display:flex;gap:10px;align-items:baseline;padding:8px 11px;border:1px solid var(--line);
+    border-radius:9px;cursor:pointer;font-size:13px;}
+  .pm-hit:hover{border-color:var(--muted);}
+  .pm-hit .t{color:var(--muted);font-size:11px;flex:none;font-variant-numeric:tabular-nums;}
+  .pm-hit .c{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pm-hit .c b{color:#c9a227;}
+  @keyframes pmFlash{0%,60%{background:rgba(201,162,39,.28);}100%{background:transparent;}}
+  .msg.pm-flash{animation:pmFlash 1.6s ease;}
+</style>
+<div class="pc-typing" id="pcTyping"></div>
+{% if i_blocked_target %}
+<p class="sub" style="color:#c0392b;">你已拉黑对方，双方消息互相屏蔽。<a href="{{ url_for('blacklist_page') }}">前往黑名单管理</a></p>
+{% elif not is_friend and not current_user.is_admin and can_send %}
+<p class="sub">提示：你们还不是好友，对方开启了「所有人可私信」，注意保护个人信息</p>
+{% endif %}
+
+<div class="drop-zone">
+  <div class="chat-box" id="chatBox">
+    {% for msg in messages %}
+    {% if msg.day_label %}<div class="pc-day">{{ msg.day_label }}</div>{% endif %}
+    {% if msg.is_deleted %}
+    <div class="recall-tip">{{ msg.username }}撤回了一条消息</div>
+    {% else %}
+    <div class="msg {% if msg.user_id == current_user.id %}me{% endif %}{% if msg.cont %} cont{% endif %} {% if get_user_effect(msg) %}effect-{{ get_user_effect(msg) }}{% endif %}"
+         data-mid="{{ msg.id }}" data-uid="{{ msg.user_id }}" data-ts="{{ msg.created_at }}">
+      <img src="{{ get_avatar_url(msg) }}" alt="" class="avatar">
+      <div class="msg-content">
+        <div class="head">
+          <span class="name">
+            {{ msg.username }}
+            {% if msg.is_admin %}<span class="tag admin">管理员</span>{% endif %}
+            {{ badges_html(msg) }}
+          </span>
+          <span class="time">{{ msg.created_at|fmttime }}</span>
+          {% if msg.last_mine %}
+          <span class="read-mark {% if msg.read_at %}on{% endif %}">{% if msg.read_at %}已读{% else %}未读{% endif %}</span>
+          {% endif %}
+        </div>
+        {% if msg.content %}
+        {# 气泡特效与聊天室保持一致：条件也要一样，只排除 solid（none/line 等都有对应的 CSS） #}
+        <div class="body{% if msg.bubble_style and msg.bubble_style != 'solid' %} bubble-{{ msg.bubble_style }}{% endif %}">{{ msg.content }}</div>
+        {% endif %}
+        {% if msg.file_url %}
+        <div class="body{% if msg.bubble_style and msg.bubble_style != 'solid' %} bubble-{{ msg.bubble_style }}{% endif %}" style="margin-top:4px;">
+          {% if msg.file_type == 'image' %}
+          <a href="{{ msg.file_url }}" target="_blank"><img src="{{ img_src(msg.file_url, row_get(msg, 'img_meta', ''), 'm') }}" style="max-width:250px;border-radius:8px;" loading="lazy" decoding="async"{% set _w, _h = img_size(row_get(msg, 'img_meta', ''), 'm') %}{% if _w %} width="{{ _w }}" height="{{ _h }}"{% endif %}></a>
+          {% elif msg.file_type == 'video' %}
+          <video src="{{ msg.file_url }}" controls style="max-width:300px;border-radius:8px;"></video>
+          {% else %}
+          <a href="{{ msg.file_url }}?name={{ msg.file_name|urlencode }}" class="file-attachment" style="text-decoration:none;color:inherit;">
+            <span class="file-icon">📄</span>
+            <div class="file-info">
+              <div class="file-name">{{ msg.file_name }}</div>
+              <div class="file-download">点击下载</div>
+            </div>
+          </a>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% if msg.user_id == current_user.id %}
+        <div class="pc-tools">
+          <button type="button" class="pc-tool" data-act="edit" data-mid="{{ msg.id }}">编辑</button>
+          <button type="button" class="pc-tool" data-act="recall" data-mid="{{ msg.id }}">撤回</button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="msg-actions">
+        {% if msg.user_id != current_user.id %}
+        <form method="post" action="{{ url_for('submit_report', target_type='private', target_id=msg.id) }}" class="inline-report" onsubmit="return confirm(__('确定举报该私聊消息？'));">
+          <select name="category" style="width:auto;padding:2px 4px;font-size:11px;">
+            <option>广告引流</option><option>辱骂引战</option><option>违规内容</option><option>刷屏骚扰</option><option>恶意文件</option><option>其他违规</option>
+          </select>
+          <button type="submit" class="report-btn">举报</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty">开始你们的对话吧！</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if can_send %}
+<form method="post" enctype="multipart/form-data" class="send-bar" action="{{ url_for('send_private', user_id=target.id) }}">
+  <div class="input-area">
+    <div class="file-preview" id="filePreview"></div>
+    <textarea name="content" id="messageInput" placeholder="输入消息... (Enter发送，Shift+Enter换行)" rows="1"></textarea>
+    <input type="file" name="file" id="fileInput" accept="image/*,video/*" style="display:none;">
+  </div>
+  <div class="row">
+    <button type="button" class="btn ghost" onclick="document.getElementById('fileInput').click()">📎</button>
+    <button type="submit" class="btn">发送</button>
+  </div>
+</form>
+{% else %}
+<div class="card" style="margin-top:16px;text-align:center;padding:20px;">
+  <p class="muted">{{ deny_reason or "当前无法发送私信" }}</p>
+  {% if i_blocked_target %}
+  <form method="post" action="{{ url_for('unblock_user', user_id=target.id) }}" style="margin-top:10px;">
+    <button type="submit" class="btn ghost sm">解除拉黑</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<div style="margin-top:16px;">
+  <a href="{{ url_for('friends') }}" class="btn ghost sm">← 返回好友列表</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ cdn_url('js/socket.io.min.js') }}"></script>
+<script>
+/* 036 私聊全文检索 */
+(function(){
+  var btn = document.getElementById('pmSearchBtn');
+  var panel = document.getElementById('pmSearchPanel');
+  var q = document.getElementById('pmSearchQ');
+  var go = document.getElementById('pmSearchGo');
+  var res = document.getElementById('pmSearchRes');
+  var meta = document.getElementById('pmSearchMeta');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', function(){
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel.style.display === 'block') q.focus();
+  });
+  function run(){
+    var kw = (q.value || '').trim();
+    if (!kw) return;
+    res.innerHTML = '<div class="muted" style="font-size:12px;">搜索中…</div>';
+    fetch('/api/pm/search?peer={{ target.id }}&q=' + encodeURIComponent(kw))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j.ok) { res.innerHTML = '<div class="muted" style="font-size:12px;">搜索失败</div>'; return; }
+        meta.textContent = j.items.length ? ('找到 ' + j.items.length + ' 条（最多 50 条，点击跳转定位）') : '没有找到相关记录';
+        res.innerHTML = j.items.map(function(it){
+          var d = new Date(it.ts);
+          var hm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+          var body = it.content || ('[文件] ' + (it.file_name || ''));
+          var esc = body.replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; });
+          var kwEsc = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var shown = esc.replace(new RegExp('(' + kwEsc + ')', 'gi'), '<b>$1</b>');
+          return '<div class="pm-hit" data-mid="' + it.id + '"><span class="t">' + hm + '</span>' +
+                 '<span class="c">' + shown + '</span></div>';
+        }).join('');
+      }).catch(function(){ res.innerHTML = '<div class="muted" style="font-size:12px;">搜索失败</div>'; });
+  }
+  go.addEventListener('click', run);
+  q.addEventListener('keydown', function(e){ if (e.key === 'Enter') run(); });
+  res.addEventListener('click', function(e){
+    var hit = e.target.closest('.pm-hit');
+    if (!hit) return;
+    var el = document.querySelector('.msg[data-mid="' + hit.dataset.mid + '"]');
+    if (!el) {
+      // 更早的历史可能不在当前页 DOM 里 —— 提示并刷新定位
+      meta.textContent = '该消息不在当前加载的页面中，正在重新加载定位…';
+      location.reload();
+      return;
+    }
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.classList.remove('pm-flash'); void el.offsetWidth; el.classList.add('pm-flash');
+  });
+})();
+</script>
+<script>
+(function(){
+  var chatBox = document.getElementById('chatBox');
+  var messageInput = document.getElementById('messageInput');
+  var fileInput = document.getElementById('fileInput');
+  var filePreview = document.getElementById('filePreview');
+  var typingBox = document.getElementById('pcTyping');
+  var TARGET = {{ target.id }};
+  var MYID = {{ current_user.id }};
+  var MYNAME = {{ current_user.username | tojson }};
+  /* 头像统一用 get_avatar_url() —— 和服务端渲染同一个来源。
+     以前这里用 /static/default_avatar.png 兜底，但那个文件当时是坏的（装的是一段
+     截断的 base64 文本），结果 JS 渲染出来的新消息头像全是破图，刷新才正常 ✗ */
+  var MYAVA = {{ get_avatar_url(current_user) | tojson }};
+  /* 自己的气泡样式：本地先渲染成 pending 时也要带上，免得确认后再闪一下 */
+  var MYBUBBLE = {{ (current_user.bubble_style or '') | tojson }};
+  var form = messageInput ? messageInput.form : null;
+  var busy = false;
+  var origTitle = document.title;
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function hhmm(ts){
+    var d = new Date(ts * 1000), p = function(n){ return n < 10 ? '0' + n : '' + n; };
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function nearBottom(){
+    return chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 140;
+  }
+  function toBottom(){ chatBox.scrollTop = chatBox.scrollHeight; }
+  function dropEmpty(){ var e = chatBox.querySelector('.empty'); if (e) e.remove(); }
+
+  function fileBlock(m, bc){
+    if (!m.file_url) return '';
+    /* 和聊天室一致：文件消息也套同一个气泡（以前这里用内联样式把背景边框去掉了） */
+    var wrap = '<div class="body' + (bc || '') + '" style="margin-top:4px;">';
+    if (m.file_type === 'image')
+      return wrap + '<a href="' + esc(m.file_url) + '" target="_blank"><img src="'
+        + esc(m.file_url) + '" style="max-width:250px;border-radius:8px;" loading="lazy" decoding="async"></a></div>';
+    if (m.file_type === 'video')
+      return wrap + '<video src="' + esc(m.file_url)
+        + '" controls style="max-width:300px;border-radius:8px;"></video></div>';
+    return wrap + '<a href="' + esc(m.file_url) + '" class="file-attachment" style="text-decoration:none;color:inherit;">'
+      + '<span class="file-icon">📄</span><div class="file-info"><div class="file-name">'
+      + esc(m.file_name || '') + '</div><div class="file-download">点击下载</div></div></a></div>';
+  }
+
+  function msgHTML(m, st, cont){
+    var mine = m.user_id === MYID;
+    /* 气泡特效：条件和聊天室 chat.html 的 _bc 完全一致（只排除 solid） */
+    var bc = (m.bubble_style && m.bubble_style !== 'solid') ? ' bubble-' + m.bubble_style : '';
+    var cls = 'msg' + (mine ? ' me' : '') + (cont ? ' cont' : '')
+      + (st === 'pending' ? ' pc-pending' : '') + (st === 'failed' ? ' pc-failed' : '');
+    var mark = '';
+    if (mine){
+      mark = '<span class="read-mark' + (st === 'sent' ? '' : ' on') + '">'
+        + (st === 'pending' ? '发送中…' : st === 'failed' ? '发送失败' : '未读') + '</span>';
+    }
+    var tools = '';
+    if (mine && m.id){
+      tools = '<div class="pc-tools">'
+        + '<button type="button" class="pc-tool" data-act="edit" data-mid="' + m.id + '">编辑</button>'
+        + '<button type="button" class="pc-tool" data-act="recall" data-mid="' + m.id + '">撤回</button>'
+        + '</div>';
+    }
+    return '<div class="' + cls + '"' + (m.id ? ' data-mid="' + m.id + '"' : '')
+      + ' data-uid="' + m.user_id + '" data-ts="' + m.created_at + '">'
+      + '<img src="' + esc(m.avatar || '') + '" alt="" class="avatar">'
+      + '<div class="msg-content"><div class="head">'
+      + '<span class="name">' + esc(m.username || '') + '</span>'
+      + '<span class="time">' + hhmm(m.created_at) + '</span>' + mark + '</div>'
+      + (m.content ? '<div class="body' + bc + '">' + esc(m.content) + '</div>' : '')
+      + fileBlock(m, bc) + tools + '</div></div>';
+  }
+
+  function lastMsgEl(){
+    var kids = chatBox.querySelectorAll('.msg');
+    return kids.length ? kids[kids.length - 1] : null;
+  }
+
+  function append(m, st){
+    dropEmpty();
+    var stick = nearBottom();
+    var p = lastMsgEl(), cont = false;
+    if (p){
+      cont = (+p.getAttribute('data-uid') === m.user_id)
+          && ((m.created_at - (+p.getAttribute('data-ts'))) < 300);
+    }
+    var holder = document.createElement('div');
+    holder.innerHTML = msgHTML(m, st, cont);
+    var el = holder.firstChild;
+    chatBox.appendChild(el);
+    if (st !== 'pending') el.classList.add('pc-in');
+    if (stick) toBottom();
+    return el;
+  }
+
+  function post(url, body){
+    var fd = new FormData();
+    for (var k in body) fd.append(k, body[k]);
+    return fetch(url, {method: 'POST', body: fd, credentials: 'same-origin'})
+      .then(function(r){ return r.json().catch(function(){ return {error: '请求失败'}; }); });
+  }
+
+  function doRecall(mid, el){
+    function handle(r){
+      if (!r || r.error || !r.ok){ alert((r && r.error) || '撤回失败'); return; }
+      if (el) el.outerHTML = '<div class="recall-tip">你撤回了一条消息</div>';
+    }
+    post('/recall-message/' + mid, {}).then(function(r){
+      if (r && r.need_card){
+        if (!confirm(__('这条消息已超过撤回时限。\n用一张「{card}」撤回？剩余 {n} 张',
+                        {card: (r.card_name || '无痕撤回卡'), n: r.card_count}))) return;
+        return post('/recall-message/' + mid, {confirm_card: '1'}).then(handle);
+      }
+      handle(r);
+    });
+  }
+
+  function doEdit(mid, el){
+    var body = el ? el.querySelector('.body') : null;
+    if (!body) return;
+    var cur = body.textContent;
+    var nv = prompt('编辑这条私信：', cur);
+    if (nv === null) return;
+    nv = nv.trim();
+    if (!nv || nv === cur) return;
+    post('/edit-message/' + mid, {content: nv}).then(function(r){
+      if (!r || r.error || !r.ok){ alert((r && r.error) || '编辑失败'); return; }
+      body.textContent = nv;
+      var h = el.querySelector('.head');
+      if (h && !h.querySelector('.pc-edited')){
+        var s = document.createElement('span');
+        s.className = 'pc-edited';
+        s.textContent = '已编辑';
+        h.appendChild(s);
+      }
+    });
+  }
+
+  if (chatBox){
+    chatBox.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('.pc-tool') : null;
+      if (!b) return;
+      var mid = b.getAttribute('data-mid');
+      var el = chatBox.querySelector('[data-mid="' + mid + '"]');
+      if (b.getAttribute('data-act') === 'recall') doRecall(mid, el);
+      else doEdit(mid, el);
+    });
+  }
+
+  function settle(el, mid){
+    el.classList.remove('pc-pending');
+    if (mid) el.setAttribute('data-mid', mid);
+    var mk = el.querySelector('.read-mark');
+    if (mk){ mk.textContent = '未读'; mk.classList.remove('on'); }
+  }
+  function fail(el, why){
+    el.classList.remove('pc-pending');
+    el.classList.add('pc-failed');
+    var mk = el.querySelector('.read-mark');
+    if (mk){ mk.textContent = why || '发送失败'; mk.classList.add('on'); }
+    if (why) el.title = why;
+  }
+
+  function ping(){
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      var c = window.__pcAC || (window.__pcAC = new AC());
+      if (c.state === 'suspended' && c.resume) c.resume();
+      var t = c.currentTime;
+      var o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(880, t);
+      o.frequency.exponentialRampToValueAtTime(1320, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.11, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      o.connect(g); g.connect(c.destination);
+      o.start(t); o.stop(t + 0.26);
+    }catch(e){}
+  }
+
+  var flashTimer = null;
+  function flashTitle(){
+    if (document.hasFocus() || flashTimer) return;
+    var on = false;
+    flashTimer = setInterval(function(){
+      on = !on;
+      document.title = on ? '【新私信】' + origTitle : origTitle;
+    }, 900);
+    window.addEventListener('focus', function(){
+      if (flashTimer){ clearInterval(flashTimer); flashTimer = null; document.title = origTitle; }
+    }, {once:true});
+  }
+
+  function onIncoming(d){
+    if (!d || !d.msg) return;
+    var m = d.msg;
+    if (m.user_id === MYID){
+      var pend = chatBox.querySelector('.msg.pc-pending');
+      if (pend){ settle(pend, m.id); return; }
+    }
+    if (chatBox.querySelector('[data-mid="' + m.id + '"]')) return;
+    append(m, 'sent');
+    if (m.user_id !== MYID){
+      try { window.__monoSio().emit('pm_ack', {id: m.id}); } catch(e){}  // 051 送达回执
+      if (!m.backfill){ ping(); flashTitle(); }  // 补推消息静默（不响铃）
+    }
+  }
+
+  function doSend(){
+    if (busy) return;
+    var text = messageInput.value.trim();
+    var f = fileInput && fileInput.files[0];
+    if (!text && !f) return;
+    busy = true;
+
+    var tmp = {
+      user_id: MYID, username: MYNAME, avatar: MYAVA, content: text,
+      bubble_style: MYBUBBLE,
+      created_at: Date.now() / 1000,
+      file_url: f ? URL.createObjectURL(f) : null,
+      file_type: f ? (f.type.indexOf('image') === 0 ? 'image'
+                    : f.type.indexOf('video') === 0 ? 'video' : 'file') : null,
+      file_name: f ? f.name : null
+    };
+    var el = append(tmp, 'pending');
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+    if (filePreview) filePreview.innerHTML = '';
+    toBottom();
+
+    var fd = new FormData();
+    fd.append('to', TARGET);
+    fd.append('content', text);
+    if (f) fd.append('file', f);
+    fd.append('idem_key', 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));  // 051 幂等键：重连重发同键只入库一次
+    if (fileInput) fileInput.value = '';
+
+    fetch('/api/private/send', {method: 'POST', body: fd, credentials: 'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        busy = false;
+        if (!r || !r.ok){ fail(el, (r && r.msg) || '发送失败'); return; }
+        settle(el, r.msg.id);
+      })
+      .catch(function(){ busy = false; fail(el, '网络异常'); });
+  }
+
+  scrollToBottom();
+
+  if (messageInput){
+    messageInput.addEventListener('input', function(){
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+    });
+    messageInput.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        doSend();
+      }
+    });
+    if (form){
+      form.addEventListener('submit', function(e){
+        e.preventDefault();
+        doSend();
+      });
+    }
+  }
+
+  (function(){
+    var fi = document.getElementById('fileInput');
+    if (!fi) return;
+    try{
+      var mode = localStorage.getItem('mono_file_pick') || 'media';
+      if (mode === 'file') fi.removeAttribute('accept');
+      else fi.setAttribute('accept', 'image/*,video/*');
+    }catch(e){}
+  })();
+
+  (function(){
+    if (!typingBox || !messageInput || typeof io === 'undefined') return;
+    var socket = window.__monoSio();
+    var lastSent = 0, hideTimer = null;
+
+    socket.on('private_message', onIncoming);
+
+    // 051：对方客户端确认收到 → 我方气泡「已送达」
+    socket.on('pm_delivered', function(d){
+      if (!d || !d.id) return;
+      var el = chatBox.querySelector('[data-mid="' + d.id + '"] .read-mark');
+      if (el){ el.textContent = '已送达'; el.classList.add('on'); }
+    });
+
+    // 015：对方已读回执 → 我方最后一条消息「已读」
+    socket.on('dm_read_receipt', function(d){
+      if (!d || d.from !== TARGET) return;
+      var mine = chatBox.querySelectorAll('.msg.mine[data-mid]');
+      for (var i = mine.length - 1; i >= 0; i--){
+        var mk = mine[i].querySelector('.read-mark');
+        if (mk && Number(mine[i].getAttribute('data-mid')) <= d.upto_id){
+          mk.textContent = '已读'; mk.classList.add('on'); break;
+        }
+      }
+    });
+
+    messageInput.addEventListener('input', function(){
+      if (!socket.connected) return;
+      var now = Date.now();
+      if (now - lastSent < 1500) return;
+      lastSent = now;
+      socket.emit('private_typing', { to: TARGET });
+    });
+
+    socket.on('private_typing', function(d){
+      if (!d || d.from !== TARGET) return;
+      typingBox.textContent = (d.name || '对方') + ' 正在输入…';
+      typingBox.classList.add('on');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function(){
+        typingBox.classList.remove('on');
+        typingBox.textContent = '';
+      }, 3000);
+    });
+
+    if (form){
+      form.addEventListener('submit', function(){
+        clearTimeout(hideTimer);
+        typingBox.classList.remove('on');
+        typingBox.textContent = '';
+      });
+    }
+  })();
+})();
+</script>
+{% endblock %}

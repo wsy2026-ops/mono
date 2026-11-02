@@ -1,0 +1,7 @@
+{
+  "title": "1 到 n 求和",
+  "description": "输入一个正整数 n，输出 1+2+...+n 的结果。",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256,
+  "checker": "diff"
+}

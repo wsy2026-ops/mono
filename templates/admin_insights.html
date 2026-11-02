@@ -1,0 +1,1073 @@
+{% extends "_admin_base.html" %}
+{% block admin_icon %}📈{% endblock %}
+{% block admin_heading %}运营分析{% endblock %}
+{% block admin_desc %}谁在用、用什么、听多久 —— 以及这些数字说明了什么问题{% endblock %}
+
+{% block admin_actions %}
+<div class="ins-days">
+  {% for d in [7, 14, 30, 60, 90] %}
+  <button type="button" class="ins-day{{ ' on' if d == 30 }}" data-days="{{ d }}">{{ d }}天</button>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block admin_content %}
+<style>
+  /* ══ 配色系统：分类色相 + 同类明度渐变 ══════════════════
+   * 12 个色相槽位等距分布在色轮上（HSL hue 间隔 30°），
+   * 同一类别的多序列用同一 hue、不同 lightness 拉开层次。
+   * 全部在 JS 端按主题重算（light/dark 亮度不同），
+   * CSS 变量只负责不随主题变的部分（分类底色、网格）。 */
+  .ins-viewtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 10px;}
+  .ins-viewtab{padding:9px 16px;border:none;background:transparent;color:var(--muted);
+    font-size:13.5px;cursor:pointer;font-family:inherit;position:relative;}
+  .ins-viewtab:hover{color:var(--fg);}
+  .ins-viewtab.on{color:var(--fg);font-weight:700;}
+  .ins-viewtab.on::after{content:'';position:absolute;left:0;right:0;bottom:-1px;
+    height:2px;background:var(--fg);}
+  .ins-days{display:flex;gap:4px;}
+  .ins-day{padding:5px 11px;border:1px solid var(--line);border-radius:15px;background:transparent;
+    color:var(--muted);font-size:12.5px;cursor:pointer;font-family:inherit;}
+  .ins-day:hover{border-color:var(--fg);color:var(--fg);}
+  .ins-day.on{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:600;}
+
+  /* ══ 紧凑布局：多栏并排，压纵向留白 ══════════════════ */
+  .ins-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+    gap:6px;margin-bottom:10px;}
+  .ins-card{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--card);}
+  .ins-card .k{font-size:10.5px;color:var(--muted);margin-bottom:2px;line-height:1.35;}
+  .ins-card .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .ins-card .s{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.35;}
+
+  /* 区块本身分两种：独占整行（宽表/多子图）与半宽（单图） */
+  .ins-block{border:1px solid var(--line);border-radius:11px;background:var(--card);
+    padding:12px 14px;margin-bottom:8px;}
+  .ins-block h3{margin:0 0 2px;font-size:14px;font-weight:700;
+    display:flex;align-items:center;gap:6px;}
+  .ins-block .hint{color:var(--muted);font-size:11.5px;margin:0 0 9px;line-height:1.55;}
+  .ins-block svg{display:block;width:100%;height:auto;overflow:visible;}
+
+  /* 图组：同一行放 2~4 个图，容器最窄 280px 就换行 */
+  /* 单栏最少 340px：280px 时折线图的 x 轴标签会挤成一团 */
+  .ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+    gap:9px;margin-bottom:9px;}
+  .ins-grid.g2{grid-template-columns:repeat(auto-fit,minmax(400px,1fr));}
+  .ins-grid .ins-block{margin-bottom:0;}
+  @media(min-width:1500px){
+    .ins-grid{grid-template-columns:repeat(3,1fr);}
+    .ins-grid.g2{grid-template-columns:repeat(2,1fr);}
+  }
+
+  /* 子图标题（图组内的每个图） */
+  .ins-st{font-size:12px;font-weight:600;color:var(--fg-2);margin:0 0 6px;
+    display:flex;align-items:center;gap:5px;}
+  .ins-st i{width:7px;height:7px;border-radius:2px;flex:0 0 7px;}
+
+  @media(max-width:640px){
+    .ins-grid,.ins-grid.g2{grid-template-columns:1fr;}
+    .ins-cards{grid-template-columns:repeat(auto-fit,minmax(96px,1fr));}
+  }
+
+  .ins-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:6px;}
+  .ins-legend i{display:inline-block;width:9px;height:2.5px;border-radius:2px;vertical-align:middle;margin-right:4px;}
+
+  .ins-bars{display:flex;flex-direction:column;gap:7px;}
+  .ins-b{display:flex;align-items:center;gap:10px;font-size:13px;}
+  .ins-b-n{flex:0 0 92px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ins-b-t{flex:1;height:18px;background:var(--soft);border-radius:4px;overflow:hidden;position:relative;}
+  .ins-b-t i{display:block;height:100%;background:var(--fg);border-radius:4px;transition:width .3s ease;}
+  .ins-b-v{flex:0 0 74px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11.5px;}
+
+  .ins-tips{display:flex;flex-direction:column;gap:6px;}
+  .ins-tip{display:flex;gap:9px;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--card);}
+  .ins-tip.warn{border-left:3px solid #c0392b;}
+  .ins-tip.good{border-left:3px solid #27ae60;}
+  .ins-tip.flat{border-left:3px solid #8a8a8a;}
+  .ins-tip .ti{font-size:15px;line-height:1.35;flex:0 0 auto;}
+  .ins-tip .tt{font-size:12.5px;font-weight:700;margin-bottom:2px;}
+  .ins-tip .tx{font-size:11.5px;color:var(--muted);line-height:1.6;}
+
+  .ins-empty{color:var(--muted);font-size:13px;padding:26px 0;text-align:center;}
+  .ins-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin-bottom:6px;}
+  .ins-kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg-elev);}
+  .ins-kpi .k{font-size:11.5px;color:var(--muted);margin-bottom:3px;line-height:1.4;}
+  .ins-kpi .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15;}
+  .ins-kpi .v.warn{color:#c0392b;}
+  .ins-kpi .s{font-size:10.5px;color:var(--muted);margin-top:2px;}
+
+  .ins-ratio{display:flex;height:16px;border-radius:5px;overflow:hidden;margin-bottom:7px;}
+  .ins-ratio-seg{min-width:2px;}
+  .ins-ratio-k{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--muted);}
+  .ins-ratio-k i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;
+    vertical-align:-1px;}
+
+  .ins-tbl-wrap{overflow-x:auto;margin-bottom:4px;}
+  .ins-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+  .ins-tbl th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;
+    padding:6px 9px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .ins-tbl td{padding:6px 9px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .ins-tbl tr:last-child td{border-bottom:none;}
+  .ins-tbl td.k{font-weight:600;}
+  .ins-tbl tr:hover td{background:var(--soft);}
+  .ins-sec-t{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.06em;
+    margin:11px 0 5px;display:flex;align-items:center;gap:5px;}
+  .ins-sec-t::before{content:'';width:2px;height:10px;border-radius:2px;background:var(--muted);}
+</style>
+
+<div class="ins-viewtabs">
+  <button type="button" class="ins-viewtab on" data-view="overview">📊 总览</button>
+  <button type="button" class="ins-viewtab" data-view="deep">🔬 深度分析（事无巨细）</button>
+</div>
+<div id="insRoot"><div class="ins-empty">加载中…</div></div>
+<div id="deepRoot" style="display:none;"><div class="ins-empty">加载中…</div></div>
+
+<script>
+(function(){
+  'use strict';
+  var root = document.getElementById('insRoot');
+  var days = 30;
+
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function fmtDur(ms){
+    var s = (ms||0)/1000;
+    if (s <= 0) return '0 分钟';
+    if (s < 3600) return Math.round(s/60) + ' 分钟';
+    return Math.floor(s/3600) + ' 小时 ' + Math.round((s%3600)/60) + ' 分';
+  }
+
+  /* ══ 配色引擎 ═══════════════════════════════════════
+   * 分类：12 个色相槽位（间隔 30°）等距铺开，一眼能区分。
+   * 同类渐变：给定基色相，用不同 lightness 拉层次（深→浅）。
+   * 明暗主题各一套 lightness 区间 —— 浅底用深色，深底用亮色，
+   *   否则同一条线在暗色主题下会糊成一片。
+   */
+  var PAL_HUES = [212, 28, 152, 262, 340, 44, 186, 96, 320, 8, 232, 128];
+
+  function isDark(){
+    var t = document.documentElement.getAttribute('data-theme');
+    if (t === 'dark') return true;
+    if (t === 'light' || t === 'sepia' || t === 'ocean' || t === 'forest') return false;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  /* 分类色：第 i 个槽位 */
+  function cat(i){
+    var h = PAL_HUES[((i % PAL_HUES.length) + PAL_HUES.length) % PAL_HUES.length];
+    var s = isDark() ? 58 : 62;
+    var l = isDark() ? 62 : 52;
+    return 'hsl(' + h + ',' + s + '%,' + l + '%)';
+  }
+
+  /* 同类渐变：基色相 + 第 k 层明度（k 越大越浅） */
+  function shade(baseHue, k, total){
+    total = total || 3;
+    var h = baseHue;
+    var s = isDark() ? 55 : 60;
+    var lo = isDark() ? 42 : 38;
+    var hi = isDark() ? 74 : 66;
+    var l = total <= 1 ? (isDark() ? 62 : 52)
+                       : lo + (hi - lo) * (k / (total - 1));
+    return 'hsl(' + h + ',' + s + '%,' + l.toFixed(1) + '%)';
+  }
+
+  /* 从任意数据条目的下标推导分类色（用于 barChart 的分组着色） */
+  function catBy(k){ return cat(k * 2 + 1); }
+
+  var GRID = 'rgba(128,128,128,.16)';
+  var AXIS = 'rgba(128,128,128,.34)';
+
+  /* ── 手写 SVG 折线图（不引外部库：离线可用、样式跟随主题）── */
+  function lineChart(labels, series, opts){
+    opts = opts || {};
+    var W = 860, H = opts.height || 200;
+    var ml = 38, mr = 12, mt = 10, mb = 22;
+    var iw = W - ml - mr, ih = H - mt - mb;
+    var n = labels.length;
+    if (!n) return '<div class="ins-empty">无数据</div>';
+
+    var all = [];
+    series.forEach(function(s){ all = all.concat(s.data); });
+    var max = opts.max || Math.max.apply(null, all.concat([1]));
+    var step = n > 1 ? iw / (n - 1) : 0;
+    var g = '';
+
+    /* 横向网格 + y 轴刻度（4 条，浅色虚线） */
+    var ticks = 4;
+    for (var t = 0; t <= ticks; t++){
+      var y = mt + ih - (ih * t / ticks);
+      var v = Math.round(max * t / ticks);
+      g += '<line x1="' + ml + '" y1="' + y.toFixed(1) + '" x2="' + (W-mr) + '" y2="' + y.toFixed(1)
+         + '" stroke="' + GRID + '" stroke-width="1" stroke-dasharray="3 4"/>';
+      g += '<text x="' + (ml-5) + '" y="' + (y+3.5).toFixed(1) + '" text-anchor="end"'
+         + ' font-size="11" fill="var(--muted)" font-variant-numeric="tabular-nums">' + v + '</text>';
+    }
+    /* 基线稍重一点 */
+    g += '<line x1="' + ml + '" y1="' + (mt+ih) + '" x2="' + (W-mr) + '" y2="' + (mt+ih)
+       + '" stroke="' + AXIS + '" stroke-width="1"/>';
+
+    /* x 轴标签：最多 8 个 */
+    var every = Math.max(1, Math.ceil(n / 8));
+    for (var i = 0; i < n; i++){
+      if (i % every !== 0 && i !== n-1) continue;
+      var x = ml + step * i;
+      var isLast = (i === n-1);
+      g += '<text x="' + x.toFixed(1) + '" y="' + (H-5) + '" text-anchor="middle"'
+         + ' font-size="10.5" fill="' + (isLast ? 'var(--fg-2)' : 'var(--muted)') + '">'
+         + esc(labels[i]) + '</text>';
+    }
+
+    /* 折线 + 面积 */
+    series.forEach(function(s, si){
+      var col = s.color || cat(si);
+      var pts = [];
+      for (var i = 0; i < n; i++){
+        var x = ml + step * i;
+        var y = mt + ih - (Math.min(s.data[i], max) / max) * ih;
+        pts.push(x.toFixed(1) + ',' + y.toFixed(1));
+      }
+      if (!pts.length) return;
+      if (s.fill !== false){
+        g += '<path d="M' + ml + ',' + (mt+ih) + ' L' + pts.join(' L')
+           + ' L' + (ml+step*(n-1)).toFixed(1) + ',' + (mt+ih) + ' Z"'
+           + ' fill="' + col + '" opacity="' + (isDark() ? .16 : .12) + '"/>';
+      }
+      g += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + col
+         + '" stroke-width="' + (series.length > 2 ? 1.5 : 1.9) + '"'
+         + ' stroke-linejoin="round" stroke-linecap="round"'
+         + (s.dash ? ' stroke-dasharray="4 3"' : '') + '/>';
+      var lastY = mt + ih - (Math.min(s.data[n-1], max) / max) * ih;
+      g += '<circle cx="' + (ml+step*(n-1)).toFixed(1) + '" cy="' + lastY.toFixed(1)
+         + '" r="2.8" fill="' + col + '" stroke="var(--card)" stroke-width="1.2"/>';
+      /* 末点数值标注（只标第一个序列，避免糊） */
+      if (series.length === 1 && s.data[n-1] > 0){
+        g += '<text x="' + (ml+step*(n-1)-3) + '" y="' + (lastY-6).toFixed(1)
+           + '" text-anchor="end" font-size="9.5" font-weight="700" fill="' + col + '">'
+           + s.data[n-1] + '</text>';
+      }
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '">' + g + '</svg>';
+  }
+
+  /* 图例 */
+  function legend(series){
+    var h = '<div class="ins-legend">';
+    series.forEach(function(s, i){
+      h += '<span><i style="background:' + (s.color || cat(i)) + '"></i>' + esc(s.name) + '</span>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  /* 子图容器（图组里的一个） */
+  function sub(title, color, body){
+    return '<div class="ins-block"><div class="ins-st">'
+         + (color ? '<i style="background:' + color + '"></i>' : '')
+         + esc(title) + '</div>' + body + '</div>';
+  }
+
+  function bars(rows, fmt){
+    if (!rows.length) return '<div class="ins-empty">暂无数据</div>';
+    var max = Math.max.apply(null, rows.map(function(r){ return r.v; }).concat([1]));
+    var h = '';
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i];
+      var pct = (r.v / max * 100).toFixed(1);
+      h += '<div class="ins-b">'
+        + '<span class="ins-b-n" title="' + esc(r.n) + '">' + esc(r.n) + '</span>'
+        + '<span class="ins-b-t"><i style="width:' + pct + '%"></i></span>'
+        + '<span class="ins-b-v">' + esc(fmt ? fmt(r) : r.v) + '</span>'
+        + '</div>';
+    }
+    return '<div class="ins-bars">' + h + '</div>';
+  }
+
+  function render(j){
+    if (!j || !j.ok) { root.innerHTML = '<div class="ins-empty">加载失败</div>'; return; }
+    var m = j.music || {};
+    var dsum = j.dau.reduce(function(a,b){ return a+b; }, 0);
+    var peak = Math.max.apply(null, j.dau.concat([0]));
+    var avg = j.dau.length ? (dsum / j.dau.length) : 0;
+
+    var h = '';
+
+    /* 概览卡片 */
+    h += '<div class="ins-cards">'
+      + '<div class="ins-card"><div class="k">日均活跃</div><div class="v">' + avg.toFixed(1) + '</div>'
+      + '<div class="s">峰值 ' + peak + ' 人</div></div>'
+      + '<div class="ins-card"><div class="k">总活跃人次</div><div class="v">' + dsum + '</div>'
+      + '<div class="s">近 ' + j.days + ' 天累计</div></div>'
+      + '<div class="ins-card"><div class="k">发帖</div><div class="v">'
+      + j.posts.reduce(function(a,b){return a+b;},0) + '</div><div class="s">评论另计</div></div>'
+      + '<div class="ins-card"><div class="k">新注册</div><div class="v">'
+      + j.regs.reduce(function(a,b){return a+b;},0) + '</div><div class="s">近 ' + j.days + ' 天</div></div>'
+      + '<div class="ins-card"><div class="k">听歌人数</div><div class="v">' + (m.listeners||0) + '</div>'
+      + '<div class="s">' + (m.plays||0) + ' 次播放</div></div>'
+      + '<div class="ins-card"><div class="k">累计收听</div><div class="v">' + fmtDur(m.total_ms) + '</div>'
+      + '<div class="s">按真实播放时长</div></div>'
+      + '</div>';
+
+    /* 智能判断 */
+    if (j.insights && j.insights.length){
+      h += '<div class="ins-block"><h3>智能判断</h3>'
+        + '<p class="hint">从上面的数字自动读出的结论，供你直接决策</p><div class="ins-tips">';
+      for (var i = 0; i < j.insights.length; i++){
+        var t = j.insights[i];
+        h += '<div class="ins-tip ' + esc(t.level) + '">'
+          + '<span class="ti">' + esc(t.icon) + '</span>'
+          + '<div><div class="tt">' + esc(t.title) + '</div>'
+          + '<div class="tx">' + esc(t.text) + '</div></div></div>';
+      }
+      h += '</div></div>';
+    }
+
+    /* 日活曲线 */
+    h += '<div class="ins-block"><h3>日活趋势</h3>'
+      + '<p class="hint">灰色为日活（去重人数），黑线为发帖数。峰值对应社团上课日。</p>'
+      + lineChart(j.labels, [
+          { name:'日活', data:j.dau, color:'var(--muted)', fill:true },
+          { name:'发帖', data:j.posts, color:'var(--fg)' }
+        ])
+      + '<div class="ins-legend">'
+      + '<span><i style="background:var(--muted)"></i>日活（去重）</span>'
+      + '<span><i style="background:var(--fg)"></i>每日发帖</span>'
+      + '</div></div>';
+
+    /* 功能使用 */
+    var acts = j.actions.map(function(a){ return { n:a.action, v:a.c, u:a.u }; });
+    h += '<div class="ins-block"><h3>功能使用排行</h3>'
+      + '<p class="hint">按操作次数。右侧显示「次数 / 人数」—— 次数高但人数少说明是少数人反复用。</p>'
+      + bars(acts, function(r){
+          var src = j.actions.filter(function(a){ return a.action === r.n; })[0];
+          return src ? (src.c + ' / ' + src.u + '人') : r.v;
+        })
+      + '</div>';
+
+    /* 游戏热度 */
+    h += '<div class="ins-block"><h3>棋类热度</h3>'
+      + '<p class="hint">联机棋类。按「玩过的人数」排 —— 人数比次数更能反映真实吸引力。</p>'
+      + bars(j.games.map(function(g){
+          return { n: ({gomoku:'五子棋',go:'围棋',xq:'象棋',chess:'国际象棋',
+                       reversi:'黑白棋',jq:'揭棋'})[g.game] || g.game,
+                   v: g.players, plays: g.plays, wins: g.wins };
+        }), function(r){ return r.v + ' 人 / ' + r.plays + ' 局'; })
+      + '</div>';
+
+    /* 单机游戏 */
+    if (j.mini_games && j.mini_games.length){
+      h += '<div class="ins-block"><h3>单机游戏参与度</h3>'
+        + '<p class="hint">左侧游戏名，右侧是「多少人玩过」。0 人意味着这个入口是死的。</p>'
+        + bars(j.mini_games.map(function(x){ return { n:x.name, v:x.players, best:x.best }; }),
+               function(r){ return r.v + ' 人 · 最高 ' + r.best; })
+        + '</div>';
+    }
+
+    /* 音乐 */
+    h += '<div class="ins-block"><h3>音乐收听</h3>'
+      + '<p class="hint">只统计实际播放超过 3 秒的记录。数据从今天开始积累。</p>';
+    if (!m.plays){
+      h += '<div class="ins-empty">还没有播放记录。等同学真的开始听，这里会出现曲线。</div>';
+    } else {
+      h += lineChart(j.labels, [
+          { name:'听众', data:(m.days||[]).map(function(x){ return x.listeners; }), color:'var(--fg)', fill:true }
+        ], {height:192});
+      if (m.tracks && m.tracks.length){
+        h += '<div class="ins-sec-t">最常听</div>'
+          + bars(m.tracks.map(function(t){ return { n:t.title || '（未知）', v:t.ms, plays:t.plays, listeners:t.listeners }; }),
+                 function(r){ return fmtDur(r.v) + ' · ' + r.plays + ' 次'; });
+      }
+      if (m.listeners_list && m.listeners_list.length){
+        h += '<div class="ins-sec-t">谁在听</div>'
+          + bars(m.listeners_list.map(function(x){ return { n:x.username, v:x.ms, plays:x.plays }; }),
+                 function(r){ return fmtDur(r.v) + ' · ' + r.plays + ' 次'; });
+      }
+    }
+    h += '</div>';
+
+    root.innerHTML = h;
+  }
+
+  function load(){
+    root.innerHTML = '<div class="ins-empty">加载中…</div>';
+    fetch('/admin/api/insights?days=' + days, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(function(r){
+        if (r.status === 401 || r.status === 302) throw new Error('auth');
+        return r.json();
+      })
+      .then(render)
+      .catch(function(){ root.innerHTML = '<div class="ins-empty">加载失败或登录已过期</div>'; });
+  }
+
+  /* ══════════ 深度分析（9 区块 / 103 字段）══════════ */
+  var deepLoaded = false;
+
+  /* 柱状图：适合「按小时分布」「按类型分布」这类离散维度 */
+  function barChart(data, opts){
+    opts = opts || {};
+    if (!data || !data.length) return '<div class="ins-empty">无数据</div>';
+    var W = 860, H = opts.height || 150, ml = 36, mr = 8, mt = 10, mb = 20;
+    var iw = W - ml - mr, ih = H - mt - mb;
+    var max = Math.max.apply(null, data.map(function(d){ return d.v; }).concat([1]));
+    var n = data.length;
+    var step = iw / n;
+    var bw = Math.max(3, Math.min(opts.wide ? 54 : 32, step * 0.72));
+    var g = '';
+
+    /* 网格：3 条 */
+    for (var t = 0; t <= 2; t++){
+      var y = mt + ih - (ih * t / 2);
+      g += '<line x1="' + ml + '" y1="' + y.toFixed(1) + '" x2="' + (W-mr) + '" y2="' + y.toFixed(1)
+         + '" stroke="' + (t === 0 ? AXIS : GRID) + '" stroke-width="1"'
+         + (t === 0 ? '' : ' stroke-dasharray="2 4"') + '/>';
+      g += '<text x="' + (ml-5) + '" y="' + (y+3.5).toFixed(1) + '" text-anchor="end"'
+         + ' font-size="10.5" fill="var(--muted)" font-variant-numeric="tabular-nums">'
+         + Math.round(max * t / 2) + '</text>';
+    }
+
+    var maxIdx = 0;
+    for (var m = 1; m < n; m++) if (data[m].v > data[maxIdx].v) maxIdx = m;
+
+    for (var i = 0; i < n; i++){
+      var d = data[i];
+      var x = ml + step * i + (step - bw) / 2;
+      var h = (d.v / max) * ih;
+      var y = mt + ih - h;
+      /* 配色：peak 高亮（分类色 0），其余同一 hue 的浅一档 —— 突出最高点 */
+      var col = opts.color || (i === maxIdx && opts.peak !== false ? cat(0) : shade(212, 1, 3));
+      g += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1)
+         + '" height="' + Math.max(0.5, h).toFixed(1) + '" fill="' + col + '" rx="1.5"'
+         + ' opacity="' + (d.v === 0 ? .28 : .92) + '">'
+         + '<title>' + esc(d.k) + '：' + d.v + '</title></rect>';
+      /* x 标签：密集时抽样 */
+      var every = Math.max(1, Math.ceil(n / (opts.wide ? 40 : 26)));
+      if (i % every === 0 || i === n-1){
+        g += '<text x="' + (x + bw/2).toFixed(1) + '" y="' + (H-4) + '" text-anchor="middle"'
+           + ' font-size="' + (n > 40 ? 9 : 10.5) + '"'
+           + ' fill="' + (i === maxIdx ? 'var(--fg-2)' : 'var(--muted)') + '"'
+           + (i === maxIdx ? ' font-weight="700"' : '') + '>' + esc(d.k) + '</text>';
+      }
+      /* 峰值数值标注 */
+      if (i === maxIdx && d.v > 0 && opts.peak !== false){
+        g += '<text x="' + (x + bw/2).toFixed(1) + '" y="' + (y-4).toFixed(1)
+           + '" text-anchor="middle" font-size="11" font-weight="700" fill="' + cat(0) + '">'
+           + d.v + '</text>';
+      }
+    }
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '">' + g + '</svg>';
+  }
+
+  /* 横向条形（排行类，标签长）—— 逐条着色 */
+  function bars(rows, fmt, opts){
+    opts = opts || {};
+    if (!rows || !rows.length) return '<div class="ins-empty">暂无数据</div>';
+    var max = Math.max.apply(null, rows.map(function(r){ return r.v; }).concat([1]));
+    var h = '';
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i];
+      var pct = (r.v / max * 100);
+      /* 同 hue 明度渐变：排名越靠前越深 */
+      var col = opts.mono ? shade(212, Math.min(2, Math.floor(i / Math.max(1, rows.length / 3))), 3)
+                          : cat(i);
+      h += '<div class="ins-b">'
+        + '<span class="ins-b-n" title="' + esc(r.n) + '">' + esc(r.n) + '</span>'
+        + '<span class="ins-b-t"><i style="width:' + pct.toFixed(1) + '%;background:' + col + '"></i></span>'
+        + '<span class="ins-b-v">' + esc(fmt ? fmt(r) : r.v) + '</span>'
+        + '</div>';
+    }
+    return '<div class="ins-bars">' + h + '</div>';
+  }
+
+  /* 堆叠条：一条里显示多段占比 */
+  function stackBar(segments, total){
+    if (!segments || !segments.length) return '<div class="ins-empty">无数据</div>';
+    var sum = total || segments.reduce(function(a,b){ return a + b.v; }, 0) || 1;
+    var h = '<div class="ins-stack" style="height:13px;">';
+    segments.forEach(function(s, i){
+      var pct = Math.max(0, s.v * 100 / sum);
+      if (pct <= 0) return;
+      h += '<div style="width:' + pct.toFixed(2) + '%;background:' + shade(s.hue, 0, 1) + '"'
+         + ' title="' + esc(s.k) + '：' + s.v + '（' + pct.toFixed(1) + '%）"></div>';
+    });
+    h += '</div><div class="ins-stack-k">';
+    segments.forEach(function(s){
+      if (s.v <= 0) return;
+      var pct = s.v * 100 / sum;
+      h += '<span><i style="background:' + shade(s.hue, 0, 1) + '"></i>' + esc(s.k)
+         + ' ' + pct.toFixed(1) + '%</span>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  /* 分段占比条 */
+  function ratioBar(rows, opts){
+    opts = opts || {};
+    if (!rows || !rows.length) return '<div class="ins-empty">无数据</div>';
+    var total = rows.reduce(function(a,b){ return a + b.v; }, 0) || 1;
+    var h = '<div class="ins-ratio">';
+    rows.forEach(function(r, i){
+      var col = opts.colors ? opts.colors[i % opts.colors.length] : cat(i);
+      h += '<div class="ins-ratio-seg" style="flex:' + Math.max(0.4, r.v) + ';background:' + col + '"'
+         + ' title="' + esc(r.k) + '：' + r.v + '（' + (r.v*100/total).toFixed(1) + '%）"></div>';
+    });
+    h += '</div><div class="ins-ratio-k">';
+    rows.forEach(function(r, i){
+      var col = opts.colors ? opts.colors[i % opts.colors.length] : cat(i);
+      h += '<span><i style="background:' + col + '"></i>' + esc(r.k) + ' ' + r.v + '</span>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  /* 指标格：数字 + 说明，用于密集的计数展示 */
+  function kpis(list, opts){
+    opts = opts || {};
+    var hue = opts.hue;
+    var h = '<div class="ins-kpis">';
+    list.forEach(function(k, i){
+      if (k.v === undefined || k.v === null) return;
+      var accent = k.warn ? 'hsl(4,72%,52%)'
+                    : (k.good ? 'hsl(152,58%,38%)'
+                    : (hue !== undefined ? shade(hue, k.tone || 1, 3) : shade(212, 1, 3)));
+      h += '<div class="ins-kpi"' + (k.span ? ' style="grid-column:span ' + k.span + '"' : '') + '>'
+         + '<div class="k">' + esc(k.k) + '</div>'
+         + '<div class="v" style="color:' + accent + '">' + esc(k.v) + '</div>'
+         + (k.s ? '<div class="s">' + esc(k.s) + '</div>' : '') + '</div>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  /* 表格 */
+  function table(head, rows, opts){
+    opts = opts || {};
+    if (!rows || !rows.length) return '<div class="ins-empty">无数据</div>';
+    var h = '<div class="ins-tbl-wrap"><table class="ins-tbl"><thead><tr>';
+    head.forEach(function(x){ h += '<th>' + esc(x) + '</th>'; });
+    h += '</tr></thead><tbody>';
+    rows.forEach(function(r){
+      h += '<tr>';
+      r.forEach(function(c, i){
+        h += '<td' + (i === 0 ? ' class="k"' : '') + '>' + esc(c) + '</td>';
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    return h;
+  }
+
+  function section(icon, title, hint, body){
+    return '<div class="ins-block"><h3>' + icon + ' ' + esc(title) + '</h3>'
+         + '<p class="hint">' + esc(hint) + '</p>' + body + '</div>';
+  }
+
+  function renderDeep(j){
+    var root = document.getElementById('deepRoot');
+    if (!j || !j.ok || !j.sections) {
+      root.innerHTML = '<div class="ins-empty">加载失败</div>'; return;
+    }
+    var S = j.sections;
+    var h = '';
+
+    /* ── 1. 用户结构 ── */
+    var u = S.users || {};
+    var pct = function(a, b){ return b > 0 ? (a * 100 / b).toFixed(0) + '%' : '—'; };
+    h += '<div class="ins-block"><h3>👥 用户结构</h3>'
+      + '<p class="hint">注册量只是一半，另一半是「注册后还回不回来」。</p>'
+      + kpis([
+          {k:'总注册', v:u.total},
+          {k:'近'+j.days+'天新增', v:u.new, s:'占总量 '+pct(u.new,u.total)},
+          {k:'近'+j.days+'天活跃', v:u.active, s:'占新增 '+pct(u.active,u.new)},
+          {k:'活跃/注册比', v:pct(u.active,u.total), warn: u.total>0 && u.active*100/u.total<30},
+          {k:'管理员', v:u.admin}, {k:'超管', v:u.super},
+          {k:'已封禁', v:u.banned, warn:u.banned>0}, {k:'已禁言', v:u.muted, warn:u.muted>0},
+          {k:'已注销', v:u.deactivated}, {k:'看过引导', v:u.onboarded, s:pct(u.onboarded,u.total)}
+        ])
+      + '<div class="ins-sec-t">资料完善度（占总注册）</div>'
+      + ratioBar([
+          {k:'设签名', v:u.profile_sig||0}, {k:'传头像', v:u.profile_avatar||0},
+          {k:'获称号', v:u.profile_title||0}, {k:'开特效', v:u.profile_effect||0},
+          {k:'挂牌坊', v:u.with_title||0}, {k:'挂徽章', v:u.with_badge||0},
+          {k:'未完善', v: Math.max(0,(u.total||0)-new Set([u.profile_sig,u.profile_avatar,u.profile_title,u.profile_effect,u.with_title,u.with_badge].filter(Boolean)).size)}
+        ], {colors:['#111','#444','#666','#888','#aaa','#ccc','#e8e8e8']})
+      + '<div class="ins-grid">'
+      + sub('等级分布', cat(0), barChart((u.levels||[]).map(function(x){ return {k:'Lv'+x.lv, v:x.c}; }), {wide:1}))
+      + sub('活跃时段（按小时）', cat(2), barChart(pad24(u.active_hour), {wide:1}))
+      + sub('注册时段（按小时）', cat(4), barChart(pad24(u.reg_hour), {wide:1}))
+      + sub('资料完善占比', cat(6), ratioBar([
+          {k:'已设', v:Math.min(u.total||0,
+              [u.profile_sig,u.profile_avatar,u.profile_title,u.profile_effect,u.with_title,u.with_badge].filter(Boolean).length)},
+          {k:'未完善', v:Math.max(0,(u.total||0) - [u.profile_sig,u.profile_avatar,u.profile_title,u.profile_effect,u.with_title,u.with_badge].filter(Boolean).length)}
+        ], {colors:[cat(6), 'var(--soft)']}))
+      + '</div></div>';
+
+    /* ── 2. 活跃与留存 ── */
+    var a = S.activity || {};
+    var dau = a.dau || [];
+    var names = ['周日','周一','周二','周三','周四','周五','周六'];
+    var dowFull = [];
+    for (var w = 0; w < 7; w++){
+      var f = (a.dow||[]).filter(function(x){ return x.w === w; })[0];
+      dowFull.push({k:names[w], v: f ? f.users : 0, acts: f ? f.acts : 0});
+    }
+    var ret = a.retention || [];
+    var retBack = ret.filter(function(x){ return x.acts > 0; }).length;
+    h += section('📈','活跃与留存',
+        '留存的口径是「注册之后还产生过行为」—— 注册完再也不来的都算流失。',
+        '<div class="ins-grid">'
+        + sub('每日活跃（去重人数）', cat(0), barChart(dau.map(function(x){ return {k:x.d.slice(5), v:x.dau}; }), {wide:1, height:184}))
+        + sub('周内人数分布', cat(2), barChart(dowFull, {wide:1, height:184}))
+        + '</div>'
+        + '<div class="ins-grid">'
+        + sub('周内操作量', cat(4), barChart(dowFull.map(function(x){ return {k:x.k, v:x.acts}; }), {wide:1, height:164}))
+        + sub('新增注册（按日）', cat(6), barChart(pad30(a.new_daily, dau.map(function(x){return x.d;})), {wide:1, height:164}))
+        + '</div>'
+        + '<div class="ins-sec-t">留存</div>'
+        + kpis([
+            {k:'期内注册', v:ret.length},
+            {k:'回访过', v:retBack, s:pct(retBack,ret.length)},
+            {k:'注册后再无动作', v:ret.length-retBack, warn:(ret.length-retBack)>0}
+          ])
+        + '<div class="ins-sec-t">活跃榜（按操作次数）</div>'
+        + table(['用户名','操作数','活跃天数'], (a.top_users||[]).map(function(x){
+            return [x.username, x.acts, x.days]; }))
+    );
+
+    /* ── 3. 内容 ── */
+    var c = S.content || {};
+    h += section('📝','内容产出',
+        '发帖是需要动脑的成本 —— 这个数字低不代表用户冷漠，代表机制没跑起来。',
+        kpis([
+          {k:'帖子总数', v:c.posts}, {k:'近7天发帖', v:c.posts_week, warn:c.posts_week<=2},
+          {k:'回收站', v:c.posts_recycle}, {k:'评论', v:c.comments},
+          {k:'点赞', v:c.likes}, {k:'收藏', v:c.favs}, {k:'浏览', v:c.views},
+          {k:'动态', v:c.dynamics}, {k:'投票', v:c.polls}
+        ])
+        + '<div class="ins-grid">'
+        + sub('发帖趋势', cat(0), barChart(pad30(c.post_daily, dau.map(function(x){return x.d;})), {wide:1, height:174}))
+        + sub('评论趋势', cat(2), barChart(pad30(c.comment_daily, dau.map(function(x){return x.d;})), {wide:1, height:174}))
+        + sub('各板块帖子数', cat(4), barChart((c.sections||[]).map(function(x){ return {k:x.name, v:x.posts}; }), {wide:1, height:174}))
+        + '</div>'
+        + '<div class="ins-sec-t">最热帖子</div>'
+        + table(['标题','作者','赞','浏览','评论'], (c.top_posts||[]).map(function(x){
+            return [x.title, x.username, x.likes, x.view_count, x.cmts]; }))
+        + '<div class="ins-sec-t">高产作者</div>'
+        + table(['用户名','发帖数','获赞'], (c.top_authors||[]).map(function(x){
+            return [x.username, x.posts, x.likes]; }))
+    );
+
+    /* ── 4. 社交 ── */
+    var s = S.social || {};
+    h += section('💬','社交与聊天',
+        '死群不会有人说话。发消息人数比消息数更能看出群是否活着。',
+        kpis([
+          {k:'好友关系', v:s.friends}, {k:'待处理申请', v:s.reqs, warn:s.reqs>0},
+          {k:'黑名单', v:s.blacklist}, {k:'群组', v:s.groups},
+          {k:'群成员', v:s.members}, {k:'聊天室', v:s.rooms},
+          {k:'群消息', v:s.group_msgs}, {k:'近7天群消息', v:s.group_msgs_week, warn:s.group_msgs_week<=3},
+          {k:'私信', v:s.priv_msgs}, {k:'公开聊天', v:s.chat_msgs},
+          {k:'通知', v:s.notifs}, {k:'近7天通知', v:s.notifs_week}
+        ])
+        + '<div class="ins-sec-t">群消息趋势</div>'
+        + barChart(pad30(s.group_daily, dau.map(function(x){return x.d;})), {height:172})
+        + '<div class="ins-sec-t">群里谁在说话</div>'
+        + table(['用户名','消息数'], (s.chat_top||[]).map(function(x){ return [x.username, x.c]; }))
+        + '<div class="ins-sec-t">私信发送榜</div>'
+        + table(['用户名','条数'], (s.priv_top||[]).map(function(x){ return [x.username, x.c]; }))
+        + '<div class="ins-sec-t">通知类型分布</div>'
+        + ratioBar((s.notif_types||[]).map(function(x){ return {k:x.type, v:x.c}; }))
+    );
+
+    /* ── 5. 游戏 ── */
+    var g = S.games || {};
+    var GL = {gomoku:'五子棋',go:'围棋',xq:'象棋',chess:'国际象棋',reversi:'黑白棋',jq:'揭棋'};
+    h += section('🎮','游戏全览',
+        '把联机棋类、单机闯关、象棋大师分开看 —— 三类人的行为模式完全不同。',
+        kpis([
+          {k:'棋类玩家', v:g.board_total_users}, {k:'累计对局', v:g.board_total_plays},
+          {k:'录像', v:g.replays}, {k:'游戏内成就', v:g.ach_unlocked},
+          {k:'残局解开', v:g.xqp}, {k:'光遇成就数', v:g.game_stats_rows}
+        ])
+        + '<div class="ins-sec-t">棋类：人数（横）与局数（数字对照）</div>'
+        + table(['棋类','玩家','局数','胜','负','和','胜率'],
+          (g.board||[]).map(function(x){
+            var wr = (x.wins + x.losses) > 0 ? (x.wins * 100 / (x.wins + x.losses)).toFixed(0) + '%' : '—';
+            return [GL[x.game]||x.game, x.players, x.plays, x.wins, x.losses, x.draws, wr];
+          }))
+        + '<div class="ins-grid">'
+        + sub('棋类对局数', cat(0), barChart((g.board||[]).map(function(x){ return {k:GL[x.game]||x.game, v:x.plays}; }), {wide:1}))
+        + sub('单机参与人数', cat(8),
+            bars((g.mini||[]).map(function(x){ return {n:x.name, v:x.players}; }), function(r){ return r.v+' 人'; }, {mono:1}))
+        + '</div>'
+        + '<div class="ins-grid">'
+        + sub('单机：分数类明细', cat(8), table(['游戏','人数','最高分','平均分'],
+          (g.mini||[]).map(function(x){ return [x.name, x.players, x.best, x.avg]; })))
+        + sub('单机：竞速类（越小越好）', cat(10), table(['项目','人数','最快'], (g.time||[]).map(function(x){
+            return [x.name, x.players, x.best_ms ? (x.best_ms/1000).toFixed(2)+' 秒' : '—']; })))
+        + '</div>'
+        + '<div class="ins-sec-t">象棋大师天梯</div>'
+        + table(['用户','Rating','胜','负','和'], (g.xqm||[]).map(function(x){
+            return [x.user_id, Math.round(x.rating||0), x.wins, x.losses, x.draws]; }))
+        + '<div class="ins-sec-t">汉诺塔最少步数</div>'
+        + table(['用户名','步数','用时'], (g.hanoi||[]).map(function(x){
+            return [x.username, x.hanoi_best_moves,
+                    x.hanoi_best_ms ? (x.hanoi_best_ms/1000).toFixed(1)+' 秒' : '—']; }))
+    );
+
+    /* ── 6. 积分与商城 ── */
+    var p = S.points || {};
+    h += section('💎','积分与商城',
+        '积分发放必须有流水可追溯 —— 这里能看到每一分是从哪来、到哪去。',
+        kpis([
+          {k:'流水条数', v:p.total_log}, {k:'近7天净增', v:(p.week_delta>0?'+':'')+p.week_delta},
+          {k:'有积分的人', v:p.holders}, {k:'积分总量', v:p.coin_sum},
+          {k:'已兑换道具', v:p.items}, {k:'扭蛋次数', v:p.gacha}
+        ])
+        + '<div class="ins-sec-t">积分来源（发放总额）</div>'
+        + table(['来源','笔数','积分量'], (p.sources||[]).map(function(x){
+            return [x.source_type, x.c, x.amt]; }))
+        + '<div class="ins-grid">'
+        + sub('积分来源（发放量）', cat(6), barChart((p.sources||[]).map(function(x){ return {k:x.source_type, v:x.amt}; }), {wide:1, height:174}))
+        + sub('积分排行（前10）', cat(44),
+            bars((p.rich||[]).map(function(x){ return {n:x.username, v:x.coins}; }),
+                 function(r){ return r.v; }, {mono:1}))
+        + '</div>'
+        + table(['积分最少（末10）','积分'], (p.poor||[]).map(function(x){
+            return [x.username, x.coins]; }))
+        + '<div class="ins-sec-t">道具类型</div>'
+        + ratioBar((p.item_types||[]).map(function(x){ return {k:x.type, v:x.c}; }))
+        + '<div class="ins-sec-t">兑换最多的道具</div>'
+        + table(['道具','人次'], (p.redeemed||[]).map(function(x){ return [x.name, x.c]; }))
+        + '<div class="ins-sec-t">消耗品存量</div>'
+        + table(['道具','持有量'], (p.consumables||[]).map(function(x){ return [x.item_key, x.c]; }))
+    );
+
+    /* ── 7. AI ── */
+    var ai = S.ai || {};
+    h += section('🤖','AI 使用',
+        'AI 是站内最重的功能 —— 也是最耗额度的地方。',
+        kpis([
+          {k:'对话总数', v:ai.chats}, {k:'用过的人数', v:ai.users},
+          {k:'近7天对话', v:ai.week}, {k:'兑换码', v:ai.codes},
+          {k:'已使用兑换码', v:ai.codes_used}, {k:'剩余调试次数', v:ai.debug_left},
+          {k:'剩余额度', v:ai.quota}
+        ])
+        + '<div class="ins-sec-t">对话趋势</div>'
+        + barChart(pad30(ai.daily, dau.map(function(x){return x.d;})), {height:182})
+        + '<div class="ins-sec-t">使用排行</div>'
+        + table(['用户ID','对话数'], (ai.top||[]).map(function(x){ return [x.user_id, x.c]; }))
+    );
+
+    /* ── 8. 音乐 ── */
+    var m = S.music || {};
+    h += section('🎧','音乐收听',
+        m.has_data ? '按真实播放时长统计，听了不足 3 秒的不计入。'
+                   : '还没有播放数据 —— 从今天起开始记录，一周后再看。',
+        m.has_data ? (kpis([
+            {k:'听众', v:m.listeners}, {k:'播放次数', v:m.plays},
+            {k:'累计时长', v:fmtDur(m.total_ms)},
+            {k:'人均单次', v: m.plays>0 ? Math.round(m.total_ms/m.plays/1000)+' 秒' : '—'}
+          ])
+          + '<div class="ins-sec-t">听众趋势</div>'
+          + barChart(pad30((m.daily||[]).map(function(x){ return {d:x.d, c:x.u}; }),
+                         dau.map(function(x){return x.d;})), {height:182})
+          + '<div class="ins-sec-t">歌曲排行（按总时长）</div>'
+          + table(['歌曲','艺术家','次数','时长','听众','听完'],
+            (m.tracks||[]).map(function(x){
+              return [x.title, x.artist, x.plays, fmtDur(x.ms), x.listeners, x.finished]; }))
+          + '<div class="ins-sec-t">谁在听</div>'
+          + table(['用户名','次数','时长','不同歌曲'], (m.listeners_list||[]).map(function(x){
+              return [x.username, x.plays, fmtDur(x.ms), x.tracks]; }))
+          )
+        : kpis([{k:'曲库歌曲', v:(m.tracks||[]).length}])
+          + '<div class="ins-empty">播放埋点已上线，等同学真的开始听就会出现数据。</div>'
+    );
+
+    /* ── 9. 安全 ── */
+    var g2 = S.security || {};
+    h += section('🛡','安全与作弊信号',
+        '可疑成绩是重点 —— 前端上报的分数本身不可信。',
+        kpis([
+          {k:'攻击事件', v:g2.attacks, warn:g2.attacks>50}, {k:'警告记录', v:g2.warnings},
+          {k:'处罚', v:g2.punishments, warn:g2.punishments>0}, {k:'举报', v:g2.reports},
+          {k:'申诉', v:g2.appeals}, {k:'敏感词库', v:g2.sensitive},
+          {k:'IP 归属地样本', v:(g2.geo||[]).length}
+        ])
+        + '<div class="ins-sec-t">可疑成绩（超出人类极限）</div>'
+        + (g2.suspect && g2.suspect.length
+            ? table(['游戏','用户名','分数','阈值'], g2.suspect.map(function(x){
+                return [x.name, x.username, x.value, x.cap]; }))
+              + '<div class="ins-tip warn" style="margin-top:10px;"><span class="ti">⚠️</span><div>'
+              + '<div class="tt">这些成绩很可能是改前端 JS 刷出来的</div>'
+              + '<div class="tx">服务端只是照单全收，没做复算。数值明显超出正常玩法可达到的范围时，'
+              + '先手动清掉；要做根治就得做服务端复算（成本很高，见 026 项评估）。</div></div></div>'
+            : '<div class="ins-empty">当前没有明显异常的成绩。</div>')
+        + '<div class="ins-sec-t">攻击类型 TOP</div>'
+        + table(['类型','次数','累计'], (g2.attack_kinds||[]).map(function(x){
+            return [x.kind, x.c, x.n]; }))
+        + '<div class="ins-sec-t">IP 归属地</div>'
+        + table(['国家','地区','城市','ISP','IP数'], (g2.geo||[]).map(function(x){
+            return [x.country, x.region, x.city, x.isp, x.c]; }))
+        + '<div class="ins-sec-t">被处罚用户</div>'
+        + table(['用户名','封禁至','禁言至'], (g2.banned||[]).map(function(x){
+            return [x.username,
+                    x.banned_until ? new Date(x.banned_until*1000).toLocaleDateString('zh-CN') : '',
+                    x.muted_until ? new Date(x.muted_until*1000).toLocaleDateString('zh-CN') : '']; }))
+    );
+
+    /* ── 10. 成长曲线 ── */
+    var gr = S.growth || {};
+    h += section('📈','成长曲线',
+        '积分、等级、获赞的分布 —— 看得出「有多少人是真正的活跃玩家」。',
+        '<div class="ins-grid">'
+        + sub('积分分布（分桶）', cat(6), barChart((gr.coin_buckets||[]).map(function(x){ return {k:x.b, v:x.c}; }), {wide:1}))
+        + sub('获赞分布（分桶）', cat(44), barChart((gr.likes_dist||[]).map(function(x){ return {k:x.b, v:x.c}; }), {wide:1}))
+        + sub('签到连续天数', cat(152), barChart((gr.sign_streak||[]).map(function(x){ return {k:x.b, v:x.c}; }), {wide:1}))
+        + sub('注册至今', cat(262), barChart((gr.days_since_reg||[]).map(function(x){ return {k:x.b, v:x.c}; }), {wide:1}))
+        + '</div>'
+        + '<div class="ins-grid">'
+        + sub('等级分布（均值）', cat(0), table(['等级','人数','均积分','均经验'],
+            (gr.level_dist||[]).map(function(x){ return ['Lv'+x.lv, x.c, Math.round(x.ac||0), Math.round(x.ae||0)]; })))
+        + sub('经验排行', cat(2), bars((gr.top_exp||[]).map(function(x){ return {n:x.username, v:x.exp}; }),
+             function(r){ return r.v; }, {mono:1}))
+        + '</div>');
+
+    /* ── 11. 签到与任务 ── */
+    var sk = S.checkin || {};
+    h += section('📅','签到与日常任务',
+        '签到是唯一「每天必来一次」的动作 —— 它掉了，站点就没人了。',
+        kpis([
+          {k:'累计签到', v:sk.sign_total}, {k:'签到人数', v:sk.sign_users},
+          {k:'近7天签到', v:sk.sign_week, warn:sk.sign_week<=3},
+          {k:'补签次数', v:sk.sign_makeup}
+        ], {hue:44})
+        + '<div class="ins-grid">'
+        + sub('签到趋势', cat(44), barChart(pad30(sk.sign_daily, dau.map(function(x){return x.d;})), {wide:1, height:174}))
+        + sub('签到时段（按小时）', cat(28), barChart(pad24(sk.sign_hour), {wide:1, height:174}))
+        + sub('月度签到', cat(340), barChart((sk.sign_month||[]).map(function(x){ return {k:x.m, v:x.u}; }), {wide:1, height:174}))
+        + sub('任务完成（近30天）', cat(152), barChart((sk.task_daily||[]).map(function(x){ return {k:x.task_key, v:x.c}; }), {wide:1, height:174}))
+        + '</div>'
+        + '<div class="ins-sec-t">成就领取分布</div>'
+        + bars((sk.achievement_daily||[]).map(function(x){ return {n:x.task_key, v:x.c}; }),
+              function(r){ return r.v+' 人'; }, {mono:1}));
+
+    /* ── 12. 商城与扭蛋 ── */
+    var sh = S.shop || {};
+    h += section('🎰','商城与扭蛋',
+        '扭蛋是站内最上瘾的机制 —— 数据也印证了。',
+        kpis([
+          {k:'商品总数', v:sh.mall_items}, {k:'已拥有道具', v:sh.owned_items},
+          {k:'已装备', v:sh.equipped}, {k:'扭蛋次数', v:sh.gacha},
+          {k:'参与扭蛋人数', v:sh.gacha_users}, {k:'群文件', v:sh.file_uploads}
+        ], {hue:320})
+        + '<div class="ins-grid">'
+        + sub('扭蛋趋势', cat(320), barChart(pad30(sh.gacha_daily, dau.map(function(x){return x.d;})), {wide:1, height:184}))
+        + sub('稀有度分布', cat(340), ratioBar((sh.gacha_rarity||[]).map(function(x){ return {k:x.rarity, v:x.c}; })))
+        + sub('商品类型', cat(8), ratioBar((sh.mall_by_type||[]).map(function(x){ return {k:x.type, v:x.c}; })))
+        + sub('消耗品存量', cat(128),
+            table(['道具','持有量','人数'], (sh.consumables||[]).map(function(x){ return [x.item_key, x.c, x.u]; })))
+        + '</div>'
+        + '<div class="ins-grid">'
+        + sub('商品价格区间', cat(96),
+            table(['类型','数量','最低价','最高价'], (sh.mall_by_type||[]).map(function(x){
+              return [x.type, x.c, x.mn, x.mx]; })))
+        + sub('已装备道具', cat(262),
+            table(['用户名','道具','类型'], (sh.equipped_list||[]).map(function(x){
+              return [x.username, x.name, x.type]; })))
+        + '</div>');
+
+    /* ── 13. 帖子细节 ── */
+    var pd = S.post || {};
+    h += section('📄','帖子细节',
+        '零评论、零点赞的帖子占多少 —— 这个比例决定论坛是「在运转」还是「在装样子」。',
+        kpis([
+          {k:'零评论帖子', v:pd.zero_comment, warn:pd.zero_comment>0},
+          {k:'零点赞帖子', v:pd.never_liked, warn:pd.never_liked>0},
+          {k:'零浏览帖子', v:pd.never_viewed, warn:pd.never_viewed>0},
+          {k:'有封面图', v:pd.with_cover}
+        ], {hue:212})
+        + '<div class="ins-grid">'
+        + sub('标题长度分布', cat(0), barChart((pd.title_len||[]).map(function(x){ return {k:x.b+'+', v:x.c}; }), {wide:1}))
+        + sub('正文长度分布', cat(2), barChart((pd.body_len||[]).map(function(x){ return {k:x.b, v:x.c}; }), {wide:1}))
+        + sub('发帖时段', cat(152), barChart(pad24(pd.post_hour), {wide:1}))
+        + '</div>'
+        + table(['标题','作者','赞','浏览','时间'], (pd.recent||[]).map(function(x){
+            return [x.title, x.username, x.likes, x.view_count,
+                    new Date(x.created_at*1000).toLocaleDateString('zh-CN')]; })));
+
+    /* ── 14. 站点健康 ── */
+    var h2 = S.health || {};
+    h += section('⚡','站点健康与防护',
+        '被攻击是常态，关键是有没有被拦住。',
+        kpis([
+          {k:'限流拦截', v:h2.rate_limited}, {k:'长连接拒绝', v:h2.sio_reject},
+          {k:'登录失败', v:h2.pw_fail, warn:h2.pw_fail>20},
+          {k:'人机验证失败', v:h2.captcha_fail, warn:h2.captcha_fail>20}
+        ], {hue:4})
+        + '<div class="ins-grid">'
+        + sub('攻击趋势', cat(4), barChart(pad30(h2.attack_daily, dau.map(function(x){return x.d;})), {wide:1, height:174}))
+        + sub('攻击来源 IP TOP', cat(8), table(['IP','次数'], (h2.ip_top||[]).map(function(x){ return [x.ip, x.c]; })))
+        + sub('被探测路径 TOP', cat(340), table(['路径','次数'], (h2.path_top||[]).map(function(x){ return [x.path, x.c]; })))
+        + sub('敏感词分类', cat(320), ratioBar((h2.sensitive_cats||[]).map(function(x){ return {k:x.category, v:x.c}; })))
+        + '</div>'
+        + '<div class="ins-sec-t">浏览器分布</div>'
+        + bars((h2.ua_top||[]).map(function(x){ return {n:(x.ua||'').slice(0,50), v:x.c}; }),
+              function(r){ return r.v; }, {mono:1}));
+
+    /* ── 15. 全站排行榜 ── */
+    var lk = S.leaderboard || {};
+    var lbHtml = '';
+    (lk.score_boards||[]).forEach(function(b, bi){
+      lbHtml += sub(b.name, cat(bi*2), table(['排名','用户名','成绩'],
+        b.rows.map(function(x, i){ return [i+1, x.username, x.v]; })));
+    });
+    (lk.time_boards||[]).forEach(function(b, bi){
+      lbHtml += sub(b.name + '（越小越好）', cat((bi*2+1) % 12), table(['排名','用户名','用时'],
+        b.rows.map(function(x, i){ return [i+1, x.username, (x.v/1000).toFixed(2)+' 秒']; })));
+    });
+    h += section('🏆','全站排行榜',
+        '共 ' + (lk.total_projects||0) + ' 个项目。分数制和竞速制分开，各自只跟同类比。',
+        '<div class="ins-grid g2">' + lbHtml + '</div>');
+
+    /* ── 16. 通知与消息 ── */
+    var nf = S.notify || {};
+    h += section('🔔','通知与消息流',
+        '通知的已读率能看出「推了也没人看」的比例。',
+        kpis([
+          {k:'通知总数', v:nf.total}, {k:'已读', v:nf.read},
+          {k:'未读', v:nf.unread, warn:nf.unread>0},
+          {k:'已读率', v:nf.read_rate+'%', warn:nf.read_rate<50},
+          {k:'近7天通知', v:nf.week}
+        ], {hue:186})
+        + '<div class="ins-grid">'
+        + sub('通知趋势', cat(186), barChart(pad30(nf.daily, dau.map(function(x){return x.d;})), {wide:1, height:174}))
+        + sub('私信趋势', cat(262), barChart(pad30(nf.priv_daily, dau.map(function(x){return x.d;})), {wide:1, height:174}))
+        + sub('通知类型', cat(44), table(['类型','总数','未读'], (nf.types||[]).map(function(x){
+            return [x.type, x.c, x.unread]; })))
+        + sub('消息活跃时段', cat(128), barChart(pad24(nf.active_hours), {wide:1, height:174}))
+        + '</div>'
+        + '<div class="ins-grid">'
+        + sub('收到通知最多', cat(262),
+            table(['用户名','条数'], (nf.by_user||[]).map(function(x){ return [x.username, x.c]; })))
+        + sub('私聊往来（高频对）', cat(340),
+            table(['发起','接收','条数'], (nf.priv_pairs||[]).map(function(x){
+              return [x.x, x.y, x.c]; })))
+        + '</div>'
+        + '<div class="ins-sec-t">最近通知</div>'
+        + table(['类型','内容','已读','时间'], (nf.recent||[]).map(function(x){
+            return [x.type, (x.content||'').slice(0,40), x.is_read?'是':'否',
+                    new Date(x.created_at*1000).toLocaleDateString('zh-CN')]; })));
+
+    /* ── 17. 系统运行 ── */
+    var sy = S.system || {};
+    var av = sy.avg || {}, sm = sy.sample || {};
+    h += section('🖥','系统运行',
+        '服务器健康度。看板本身越重，越要注意别把它自己压垮。',
+        kpis([
+          {k:'平均 CPU', v:(av.cpu||0).toFixed(1)+'%', warn:(av.cpu||0)>70},
+          {k:'峰值 CPU', v:(av.cpu_max||0).toFixed(1)+'%', warn:(av.cpu_max||0)>90},
+          {k:'平均负载', v:(av.load||0).toFixed(2)},
+          {k:'平均内存', v:Math.round(av.mem||0)+' MB', warn:(av.mem||0)>1400},
+          {k:'峰值内存', v:Math.round(av.mem_max||0)+' MB', warn:(av.mem_max||0)>1800},
+          {k:'路由数', v:sy.route_count}, {k:'模板数', v:sy.template_count},
+          {k:'数据表', v:sy.db_tables}, {k:'索引', v:sy.db_indexes}
+        ], {hue:212})
+        + '<div class="ins-grid">'
+        + sub('CPU 采样（近1小时）', cat(0),
+            lineChart((sy.cpu_hist||[]).map(function(x, i){ return String(i); }),
+                      [{name:'CPU %', data:(sy.cpu_hist||[]).map(function(x){ return Math.round(x.cpu_pct||0); }),
+                        color: cat(0), max: 100}], {height:162}))
+        + sub('后台操作类型', cat(44),
+            bars((sy.admin_kinds||[]).map(function(x){ return {n:x.action, v:x.c}; }),
+                 function(r){ return r.v+' 次'; }, {mono:1}))
+        + sub('内容治理', cat(340), kpis([
+            {k:'近'+j.days+'天后台操作', v:sy.admin_logs},
+            {k:'撤回记录', v:sy.recall},
+            {k:'回收站帖子', v:sy.recycle},
+            {k:'公告', v:sy.announcements},
+            {k:'喇叭消息', v:sy.horn},
+            {k:'更新日志', v:sy.changelog}
+          ], {hue:4}))
+        + sub('数据库', cat(128), kpis([
+            {k:'数据表', v:sy.db_tables}, {k:'索引', v:sy.db_indexes},
+            {k:'视图', v:sy.db_views}, {k:'上传文件', v:sy.upload_files}
+          ], {hue:128}))
+        + '</div>');
+
+    /* ── 18. 设备与体验 ── */
+    var ex = S.experience || {};
+    h += section('📱','设备与体验',
+        '他们的设备构成决定了移动端优化值不值得做。',
+        kpis([
+          {k:'引导完成率', v:ex.onboard_rate+'%', warn:ex.onboard_rate<60},
+          {k:'近7天看过引导', v:ex.onboard_week},
+          {k:'移动端访问', v:ex.has_mobile?'有':'无'},
+          {k:'微信内置浏览器', v:ex.has_wechat?'有':'无', warn:!!ex.has_wechat},
+          {k:'缩略图使用者', v:ex.thumb_users}
+        ], {hue:262})
+        + '<div class="ins-grid">'
+        + sub('浏览器 / 设备 TOP', cat(262),
+            bars((ex.ua_raw||[]).map(function(x){ return {n:(x.ua||'').slice(0,46), v:x.c}; }),
+                 function(r){ return r.v; }, {mono:1}))
+        + '</div>');
+
+    root.innerHTML = h;
+  }
+
+  /* 把稀疏的 {d,c} 补成跟日期轴对齐的完整序列 */
+  function pad30(rows, dates){
+    if (!dates || !dates.length) dates = (rows||[]).map(function(x){ return x.d; });
+    var m = {};
+    (rows||[]).forEach(function(x){ m[x.d] = x.c; });
+    return dates.map(function(d){ return {k:(d||'').slice(5), v: m[d] || 0}; });
+  }
+  function pad24(rows){
+    var m = {};
+    (rows||[]).forEach(function(x){ m[x.h] = x.c; });
+    var out = [];
+    for (var i = 0; i < 24; i++) out.push({k:String(i).padStart(2,'0'), v: m[i] || 0});
+    return out;
+  }
+
+  function loadDeep(){
+    document.getElementById('deepRoot').innerHTML = '<div class="ins-empty">加载中…</div>';
+    fetch('/admin/api/deep?days=' + days, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(function(r){
+        if (r.status === 401 || r.status === 302) throw new Error('auth');
+        return r.json();
+      })
+      .then(renderDeep)
+      .catch(function(){ document.getElementById('deepRoot').innerHTML = '<div class="ins-empty">加载失败或登录已过期</div>'; });
+  }
+
+  var vtabs = document.querySelectorAll('.ins-viewtab');
+  for (var v = 0; v < vtabs.length; v++){
+    vtabs[v].addEventListener('click', function(){
+      for (var w = 0; w < vtabs.length; w++) vtabs[w].classList.remove('on');
+      this.classList.add('on');
+      var view = this.getAttribute('data-view');
+      var isOv = view === 'overview';
+      document.getElementById('insRoot').style.display = isOv ? '' : 'none';
+      document.getElementById('deepRoot').style.display = isOv ? 'none' : '';
+      document.querySelector('.ins-days').style.display = isOv ? '' : 'none';
+      if (!isOv && !deepLoaded) { deepLoaded = true; loadDeep(); }
+    });
+  }
+
+  var btns = document.querySelectorAll('.ins-day');
+  for (var i = 0; i < btns.length; i++){
+    btns[i].addEventListener('click', function(){
+      for (var j = 0; j < btns.length; j++) btns[j].classList.remove('on');
+      this.classList.add('on');
+      days = parseInt(this.getAttribute('data-days'), 10) || 30;
+      load();
+    });
+  }
+
+  load();
+})();
+</script>
+{% endblock %}

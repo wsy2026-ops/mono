@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ tr('profile.title') }} - {{ tr('brand') }}{% endblock %}
+<style>
+.cs-box{flex:1 1 80px;min-width:80px;padding:10px 8px;border-radius:10px;background:var(--bg-elev);border:1px solid var(--line);text-align:center;}
+.cs-box b{display:block;font-size:19px;font-variant-numeric:tabular-nums;color:var(--fg-1);}
+.cs-box span{display:block;font-size:11px;color:var(--fg-3);margin-top:3px;}
+</style>
+<style>
+.my-posts{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 4px;}
+.my-posts th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);color:var(--fg-3);font-weight:600;}
+.my-posts td{padding:6px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+.my-posts td:first-child{font-variant-numeric:normal;}
+.my-posts .mp-t{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.my-posts .mp-ess{font-size:10px;padding:1px 5px;border-radius:4px;background:#fff7e0;color:#b8860b;margin-left:4px;}
+</style>
+{% block content %}
+<h2>{{ tr('profile.title') }}</h2>
+
+<div class="card">
+  <div class="profile-header">
+    <img src="{{ get_avatar_url(user) }}" alt="" class="profile-avatar">
+    <div>
+      <h3 style="margin-bottom:8px;">
+        {{ user.username }}
+        {% if user.user_no %}<span class="tag" style="margin-left:8px;font-variant-numeric:tabular-nums;">ID {{ user.user_no }}</span>{% endif %}
+        <span class="tag creator-lv" style="margin-left:8px;background:#fff7e0;color:#b8860b;border-color:#e6c66a;">{{ creator.level_icon }} {{ creator.level_name }}</span>
+        {% if user.is_admin %}<span class="tag admin" style="margin-left:8px;">{{ tr('post.staff') }}</span>{% endif %}
+        {% if get_user_effect(user) == 'popular' %}<span class="tag popular" style="margin-left:8px;">{{ tr('profile.hot_users') }}</span>{% endif %}
+      </h3>
+      <p class="muted">注册时间：{{ user.created_at|fmttime }}</p>
+      {% if user.has_effect %}
+      <p style="margin-top:8px;"><span class="tag popular">{{ tr('profile.effects') }}</span></p>
+      {% endif %}
+    </div>
+    <div style="margin-top:10px;">
+      <a href="{{ url_for('my_punishments') }}" class="btn sm ghost">{{ tr('profile.punishments') }}</a>
+    </div>
+  </div>
+
+  <hr>
+
+  <h3>{{ tr('profile.creator') }} <span class="muted" style="font-size:12px;font-weight:400;">{{ tr('profile.creator_hint') }}</span></h3>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 6px;">
+    <div class="cs-box"><b>{{ creator.contribution }}</b><span>{{ tr('profile.score') }}</span></div>
+    <div class="cs-box"><b>{{ creator.posts }}</b><span>{{ tr('profile.posts') }}</span></div>
+    <div class="cs-box"><b>{{ creator.likes }}</b><span>{{ tr('profile.likes') }}</span></div>
+    <div class="cs-box"><b>{{ creator.comments }}</b><span>{{ tr('profile.comments') }}</span></div>
+    <div class="cs-box"><b>{{ creator.essence }}</b><span>{{ tr('post.featured') }}</span></div>
+  </div>
+  <p class="muted" style="font-size:12px;">
+    {% if creator.next_name %}距离「{{ creator.next_name }}」还差 {{ creator.to_next }} 贡献值{% else %}已达最高等级 🎉{% endif %}
+    · 发帖 +10 / 获赞 +3 / 被评论 +2 / 精华 +50
+  </p>
+
+  <hr>
+
+  <h3>{{ tr('profile.post_perf') }} <span class="muted" style="font-size:12px;font-weight:400;">{{ tr('profile.post_perf_hint') }}</span></h3>
+  {% if my_posts %}
+  <table class="my-posts">
+    <tr><th>{{ tr('profile.col_title') }}</th><th>{{ tr('profile.col_views') }}</th><th>{{ tr('profile.col_likes') }}</th><th>{{ tr('profile.col_comments') }}</th></tr>
+    {% for p in my_posts %}
+    <tr>
+      <td class="mp-t"><a href="{{ url_for('view_post', post_id=p.id) }}">{{ p.title }}</a>{% if p.ess %} <span class="mp-ess">{{ tr('post.featured') }}</span>{% endif %}</td>
+      <td>{{ p.v }}</td><td>{{ p.l }}</td><td>{{ p.cm }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted" style="font-size:12.5px;">{{ tr('profile.no_posts') }}</p>
+  {% endif %}
+
+  <hr>
+
+  <h3>{{ tr('profile.signature') }}</h3>
+  <form method="post" action="{{ url_for('update_signature') }}">
+    <input type="text" name="signature" value="{{ user.signature or '' }}" maxlength="50" placeholder="{{ tr('profile.sig_ph') }}" style="width:100%;max-width:360px;padding:8px 12px;">
+    <div style="margin-top:8px;">
+      <button type="submit" class="btn sm">{{ tr('settings.save_signature') }}</button>
+    </div>
+  </form>
+  <p class="muted" style="font-size:12px;">{{ tr('profile.sig_warn') }}</p>
+
+  <hr>
+
+  <h3>{{ tr('profile.dm_perm') }}</h3>
+  <form method="post" action="{{ url_for('update_private_perm') }}">
+    <label style="display:block;margin:6px 0;"><input type="radio" name="private_chat_perm" value="0" {% if user.private_chat_perm == 0 %}checked{% endif %}> {{ tr('profile.dm_open') }}</label>
+    <label style="display:block;margin:6px 0;"><input type="radio" name="private_chat_perm" value="1" {% if user.private_chat_perm == 1 or user.private_chat_perm is none %}checked{% endif %}> {{ tr('profile.dm_friends') }}</label>
+    <label style="display:block;margin:6px 0;"><input type="radio" name="private_chat_perm" value="2" {% if user.private_chat_perm == 2 %}checked{% endif %}> {{ tr('profile.dm_off') }}</label>
+    <button type="submit" class="btn sm" style="margin-top:6px;">{{ tr('group.save') }}</button>
+  </form>
+  <p class="muted" style="font-size:12px;">{{ tr('profile.blocklist_wins') }}<a href="{{ url_for('blacklist_page') }}" style="text-decoration:underline;">{{ tr('profile.manage_blocklist') }}</a></p>
+
+  <hr>
+
+  <h3>{{ tr('settings.change_pass') }}</h3>
+  <form method="post" action="{{ url_for('change_password') }}">
+    <label>{{ tr('settings.cur_pass') }}</label>
+    <input type="password" name="old_password" required style="width:100%;max-width:360px;padding:8px 12px;margin-bottom:10px;">
+    <label>{{ tr('settings.new_pass') }}</label>
+    <input type="password" name="new_password" required minlength="4" style="width:100%;max-width:360px;padding:8px 12px;margin-bottom:10px;">
+    <label>{{ tr('profile.new_pass2') }}</label>
+    <input type="password" name="confirm_password" required minlength="4" style="width:100%;max-width:360px;padding:8px 12px;margin-bottom:10px;">
+    <div style="margin-top:8px;">
+      <button type="submit" class="btn sm">{{ tr('settings.change_pass') }}</button>
+    </div>
+  </form>
+  <p class="muted" style="font-size:12px;">{{ tr('profile.relogin') }}</p>
+
+  <hr>
+
+  <h3>{{ tr('profile.change_avatar') }}</h3>
+  <form method="post" action="{{ url_for('upload_avatar') }}" enctype="multipart/form-data">
+    <input type="file" name="avatar" accept="image/*" required>
+    <p class="muted" style="margin:8px 0;">{{ tr('profile.avatar_formats') }}</p>
+    <button type="submit" class="btn">{{ tr('settings.upload_avatar') }}</button>
+  </form>
+
+  <hr>
+
+  <h3>{{ tr('profile.github') }}</h3>
+  {% if github_oauth_on %}
+    {% if user.github_id %}
+    <p style="font-size:13.5px;">{{ tr('profile.github_bound') }}<b>@{{ user.github_login or 'GitHub 用户' }}</b></p>
+    <form method="post" action="{{ url_for('settings_github_unbind') }}"
+          onsubmit="return confirm(__('解绑后将无法用 GitHub 一键登录，确定？'));">
+      <button type="submit" class="btn sm ghost">{{ tr('profile.github_unbind') }}</button>
+    </form>
+    {% else %}
+    <p class="muted" style="font-size:12.5px;">{{ tr('profile.github_hint') }}</p>
+    <a href="{{ url_for('settings_github_bind') }}" class="btn sm">{{ tr('profile.github_bind') }}</a>
+    {% endif %}
+  {% else %}
+    <p class="muted" style="font-size:12.5px;">{{ tr('profile.github_unconfigured') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

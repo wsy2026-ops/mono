@@ -1,0 +1,142 @@
+{% extends "_admin_base.html" %}
+{% block title %}消息管理 · 管理后台{% endblock %}
+{% block admin_icon %}💬{% endblock %}
+{% block admin_heading %}消息管理{% endblock %}
+{% block admin_desc %}按关键词、房间、状态筛选聊天消息 · 支持批量删除{% endblock %}
+
+{% block admin_content %}
+<style>
+  .mg-bar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:12px 14px;border-bottom:1px solid var(--line);background:var(--soft);
+  }
+  .mg-bar .sp{flex:1;}
+  .mg-bar input[type="text"], .mg-bar select{
+    font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);
+    border-radius:8px;background:var(--card);color:var(--fg);min-width:0;
+  }
+  .mg-bar input[type="text"]{flex:1 1 200px;max-width:280px;}
+  .mg-bar label.tog{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-2);cursor:pointer;}
+  .mg-bar button[disabled]{opacity:.45;cursor:not-allowed;}
+  .mg-check{width:16px;height:16px;cursor:pointer;vertical-align:-2px;}
+  .mg-txt{max-width:420px;word-break:break-word;line-height:1.65;}
+  .mg-del{color:var(--muted);text-decoration:line-through;}
+  .mg-tag{
+    display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;
+    background:var(--soft);color:var(--fg-2);border:1px solid var(--line);
+  }
+  .mg-tag.off{color:#b42318;border-color:#f2cfcb;}
+  @media (max-width:760px){
+    .mg-bar{padding:10px 12px;gap:8px;}
+    .mg-bar input[type="text"]{flex:1 1 100%;max-width:none;}
+    .mg-check{width:20px;height:20px;}
+  }
+</style>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>聊天消息</h3>
+    <span class="adm-hint">显示最近 {{ msgs|length }} 条</span>
+  </div>
+
+  <form method="get" class="mg-bar">
+    <input type="text" name="q" value="{{ q }}" placeholder="搜索消息内容或用户名…" maxlength="60">
+    <select name="room">
+      <option value="">全部房间</option>
+      {% for r in rooms %}
+      <option value="{{ r.id }}" {{ 'selected' if cur_room == r.id|string else '' }}>{{ r.name }}</option>
+      {% endfor %}
+    </select>
+    <label class="tog">
+      <input type="checkbox" name="deleted" value="1" {{ 'checked' if only_deleted else '' }}> 只看已删除
+    </label>
+    <button class="btn sm" type="submit">筛选</button>
+    <a href="{{ url_for('admin_messages') }}" class="btn sm ghost">重置</a>
+  </form>
+
+  <form method="post" action="{{ url_for('admin_messages_bulk') }}" id="mgForm">
+    <input type="hidden" name="back" value="{{ request.full_path }}">
+    <div class="mg-bar">
+      <span style="font-size:13px;color:var(--fg-2);">已选 <b id="mgSel" style="color:var(--fg);">0</b> 条</span>
+      <span class="sp"></span>
+      <button class="btn sm ghost" type="submit" id="mgDel" disabled
+              style="color:#b42318;border-color:#f2cfcb;"
+              onclick="return confirm(__('确定删除选中的消息？删除后聊天室里会显示为「已被管理员删除」。'));">
+        批量删除
+      </button>
+    </div>
+
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead>
+          <tr>
+            <th style="width:44px;"><input type="checkbox" class="mg-check" id="mgAll" title="全选"></th>
+            <th style="width:70px;">ID</th>
+            <th style="width:120px;">用户</th>
+            <th style="width:120px;">房间</th>
+            <th>内容</th>
+            <th style="width:150px;">时间</th>
+            <th style="width:90px;">状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in msgs %}
+          <tr>
+            <td>
+              {% if m.is_deleted %}
+              <input type="checkbox" class="mg-check" disabled title="已删除">
+              {% else %}
+              <input type="checkbox" class="mg-check mg-row" name="ids" value="{{ m.id }}">
+              {% endif %}
+            </td>
+            <td class="adm-id">{{ m.id }}</td>
+            <td class="adm-clip">{{ m.username }}</td>
+            <td>{% if m.room_name %}<span class="mg-tag">{{ m.room_name }}</span>{% else %}<span class="adm-id">—</span>{% endif %}</td>
+            <td>
+              <div class="mg-txt {{ 'mg-del' if m.is_deleted else '' }}">{{ m.content or '' }}</div>
+              {% if m.file_url %}<span class="mg-tag">附件 {{ m.file_type or '' }}</span>{% endif %}
+            </td>
+            <td class="adm-nowrap adm-id">{{ m.created_at|fmttime }}</td>
+            <td>{% if m.is_deleted %}<span class="mg-tag off">已删除</span>{% else %}<span class="mg-tag">正常</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="adm-empty">
+                <div class="adm-empty-ico">💬</div>
+                <div class="adm-empty-text">没有符合条件的消息</div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  var all = document.getElementById('mgAll');
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.mg-row'));
+  var sel = document.getElementById('mgSel');
+  var bDel = document.getElementById('mgDel');
+  if (!all) return;
+
+  function sync(){
+    var n = rows.filter(function(c){ return c.checked; }).length;
+    sel.textContent = n;
+    all.checked = n > 0 && n === rows.length;
+    all.indeterminate = n > 0 && n < rows.length;
+    bDel.disabled = n === 0;
+  }
+
+  all.addEventListener('change', function(){
+    rows.forEach(function(c){ c.checked = all.checked; });
+    sync();
+  });
+  rows.forEach(function(c){ c.addEventListener('change', sync); });
+  sync();
+})();
+</script>
+{% endblock %}

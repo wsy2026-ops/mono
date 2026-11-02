@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+{% block title %}{{ room.name }} - 五子棋{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .gmk-wrap{max-width:920px;margin:0 auto;display:grid;grid-template-columns:auto 260px;gap:20px;align-items:start;}  .gmk-info{
+    border:1px solid var(--line);border-radius:14px;padding:18px;background:#fff;
+    display:flex;flex-direction:column;gap:10px;margin-bottom:16px;
+  }
+  .gmk-info h2{margin:0;font-size:18px;font-weight:800;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;}
+  .gmk-info h2 .tag{font-size:11px;font-weight:500;}
+  .gmk-info .meta{font-size:12.5px;color:var(--muted,#888);display:flex;flex-wrap:wrap;gap:10px;}
+  .gmk-info .status{font-size:13px;font-weight:600;}
+
+  .gmk-board{
+    position:relative;width:100%;max-width:560px;aspect-ratio:1;margin:0 auto;
+    background:#ffffff;border:2px solid #000;border-radius:6px;
+    box-shadow:0 4px 18px rgba(0,0,0,.18);
+    background-image:
+      linear-gradient(to right, #1a1a1a 1.5px, transparent 1.5px),
+      linear-gradient(to bottom, #1a1a1a 1.5px, transparent 1.5px);
+    background-size: calc(100% / 14) calc(100% / 14);
+    background-position: 0 0;
+  }
+  /* ⚠️ 棋盘是 width:100% 自适应的，但热区原来写死 30px ✗
+     手机 350px 宽时每格只有 25px，30px 的热区会互相重叠 ✗
+     改成按棋盘百分比：14 格 → 每格 7.143%，热区取 7.1% ✓ */
+  .gmk-pt{
+    position:absolute;width:7.1%;aspect-ratio:1;
+    transform:translate(-50%,-50%);
+    cursor:pointer;z-index:2;border-radius:50%;
+  }
+  .gmk-pt:hover:not(.disabled){background:rgba(0,0,0,.08);}
+  .gmk-pt.disabled{cursor:not-allowed;pointer-events:none;}
+  /* 棋子同理：6.2% ≈ 0.87 格，永远比格子小一点 ✓
+     原来写死 30px，手机上比格子还大 ✗ 这就是反馈 #33「棋子过大」 */
+  .gmk-stone{
+    position:absolute;width:6.2%;aspect-ratio:1;border-radius:50%;
+    transform:translate(-50%,-50%);
+    box-shadow:0 2px 4px rgba(0,0,0,.35);z-index:3;pointer-events:none;
+  }
+  .gmk-stone.black{background:radial-gradient(circle at 32% 32%,#666,#000 78%);}
+  .gmk-stone.white{background:radial-gradient(circle at 32% 32%,#fff,#bbb 78%);}
+  .gmk-stone.last::after{
+    content:'';position:absolute;inset:-16%;border:2px solid #ef4444;
+    border-radius:50%;box-sizing:border-box;pointer-events:none;
+  }
+  .gmk-star{
+    position:absolute;width:1.3%;aspect-ratio:1;background:#1a1a1a;
+    border-radius:50%;transform:translate(-50%,-50%);
+    pointer-events:none;z-index:1;
+  }
+  .gmk-thinking{
+    position:absolute;inset:0;background:rgba(255,255,255,.12);z-index:6;
+    display:flex;align-items:center;justify-content:center;pointer-events:none;
+  }
+  .gmk-thinking .box{
+    background:rgba(255,255,255,.92);border:1px solid #ccc;border-radius:20px;
+    padding:6px 14px;font-size:12px;font-weight:600;color:#555;
+    display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,.08);
+  }
+  .gmk-thinking .spinner{
+    width:12px;height:12px;border:2px solid #ddd;border-top-color:#111;
+    border-radius:50%;animation:gmkspin .8s linear infinite;
+  }
+  @keyframes gmkspin{to{transform:rotate(360deg);}}
+
+  .gmk-side{position:sticky;top:80px;display:flex;flex-direction:column;gap:12px;}
+  .gmk-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:#fff;}
+  .gmk-card h4{margin:0 0 8px;font-size:13px;font-weight:700;}
+  .gmk-card p{margin:0;font-size:12.5px;color:var(--muted,#888);line-height:1.7;}
+  .gmk-card .gmk-btn-primary{width:100%;padding:8px;border-radius:8px;background:#111;color:#fff;border:1px solid #111;cursor:pointer;font-size:13px;font-weight:600;margin-top:8px;}
+  .gmk-card .gmk-btn-ghost{width:100%;padding:8px;border-radius:8px;background:#fff;color:#333;border:1px solid #ddd;cursor:pointer;font-size:13px;font-weight:600;margin-top:6px;}
+  .gmk-card .gmk-btn-ghost:hover{border-color:#999;}
+  .gmk-card .gmk-btn-del{width:100%;padding:8px;border-radius:8px;background:#fff;color:#dc2626;border:1px solid #f3c0c0;cursor:pointer;font-size:13px;font-weight:600;margin-top:6px;}
+  .gmk-card .gmk-btn-del:hover{background:#fef2f2;border-color:#dc2626;}
+
+  .gmk-bar{
+    border:2px solid #111;border-radius:10px;background:#fff;
+    padding:13px 16px;margin-bottom:12px;display:flex;justify-content:space-between;
+    align-items:center;gap:12px;box-shadow:0 4px 14px rgba(0,0,0,.10);flex-wrap:wrap;
+  }
+  .gmk-bar .title{font-size:16px;font-weight:800;}
+  .gmk-bar .small{font-size:12px;color:#666;margin-top:2px;}
+  .gmk-bar .actions{display:flex;gap:8px;}
+  .gmk-bar button{padding:8px 15px;border-radius:8px;border:1px solid #111;background:#111;color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  .gmk-bar button.ghost{background:#fff;color:#111;}
+
+  @media (max-width:800px){
+    .gmk-wrap{grid-template-columns:minmax(0, 1fr);}
+    .gmk-side{position:static;}
+  }
+</style>
+
+<div class="gmk-wrap">
+  <div>
+    <div class="gmk-info">
+      <h2>
+        {{ room.name }}
+        <span class="tag">对战</span>
+        <span class="tag">{{ '公开' if room.is_public else '私密' }}</span>
+      </h2>
+      <div class="meta">
+        <span>房主：{{ room.owner_name or room.owner_id }}</span>
+        <span>对手：{{ room.ai_name or room.guest_name or (room.guest_id if room.guest_id else '（等待加入）') }}</span>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div id="topBar"></div>
+
+    <div class="gmk-board" id="board"></div>
+  </div>
+
+  <div class="gmk-side">
+    <div class="gmk-card">
+      <h4>操作</h4>
+      <button class="gmk-btn-ghost" id="undoBtn" onclick="askUndo()">↩ 悔棋</button>
+      <button class="gmk-btn-del" id="resignBtn" onclick="askResign()">🏳 认输</button>
+      <p style="margin-top:10px;font-size:12px;color:#999;">对局结束后双方可自由退出，互不影响。</p>
+    </div>
+    <div class="gmk-card">
+      <h4>规则</h4>
+      <p>15×15 棋盘 · 双方轮流落子。<br>房主执黑（先手），对手执白。<br>五子连珠即获胜。</p>
+    </div>
+  </div>
+</div>
+
+<script src="{{ cdn_url('js/socket.io.min.js') }}"></script>
+<script>
+const ROOM_ID = {{ room.id }};
+const ME_ID = {{ user.id }};
+const IS_OWNER = {{ 'true' if is_owner else 'false' }};
+const IS_GUEST = {{ 'true' if is_guest else 'false' }};
+// ── 观战模式（058）：非对局参与者可看，不可落子 ──
+const IS_SPECTATOR = !IS_OWNER && !IS_GUEST;
+
+// 对局结束后显示「看复盘」浮动按钮（058）
+{% if room.status == 'finished' %}
+if (true) {
+  var _rb = document.createElement('a');
+  _rb.href = '/board/replay/gomoku/{{ room.id }}';
+  _rb.textContent = '📺 看复盘';
+  _rb.style.cssText = 'position:fixed;right:16px;bottom:84px;z-index:9998;background:#2563eb;' +
+                      'color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;' +
+                      'font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.35);';
+  document.body.appendChild(_rb);
+}
+{% endif %}
+if (IS_SPECTATOR) {
+  var _sb = document.createElement('div');
+  _sb.textContent = '👁 观战模式 — 你正在旁观这局对局（不可落子）';
+  _sb.style.cssText = 'position:sticky;top:0;z-index:9999;background:#374151;color:#fff;' +
+                      'text-align:center;padding:9px 12px;font-size:14px;letter-spacing:.5px;';
+  document.body.insertBefore(_sb, document.body.firstChild);
+}
+const IS_ADMIN = {{ 'true' if user.is_admin else 'false' }};
+const N = {{ N }};
+const MODE = {{ room.mode|tojson }};
+
+let board = {{ ('"' + (room.board_state or '.'*N*N) + '"')|safe }};
+let status = '{{ room.status }}';
+let turnUserId = {{ room.turn_user_id if room.turn_user_id is not none else 'null' }};   // 由 applyState 更新，不能写死成模板常量
+let lastMove = [{{ room.last_move_x if room.last_move_x is not none else 'null' }}, {{ room.last_move_y if room.last_move_y is not none else 'null' }}];
+let winnerId = {{ room.winner_id if room.winner_id is not none else 'null' }};
+let winLine = {{ (room.win_line or 'null')|safe }};
+let pending = false;
+let pendingSince = 0;                 // pending 置真的时刻（超时兜底用）
+const PENDING_TIMEOUT_MS = 25000;     // 走子请求超过此时长视为挂住，强制复位
+
+const STAR_POS = [[3,3],[3,11],[7,7],[11,3],[11,11]];
+
+function pct(x){ return (x / (N - 1) * 100) + '%'; }
+function at(x, y){ return board[y * N + x]; }
+function setAt(x, y, v){ board = board.slice(0, y*N+x) + v + board.slice(y*N+x+1); }
+function myTurn(){
+  return status === 'playing' && turnUserId === ME_ID;
+}
+
+function renderBoard(){
+  const el = document.getElementById('board');
+  el.innerHTML = '';
+  for (const [sx, sy] of STAR_POS){
+    const star = document.createElement('div');
+    star.className = 'gmk-star';
+    star.style.left = pct(sx); star.style.top = pct(sy);
+    el.appendChild(star);
+  }
+  for (let y = 0; y < N; y++){
+    for (let x = 0; x < N; x++){
+      const pt = document.createElement('div');
+      pt.className = 'gmk-pt';
+      pt.dataset.x = x; pt.dataset.y = y;
+      pt.style.left = pct(x); pt.style.top = pct(y);
+      if (status !== 'playing' || at(x, y) !== '.' || !myTurn()){
+        pt.classList.add('disabled');
+      }
+      pt.addEventListener('click', onPtClick);
+      el.appendChild(pt);
+    }
+  }
+  for (let y = 0; y < N; y++){
+    for (let x = 0; x < N; x++){
+      const p = at(x, y);
+      if (p === '1' || p === '2'){
+        const stone = document.createElement('div');
+        stone.className = 'gmk-stone ' + (p === '1' ? 'black' : 'white');
+        stone.style.left = pct(x); stone.style.top = pct(y);
+        if (lastMove && lastMove[0] === x && lastMove[1] === y) stone.classList.add('last');
+        el.appendChild(stone);
+      }
+    }
+  }
+  if (winLine && Array.isArray(winLine) && winLine.length === 4){
+    const [x1, y1, x2, y2] = winLine;
+    const line = document.createElement('div');
+    const dx = x2 - x1, dy = y2 - y1;
+    line.style.position = 'absolute';
+    line.style.left = pct(x1); line.style.top = pct(y1);
+    line.style.background = '#ef4444'; line.style.zIndex = 4;
+    line.style.pointerEvents = 'none';
+    if (dx === 0){
+      line.style.width = '3px'; line.style.height = '100%';
+      line.style.transform = 'translate(-50%, 0)';
+    } else if (dy === 0){
+      line.style.height = '3px'; line.style.width = '100%';
+      line.style.transform = 'translate(0, -50%)';
+    } else {
+      const len = Math.sqrt(dx*dx + dy*dy);
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      line.style.width = (len / (N - 1) * 100) + '%';
+      line.style.height = '3px';
+      line.style.transform = `translate(0, -50%) rotate(${angle}deg)`;
+    }
+    el.appendChild(line);
+  }
+  if (MODE === 1 && status === 'playing' && (pending || !myTurn())){
+    const ov = document.createElement('div');
+    ov.className = 'gmk-thinking';
+    ov.innerHTML = '<div class="box"><div class="spinner"></div>对手思考中…</div>';
+    el.appendChild(ov);
+  }
+  statusText();
+  renderTopBar();
+}
+
+function statusText(){
+  const el = document.getElementById('status');
+  if (status === 'waiting'){
+    if (IS_OWNER) el.innerHTML = '<span class="turn-black">⌛ 等待对手加入…（把邀请链接发给好友）</span>';
+    else el.innerHTML = '<span class="turn-white">○ 房间等待对手中</span>';
+    return;
+  }
+  if (status === 'finished'){
+    const name = winnerId === ME_ID ? '你' : '对手';
+    el.innerHTML = `<span style="color:#111;font-weight:800;">🏁 ${name} 获胜</span>`;
+    return;
+  }
+  el.innerHTML = myTurn()
+    ? '<span class="turn-black">⬤ 轮到你落子</span>'
+    : '<span class="turn-white">○ 等待对手…</span>';
+}
+
+function renderTopBar(){
+  const bar = document.getElementById('topBar');
+  bar.innerHTML = '';
+  if (status === 'waiting'){
+    if (IS_OWNER){
+      bar.innerHTML = `
+        <div class="gmk-bar">
+          <div>
+            <div class="title">⌛ 等待对手加入</div>
+            <div class="small">把邀请链接发给好友，对方打开即可加入对战</div>
+          </div>
+          <div class="actions"><button onclick="copyInvite()">📋 复制邀请链接</button></div>
+        </div>`;
+    } else {
+      bar.innerHTML = `
+        <div class="gmk-bar">
+          <div>
+            <div class="title">♟️ 加入 {{ room.name|jsstr }}</div>
+            <div class="small">{{ '公开房间' if room.is_public else '私密房间 · 你通过房主分享的链接进入' }}</div>
+          </div>
+          <div class="actions"><button onclick="joinRoom()">⚡ 加入对战</button></div>
+        </div>`;
+    }
+    return;
+  }
+  if (status === 'finished'){
+    const name = winnerId === ME_ID ? '你赢了！' : '对手获胜';
+    bar.innerHTML = `
+      <div class="gmk-bar">
+        <div>
+          <div class="title">${name}</div>
+        </div>
+        <div class="actions">
+          <button class="ghost" onclick="location.href=\'/game/gomoku\'">返回大厅</button>
+        </div>
+      </div>`;
+    return;
+  }
+  if (pending && MODE === 1){
+  }
+}
+
+async function joinRoom(){
+  const r = await fetch('/api/gomoku/' + ROOM_ID + '/join', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.reload();
+  else alert(j.msg || __('加入失败'));
+}
+
+async function onPtClick(e){
+  if (pending) return;
+  const pt = e.currentTarget;
+  if (pt.classList.contains('disabled')) return;
+  const x = parseInt(pt.dataset.x), y = parseInt(pt.dataset.y);
+  setAt(x, y, IS_OWNER ? '1' : '2');
+  lastMove = [x, y];
+  pending = true; pendingSince = Date.now();
+  renderBoard();
+  try {
+    const r = await fetch('/api/gomoku/' + ROOM_ID + '/move', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'x=' + x + '&y=' + y
+    });
+    const j = await r.json();
+    if (!j.ok){ alert(j.msg || __('落子失败')); pending = false; renderBoard(); return; }
+    applyState(j);
+  } catch(e){
+    alert(__('网络错误，请刷新页面查看最新局面'));
+    pending = false;
+    renderBoard();
+  }
+}
+
+function applyState(s){
+  board = s.board || board;
+  status = s.status || status;
+  if (s.turn_user_id !== null && s.turn_user_id !== undefined) turnUserId = s.turn_user_id;
+  winnerId = s.winner_id !== null && s.winner_id !== undefined ? s.winner_id : winnerId;
+  winLine = s.win_line || null;
+  lastMove = s.last_move && s.last_move[0] !== null ? s.last_move : lastMove;
+  pending = false;
+  renderBoard();
+}
+
+async function pollState(){
+  if (document.hidden || status === 'finished' || status === 'waiting') return;
+  try{
+    const r = await fetch('/api/gomoku/' + ROOM_ID + '/state');
+    if (r.redirected) { location.href = '/login'; return; }
+    const j = await r.json();
+    if (!j.ok) return;
+    applyState(j);
+  }catch(e){}
+}
+
+function copyInvite(){
+  const url = location.origin + '/game/gomoku/' + ROOM_ID;
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url)
+      .then(() => alert(__('✅ 邀请链接已复制：\n') + url))
+      .catch(() => prompt(__('复制邀请链接'), url));
+  } else {
+    prompt(__('复制邀请链接'), url);
+  }
+}
+
+async function restartGame(){
+  if (!IS_OWNER){ alert(__('仅房主可重开')); return; }
+  if (!confirm(__('确定重开一局？当前棋盘将清空。'))) return;
+  const r = await fetch('/api/gomoku/' + ROOM_ID + '/restart', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.reload(); else alert(j.msg || __('重开失败'));
+}
+
+async function deleteRoom(){
+  if (!confirm(__('确定删除该房间？删除后无法恢复，对局进行中也将结束。'))) return;
+  const r = await fetch('/api/room/gomoku/' + ROOM_ID + '/delete', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.href = '/game/gomoku';
+  else alert(j.msg || __('删除失败'));
+}
+
+renderBoard();
+setInterval(pollState, 1000);
+
+setInterval(function(){
+  if (pending && pendingSince && Date.now() - pendingSince > PENDING_TIMEOUT_MS){
+    pending = false; pendingSince = 0;
+    renderBoard();
+    pollState();
+  }
+}, 3000);
+
+let socket = null;
+if (typeof io !== 'undefined'){
+  try {
+    socket = window.__monoSio();
+    window.__monoSioReady(() => {
+      socket.emit('join_gomoku', {rid: ROOM_ID});
+    });
+    socket.on('gmk_move', (data) => {
+      if (!data) return;
+      if (data.closed){ location.href = '/game/gomoku'; return; }
+      if (data.board && data.board !== board){
+        applyState(data);
+      }
+    });
+    socket.on('gmk_room_update', (data) => {
+      if (data && data.rid === ROOM_ID) location.reload();
+    });
+  } catch(e){
+    socket = null;  // socket 不可用则回退到 1 秒轮询
+  }
+}
+</script>
+
+<script>
+(function(){
+  var RID = {{ room.id }};
+  var GAME = 'gomoku';
+  function tip(t){ try { alert(t); } catch (e) {} }
+
+  window.askResign = function(){
+    if (!confirm(__('确定认输吗？这一局会判你负。'))) return;
+    fetch('/api/' + GAME + '/' + RID + '/resign', {method:'POST', credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (!j.ok) tip(j.msg || '认输失败，稍后再试'); })
+      .catch(function(){ tip('网络不太好，再试一次'); });
+  };
+
+  window.askUndo = function(){
+    fetch('/api/' + GAME + '/' + RID + '/undo', {method:'POST', credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok){ tip((j && j.msg) || '悔棋失败'); return; }
+        if (j.done){ tip('已悔棋，重新走一步吧'); setTimeout(function(){ location.reload(); }, 600); return; }
+        tip(j.msg || '已请求悔棋，等对手回应');
+      })
+      .catch(function(){ tip('网络不太好，再试一次'); });
+  };
+
+  var undoAsked = false;
+  setInterval(function(){
+    fetch('/api/' + GAME + '/' + RID + '/undo-poll', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) return;
+        if (!j.pending){ undoAsked = false; return; }
+        if (undoAsked) return;
+        undoAsked = true;
+        var yes = confirm(__('对手想悔一步棋，同意吗？'));
+        fetch('/api/' + GAME + '/' + RID + '/undo-reply', {
+          method:'POST', credentials:'same-origin',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body: yes ? 'accept=1' : 'accept=0'
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(j2){
+            undoAsked = false;
+            if (j2 && j2.done){ tip('已同意悔棋'); setTimeout(function(){ location.reload(); }, 600); }
+          })
+          .catch(function(){ undoAsked = false; });
+      })
+      .catch(function(){});
+  }, 2500);
+
+  // 打完一局显示评级变化。
+  // 不依赖各棋的「对局结束」检测（它们结构都不一样），直接定时比对评级 ——
+  // 评级一变就说明刚结算完。
+  var rating0 = 0, hadRating = false, ratingShown = false;
+
+  function ratingBar(text){
+    var bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translateX(-50%);'
+      + 'z-index:9999;padding:13px 22px;border-radius:14px;background:#111;color:#fff;'
+      + 'font-size:14.5px;font-weight:600;white-space:nowrap;'
+      + 'box-shadow:0 10px 30px rgba(0,0,0,.28);transition:opacity .5s ease;';
+    bar.textContent = text;
+    document.body.appendChild(bar);
+    setTimeout(function(){ bar.style.opacity = '0'; }, 7000);
+    setTimeout(function(){ try { bar.remove(); } catch (e) {} }, 7800);
+  }
+
+  function pullRating(){
+    fetch('/api/mm/me?game=' + GAME, {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) return;
+        if (!hadRating){
+          if (j.rating){
+            hadRating = true;
+            rating0 = j.rating;
+            ratingBar('本局评级 ' + j.rating.toFixed(1) + ' · 已下 ' + j.games + ' 局');
+          }
+          return;
+        }
+        if (ratingShown || !j.rating || j.rating === rating0) return;
+        ratingShown = true;
+        var d = j.rating - rating0;
+        ratingBar('本局评级 ' + rating0.toFixed(1) + ' → ' + j.rating.toFixed(1)
+                  + '（' + (d > 0 ? '+' : '') + d.toFixed(1) + '）');
+      })
+      .catch(function(){});
+  }
+
+  pullRating();
+  setInterval(pullRating, 6000);
+
+  // 每 30 秒报一次「我还在」—— 离开超过两分钟会被判负
+  function alive(){
+    fetch('/api/' + GAME + '/' + RID + '/alive', {method:'POST', credentials:'same-origin'})
+      .catch(function(){});
+  }
+  alive();
+  setInterval(alive, 30000);
+})();
+</script>
+
+
+<style>
+  /* AI 对局不显示「对手思考中」遮罩 —— 和真人对局一样静默。
+     这些遮罩本来就只在人机房出现（JS 里判断了 mode===1），所以隐藏它们不影响真人对局。 */
+  .gmk-thinking, .go-thinking, .cs-thinking, .jq-thinking, .xq-thinking,
+  .rv-thinking { display: none !important; }
+</style>
+
+{% endblock %}

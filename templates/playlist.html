@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}{{ pl.name }} - 歌单 - MONO 社区{% endblock %}
+{% set active = 'music' %}
+{% block content %}
+<style>
+  .plp-page{max-width:780px;margin:0 auto;padding-bottom:24px;}
+
+  .plp-hero{
+    border:1px solid var(--line);border-radius:18px;
+    background:linear-gradient(135deg, var(--card), var(--bg-elev));
+    padding:22px;margin-bottom:16px;
+    box-shadow:0 3px 16px var(--shadow);
+  }
+  .plp-hero .h-top{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;
+  }
+  .plp-hero .h-ico{
+    width:52px;height:52px;border-radius:15px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:25px;line-height:1;
+    background:var(--soft);
+  }
+  .plp-hero .h-main{flex:1;min-width:0;}
+  .plp-hero h1{
+    margin:0;font-size:21px;font-weight:800;letter-spacing:-.3px;
+    word-break:break-all;line-height:1.35;
+  }
+  .plp-hero .h-sub{
+    font-size:12.5px;color:var(--muted);margin-top:5px;
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  }
+  .plp-hero .h-sub a{color:var(--fg-2);text-decoration:none;font-weight:600;}
+  .plp-hero .h-sub a:hover{text-decoration:underline;}
+  .plp-tag{
+    font-size:10.5px;padding:2px 9px;border-radius:20px;font-weight:600;
+    background:var(--soft);color:var(--fg-2);
+  }
+  .plp-tag.pub{background:#dbeafe;color:#1d4ed8;}
+  .plp-tag.pri{background:#fef3c7;color:#b45309;}
+  .plp-hero .h-acts{
+    display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;
+  }
+
+  .plp-list{
+    border:1px solid var(--line);border-radius:16px;
+    background:var(--card);overflow:hidden;
+  }
+  .plp-row{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 15px;border-top:1px solid var(--soft);
+    cursor:pointer;transition:background .15s;
+  }
+  .plp-row:first-child{border-top:0;}
+  .plp-row:hover{background:var(--soft);}
+  .plp-row.now{background:var(--soft);}
+  .plp-row.now .plp-idx{color:var(--accent);font-weight:700;}
+  .plp-idx{
+    width:26px;flex-shrink:0;text-align:center;
+    font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;
+  }
+  .plp-body{flex:1;min-width:0;}
+  .plp-ttl{font-size:14px;font-weight:600;word-break:break-word;line-height:1.4;}
+  .plp-art{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .plp-dur{
+    font-size:12px;color:var(--muted);flex-shrink:0;
+    font-variant-numeric:tabular-nums;
+  }
+  .plp-ops{display:flex;gap:6px;flex-shrink:0;}
+  .plp-ops button{
+    border:1px solid var(--line);background:var(--bg-elev);
+    color:var(--fg-2);border-radius:8px;padding:6px 10px;
+    font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .plp-ops button:hover{border-color:var(--muted);}
+
+  .plp-empty{
+    padding:50px 20px;text-align:center;color:var(--muted);
+  }
+  .plp-empty .e-ico{font-size:36px;opacity:.5;display:block;margin-bottom:12px;}
+  .plp-empty .e-main{font-size:14px;font-weight:600;color:var(--fg-2);margin-bottom:6px;}
+  .plp-empty .e-sub{font-size:12.5px;line-height:1.7;}
+
+  .plp-edit{
+    border:1px solid var(--line);border-radius:16px;
+    background:var(--bg-elev);padding:16px 18px;margin-top:16px;
+  }
+  .plp-edit h3{margin:0 0 12px;font-size:14.5px;font-weight:700;}
+  .plp-edit .row{
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+  }
+  .plp-edit input[type=text]{
+    flex:1;min-width:150px;padding:9px 12px;
+    border:1px solid var(--line);border-radius:9px;
+    background:var(--card);color:var(--fg);font-size:13.5px;font-family:inherit;
+  }
+
+  @media (max-width:640px){
+    .plp-hero{padding:17px;}
+    .plp-hero h1{font-size:18px;}
+    .plp-hero .h-ico{width:44px;height:44px;font-size:21px;border-radius:12px;}
+    .plp-hero .h-acts .btn{flex:1;text-align:center;}
+    .plp-row{padding:11px 12px;gap:9px;flex-wrap:wrap;}
+    .plp-ops{width:100%;justify-content:flex-start;margin-top:4px;}
+    .plp-ops button{flex:1;}
+  }
+</style>
+
+<div class="plp-page">
+  <div class="plp-hero">
+    <div class="h-top">
+      <span class="h-ico">📚</span>
+      <div class="h-main">
+        <h1>{{ pl.name }}</h1>
+        <div class="h-sub">
+          <span>by
+            {% if owner %}<a href="{{ url_for('user_page', user_id=owner.id) }}">{{ owner.username }}</a>
+            {% else %}（已注销）{% endif %}
+          </span>
+          <span>{{ tracks|length }} 首</span>
+          <span class="plp-tag {{ 'pub' if pl.is_public else 'pri' }}">
+            {{ '公开' if pl.is_public else '私密' }}
+          </span>
+          <span>{{ pl.created_at | fmttime('%Y-%m-%d') }} 创建</span>
+        </div>
+      </div>
+    </div>
+    <div class="h-acts">
+      {% if tracks %}
+      <button class="btn" onclick="playAll()">▶ 播放全部</button>
+      {% endif %}
+      <a class="btn ghost" href="{{ url_for('music_page') }}">← 回音乐台</a>
+    </div>
+  </div>
+
+  {% if tracks %}
+  <div class="plp-list" id="plpList">
+    {% for t in tracks %}
+    <div class="plp-row" data-tid="{{ t.id }}" data-idx="{{ loop.index0 }}">
+      <span class="plp-idx">{{ loop.index }}</span>
+      <div class="plp-body">
+        <div class="plp-ttl">{{ t.title }}</div>
+        <div class="plp-art">{{ t.artist }}</div>
+      </div>
+      <span class="plp-dur">
+        {%- if t.duration -%}
+          {{ '%d:%02d' % (t.duration // 60 | int, t.duration % 60 | int) }}
+        {%- else -%}--:--{%- endif -%}
+      </span>
+      <div class="plp-ops">
+        <button type="button" data-play="{{ t.id }}">▶ 播放</button>
+        {% if is_owner %}
+        <button type="button" data-remove="{{ t.id }}" title="从歌单里移除">移出</button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="plp-list">
+    <div class="plp-empty">
+      <span class="e-ico">🎵</span>
+      <div class="e-main">这个歌单还是空的</div>
+      <div class="e-sub">
+        回音乐台，在歌曲那行点「＋歌单」就能把歌加进来
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if is_owner %}
+  <div class="plp-edit">
+    <h3>✏️ 编辑歌单</h3>
+    <form class="row" method="post" action="{{ url_for('playlist_edit', pid=pl.id) }}">
+      <input type="text" name="name" value="{{ pl.name }}" maxlength="30" placeholder="歌单名字">
+      <button type="submit" class="btn sm">改名</button>
+    </form>
+    <div class="row" style="margin-bottom:0;">
+      <form method="post" action="{{ url_for('playlist_edit', pid=pl.id) }}" style="display:contents;">
+        <input type="hidden" name="toggle_public" value="1">
+        <button type="submit" class="btn sm ghost">
+          {{ '设为私密' if pl.is_public else '设为公开' }}
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('playlist_delete', pid=pl.id) }}" style="display:contents;"
+            data-name="{{ pl.name }}" onsubmit="return confirm(__('删除歌单「') + this.dataset.name + __('」？歌单会没，但歌本身还在音乐台。'));">
+        <button type="submit" class="btn sm ghost">删除歌单</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+var PLAYLIST = {{ tracks|map(attribute='id')|list|tojson }};
+var PLNAME = {{ pl.name|tojson }};
+
+function player(){
+  if (window.parent !== window && window.parent.MonoPlayer) return window.parent.MonoPlayer;
+  return null;
+}
+
+function playAll(){
+  var p = player();
+  if (!p){ alert(__('请在正常浏览模式下使用（播放器在右下角）')); return; }
+  fetch('/api/music/playlist/{{ pl.id }}/tracks')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j.ok || !j.tracks || !j.tracks.length){ alert(__('这个歌单还是空的')); return; }
+      p.playQueue(j.tracks, PLNAME);
+      markNow(-1);
+    })
+    .catch(function(){ alert(__('加载失败，稍后再试')); });
+}
+
+function markNow(idx){
+  document.querySelectorAll('.plp-row').forEach(function(r, i){
+    r.classList.toggle('now', i === idx);
+  });
+}
+
+document.getElementById('plpList') && document.getElementById('plpList').addEventListener('click', function(e){
+  var t = e.target;
+  if (!t || !t.closest) return;
+  var row = t.closest('.plp-row');
+  if (!row) return;
+  var tid = parseInt(row.getAttribute('data-tid'), 10);
+  var idx = parseInt(row.getAttribute('data-idx'), 10);
+
+  if (t.closest('[data-remove]')){
+    if (!confirm(__('把这首歌从歌单里移出？'))) return;
+    var f = document.createElement('form');
+    f.method = 'post';
+    f.action = '/music/playlist/{{ pl.id }}/remove/' + tid;
+    document.body.appendChild(f);
+    f.submit();
+    return;
+  }
+
+  var p = player();
+  if (!p){ alert(__('请在正常浏览模式下使用（播放器在右下角）')); return; }
+  p.playTrack(tid);
+  markNow(idx);
+});
+
+(function(){
+  var p = player();
+  if (!p || !p.currentState) return;
+  setTimeout(function(){
+    try {
+      var s = p.currentState();
+      if (!s || !s.tid) return;
+      var i = PLAYLIST.indexOf(s.tid);
+      if (i >= 0) markNow(i);
+    } catch(e){}
+  }, 600);
+})();
+</script>
+{% endblock %}

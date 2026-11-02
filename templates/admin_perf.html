@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}性能面板 - 管理后台{% endblock %}
+{% set active = 'admin' %}
+
+{% block content %}
+<style>
+  .pf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;}
+  .pf-card{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--card);}
+  .pf-card h3{margin:0 0 12px;font-size:14px;font-weight:700;}
+  .pf-bars{display:flex;flex-direction:column;gap:8px;}
+  .pf-brow{display:flex;align-items:center;gap:10px;font-size:12.5px;}
+  .pf-brow .lb{width:44px;flex:none;color:var(--fg-2);}
+  .pf-brow .bar{height:16px;border-radius:4px;min-width:2px;}
+  .pf-brow .vl{flex:none;font-variant-numeric:tabular-nums;font-weight:700;}
+  .pf-table{width:100%;font-size:12px;border-collapse:collapse;}
+  .pf-table th{text-align:left;padding:5px 7px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;}
+  .pf-table td{padding:5px 7px;border-bottom:1px solid var(--line);}
+  .pf-num{font-variant-numeric:tabular-nums;font-weight:700;}
+  .pf-ms{font-weight:700;}
+  .pf-ms.slow{color:#c0392b;}
+  .pf-path{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pf-tb{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.55;
+    background:var(--bg-elev);border:1px solid var(--line);border-radius:9px;padding:11px 13px;
+    overflow-x:auto;white-space:pre;color:var(--fg-2);max-height:260px;overflow-y:auto;}
+  .pf-note{font-size:11.5px;color:var(--muted);margin-top:8px;}
+</style>
+
+<h2>048 性能面板</h2>
+<p class="sub">数据源：mono.log 近 6000 行 REQ 记录（应用计时）+ monitor_samples（系统采样）· 慢请求阈值 {{ slow_ms }}ms</p>
+
+<div class="pf-grid">
+  <div class="pf-card">
+    <h3>状态码分布（近 {{ total }} 请求）</h3>
+    <div class="pf-bars">
+      {% set mx = (buckets.values()|max or 1) or 1 %}
+      {% for lb, n in buckets.items() %}
+      <div class="pf-brow">
+        <span class="lb">{{ lb }}</span>
+        <span class="bar" style="width:{{ (n * 220 / mx)|int }}px;background:{{ '#111' if lb != '5xx' else '#c0392b' }};{% if n == 0 %}opacity:.15;{% endif %}"></span>
+        <span class="vl">{{ n }}</span>
+        <span class="muted" style="font-size:11px;">{{ (n * 100 / total)|round(1) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="pf-note">明细：{% for c, n in codes.items()|sort %}{{ c }}×{{ n }} {% endfor %}</p>
+  </div>
+
+  <div class="pf-card">
+    <h3>系统趋势（monitor_samples 近 24h）</h3>
+    <table class="pf-table">
+      <tr><th>时间</th><th>请求数</th><th>均耗时</th><th>CPU</th><th>内存</th></tr>
+      {% for s in samples[-12:] %}
+      <tr>
+        <td class="pf-num">{{ s.ts | dt_local }}</td>
+        <td class="pf-num">{{ s.req_count }}</td>
+        <td class="pf-num">{{ s.req_avg_ms }}ms</td>
+        <td class="pf-num">{{ (s.cpu_pct or 0)|round }}%</td>
+        <td class="pf-num">{{ s.mem_used_mb }}M</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">暂无采样（monitor 采集线程每分钟一次）</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="pf-card" style="grid-column:1/-1;">
+    <h3>慢请求 TOP15（≥ {{ slow_ms }}ms）</h3>
+    <table class="pf-table">
+      <tr><th>方法</th><th>路径</th><th>状态</th><th>耗时</th><th>IP</th></tr>
+      {% for s in slow %}
+      <tr>
+        <td>{{ s.method }}</td>
+        <td class="pf-path" title="{{ s.path }}">{{ s.path }}</td>
+        <td class="pf-num">{{ s.code }}</td>
+        <td class="pf-ms {{ 'slow' if s.ms >= slow_ms * 2 }}">{{ s.ms }}ms</td>
+        <td class="pf-num">{{ s.ip }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">没有慢请求，站点飞起 ✓</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="pf-card" style="grid-column:1/-1;">
+    <h3>5xx 明细（最近 30 条）</h3>
+    <table class="pf-table">
+      <tr><th>路径</th><th>状态</th><th>耗时</th><th>IP</th><th>原始日志</th></tr>
+      {% for e in errs %}
+      <tr>
+        <td class="pf-path" title="{{ e.path }}">{{ e.path }}</td>
+        <td class="pf-num" style="color:#c0392b;">{{ e.code }}</td>
+        <td class="pf-num">{{ e.ms }}ms</td>
+        <td class="pf-num">{{ e.ip }}</td>
+        <td class="muted" style="font-size:11px;">{{ e.raw[:90] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">没有 5xx ✓</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  {% if tbs %}
+  <div class="pf-card" style="grid-column:1/-1;">
+    <h3>异常采样（最近 {{ tbs|length }} 段 traceback）</h3>
+    {% for tb in tbs %}
+    <div class="pf-tb" style="margin-bottom:10px;">{{ tb }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

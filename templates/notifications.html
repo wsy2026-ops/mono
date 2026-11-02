@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}通知中心 - MONO 社区{% endblock %}
+{% set active = 'notifications' %}
+{% block content %}
+<style>
+.notif-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  flex-wrap:wrap;margin-bottom:16px;}
+.notif-tools .right{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.notif-tools form{margin:0;}
+.notif-all{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer;
+  user-select:none;}
+.notif-all input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent,#C9A227);}
+.notif-cbwrap{display:flex;align-items:center;padding:0 4px 0 2px;flex-shrink:0;}
+.notif-cb{width:16px;height:16px;cursor:pointer;accent-color:var(--accent,#C9A227);}
+.notif-item.picked{background:var(--soft,rgba(201,162,39,.10));}
+@media (max-width:640px){
+  .notif-tools{flex-direction:column;align-items:stretch;}
+  .notif-tools .right{justify-content:space-between;}
+}
+</style>
+
+<h2>通知中心</h2>
+<p class="sub">你收到的所有系统通知 · 未读显示红点，点击即标记已读</p>
+
+{% set nicon = {
+  'mention':'📢','mention_post':'📢','mention_comment':'📢','friend_request':'👤',
+  'friend_accept':'✅','private_message':'💬','like':'❤️','comment':'💭','reply':'↩️',
+  'ban':'⛔️','mute':'🔇','ban_lift':'🔓','mute_lift':'🔓','effect':'🏆','badge':'🏅',
+  'levelup':'🎉','report_result':'📨','appeal_result':'⚖️','appeal_new':'📝',
+  'report_escalated':'🚨','essence':'⭐','move':'📦','official':'📣','activity':'🎪',
+  'group_request':'📥','group_accept':'👥','group_invite':'✉️','group_dissolved':'🚫',
+  'dynamic_like':'❤️','dynamic_comment':'💭'
+} %}
+
+{% if notifications %}
+{# 批量操作用独立表单 + 复选框的 form 属性关联 —— 不能嵌套在列表项的表单里 #}
+<form id="batchDel" method="post" action="{{ url_for('notif_delete_batch') }}"></form>
+<form id="clearAll" method="post" action="{{ url_for('notif_delete_all') }}"></form>
+
+{# 047 分类 tabs（含各分类未读数） #}
+<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+  {% set cats = [('all','全部', total_unread), ('interact','互动', cat_counts.get('interact',0)),
+                 ('social','社交', cat_counts.get('social',0)), ('honor','荣誉', cat_counts.get('honor',0)),
+                 ('points','积分', cat_counts.get('points',0)), ('system','系统', cat_counts.get('system',0))] %}
+  {% for key, name, n in cats %}
+  <a href="{{ url_for('notifications', cat='' if key == 'all' else key) }}"
+     style="font-size:12.5px;padding:5px 13px;border-radius:99px;text-decoration:none;
+            border:1px solid var(--line);color:var(--fg-2);background:var(--card);
+            {{ 'background:#111;color:#fff;border-color:#111;' if (cat == '' and key == 'all') or cat == key }}">
+    {{ name }}{% if n %}<span style="margin-left:4px;font-variant-numeric:tabular-nums;">{{ n }}</span>{% endif %}
+  </a>
+  {% endfor %}
+  <a href="{{ url_for('notif_prefs') }}" style="margin-left:auto;font-size:12px;color:var(--muted);">偏好设置 ⚙</a>
+</div>
+
+<div class="notif-tools">
+  <label class="notif-all">
+    <input type="checkbox" id="notifAll">
+    <span>全选</span>
+  </label>
+  <div class="right">
+    <button type="submit" form="batchDel" id="batchBtn" class="btn sm ghost" disabled>🗑 删除选中</button>
+    <button type="submit" form="clearAll" class="btn sm ghost"
+            onclick="return confirm(__('确定清空全部通知？这个操作不可恢复。'));">🧹 清空全部</button>
+    <form method="post" action="{{ url_for('notif_read_all') }}">
+      <button type="submit" class="btn sm ghost">✅ 全部已读</button>
+    </form>
+  </div>
+</div>
+
+<div class="notif-list">
+  {% for n in notifications %}
+  <div class="notif-item {% if not n.is_read %}unread{% endif %}" style="position:relative;">
+    <label class="notif-cbwrap" title="选中以批量删除">
+      <input type="checkbox" class="notif-cb" name="ids" value="{{ n.id }}" form="batchDel">
+    </label>
+    <div class="notif-icon">{{ nicon.get(n.type, '🔔') }}</div>
+    <form method="post" action="{{ url_for('notif_read', nid=n.id) }}" style="flex:1;margin:0;">
+      <button type="submit" class="notif-link" style="background:none;border:none;padding:0;text-align:left;cursor:pointer;width:100%;">
+        <div class="notif-content">
+          <div class="notif-text">{{ n.content }}</div>
+          <div class="notif-time">{{ n.created_at|timeago }}</div>
+        </div>
+      </button>
+    </form>
+    {% if not n.is_read %}
+    <span style="position:absolute;top:14px;right:14px;width:8px;height:8px;border-radius:50%;background:#f5576c;"></span>
+    {% endif %}
+    <form method="post" action="{{ url_for('notif_delete', nid=n.id) }}" onsubmit="return confirm(__('确定删除该通知？'));" style="margin:0;">
+      <button type="submit" class="btn sm ghost" style="color:#9ca3af;padding:4px 8px;">✕</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+(function(){
+  var all = document.getElementById('notifAll');
+  var btn = document.getElementById('batchBtn');
+  var cbs = document.querySelectorAll('.notif-cb');
+  if (!all || !btn || !cbs.length) return;
+
+  function sync(){
+    var n = 0;
+    cbs.forEach(function(c){
+      var it = c.closest ? c.closest('.notif-item') : null;
+      if (it) it.classList.toggle('picked', c.checked);
+      if (c.checked) n++;
+    });
+    btn.disabled = (n === 0);
+    btn.textContent = n ? ('🗑 删除选中（' + n + '）') : '🗑 删除选中';
+    all.checked = (n > 0 && n === cbs.length);
+    all.indeterminate = (n > 0 && n < cbs.length);
+  }
+
+  all.addEventListener('change', function(){
+    cbs.forEach(function(c){ c.checked = all.checked; });
+    sync();
+  });
+  cbs.forEach(function(c){ c.addEventListener('change', sync); });
+  sync();
+})();
+</script>
+{% else %}
+<div class="card center" style="padding:40px;">
+  <p class="muted">暂无通知</p>
+</div>
+{% endif %}
+{% endblock %}

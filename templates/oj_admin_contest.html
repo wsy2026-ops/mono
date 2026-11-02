@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}{{ contest.title }} - 比赛管理{% endblock %}
+
+{% block content %}
+<style>
+  .oc-wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px;}
+  .oc-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .oc-title{font-size:20px;font-weight:800;margin:0;}
+  .oc-back{
+    font-size:13px;color:var(--fg-3);text-decoration:none;
+    padding:4px 10px;border-radius:7px;border:1px solid var(--line);
+  }
+  .oc-back:hover{background:var(--soft);color:var(--fg);}
+  .oc-sub{font-size:12.5px;color:var(--fg-3);margin:0 0 18px;line-height:1.7;}
+
+  .oc-card{
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    padding:18px 20px;margin-bottom:14px;
+  }
+  .oc-card h2{
+    margin:0 0 14px;font-size:14.5px;font-weight:700;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .oc-card h2 .cnt{font-size:12px;font-weight:400;color:var(--fg-3);}
+
+  .oc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .oc-field{margin-bottom:14px;}
+  .oc-field:last-child{margin-bottom:0;}
+  .oc-label{display:block;font-size:12px;font-weight:700;color:var(--fg-2);margin:0 0 6px;}
+  .oc-label .oc-tip{font-size:11.5px;font-weight:400;color:var(--fg-3);margin:0;}
+  .oc-input,.oc-textarea{
+    width:100%;box-sizing:border-box;
+    padding:9px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg-sunken);color:var(--fg);
+    font-size:13.5px;font-family:inherit;outline:none;
+  }
+  .oc-input:focus,.oc-textarea:focus{border-color:var(--fg-3);}
+  .oc-textarea{min-height:70px;resize:vertical;line-height:1.7;}
+  .oc-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg-2);}
+
+  .oc-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:8px 18px;border:0;border-radius:8px;cursor:pointer;
+    font-size:13.5px;font-weight:700;font-family:inherit;
+    background:var(--fg);color:var(--bg);text-decoration:none;
+  }
+  .oc-btn:hover{opacity:.85;}
+  .oc-btn.ghost{background:none;color:var(--fg);border:1px solid var(--line);}
+  .oc-btn.ghost:hover{background:var(--soft);}
+  .oc-btn.danger{background:none;color:#c62828;border:1px solid var(--line);}
+  .oc-btn.danger:hover{background:#fdecea;border-color:#f5b5b0;}
+  .oc-btn.sm{padding:5px 12px;font-size:12.5px;}
+
+  .oc-plist{display:flex;flex-direction:column;gap:9px;}
+  .oc-pitem{
+    display:flex;align-items:center;gap:12px;
+    padding:13px 15px;border:1px solid var(--line);border-radius:10px;
+    background:var(--bg-sunken);
+  }
+  .oc-pidx{
+    flex-shrink:0;width:28px;height:28px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--soft);color:var(--fg-2);
+    font-size:12.5px;font-weight:700;
+  }
+  .oc-pmain{flex:1;min-width:0;}
+  .oc-pname{display:block;font-size:14px;font-weight:700;color:var(--fg);margin-bottom:3px;}
+  .oc-pmeta{display:block;font-size:11.5px;color:var(--fg-3);}
+  .oc-pact{display:flex;gap:7px;flex-shrink:0;}
+
+  .oc-empty{
+    text-align:center;padding:36px 20px;
+    border:1px dashed var(--line);border-radius:11px;background:var(--bg-sunken);
+    font-size:13px;color:var(--fg-3);
+  }
+  .oc-flash{padding:11px 15px;border-radius:9px;margin-bottom:14px;font-size:13px;}
+  .oc-flash.ok{background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}
+  .oc-flash.error{background:#fdecea;color:#a32d2d;border:1px solid #f5b5b0;}
+  .oc-tip{font-size:11.5px;color:var(--fg-3);margin-top:8px;line-height:1.65;}
+
+  @media (max-width:640px){
+    .oc-wrap{padding:14px 12px 50px;}
+    .oc-card{padding:15px 14px;}
+    .oc-grid{grid-template-columns:1fr;}
+    .oc-pitem{flex-wrap:wrap;}
+    .oc-pact{width:100%;}
+  }
+</style>
+
+<div class="oc-wrap">
+  <div class="oc-head">
+    <h1 class="oc-title">{{ contest.title }}</h1>
+    <a class="oc-back" href="{{ url_for('oj_admin') }}">← 比赛列表</a>
+  </div>
+  <p class="oc-sub">编辑比赛信息，添加题目。每道题单独上传测试点。</p>
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}
+    <div class="oc-flash {{ 'error' if cat == 'error' else 'ok' }}">{{ m }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="oc-card">
+    <h2>比赛信息</h2>
+    <form method="post" action="{{ url_for('oj_admin_contest_save', cid=contest.id) }}">
+      <div class="oc-field">
+        <label class="oc-label">标题</label>
+        <input class="oc-input" name="title" value="{{ contest.title }}" maxlength="120" required>
+      </div>
+      <div class="oc-field">
+        <label class="oc-label">说明</label>
+        <textarea class="oc-textarea" name="description" maxlength="4000">{{ contest.description }}</textarea>
+      </div>
+      <div class="oc-grid">
+        <div class="oc-field">
+          <label class="oc-label">开始时间 <span class="oc-tip">北京时间</span></label>
+          <input class="oc-input" type="datetime-local" name="start_at"
+                 value="{{ contest.start_at|dt_local }}">
+        </div>
+        <div class="oc-field">
+          <label class="oc-label">结束时间 <span class="oc-tip">北京时间</span></label>
+          <input class="oc-input" type="datetime-local" name="end_at"
+                 value="{{ contest.end_at|dt_local }}">
+        </div>
+      </div>
+      <div class="oc-field">
+        <label class="oc-label">赛制</label>
+        <select class="oc-input" name="rule">
+          {% for k, v in rules.items() %}
+          <option value="{{ k }}"{{ ' selected' if (contest.rule or 'ioi') == k }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="oc-field">
+        <label class="oc-check">
+          <input type="checkbox" name="is_public" {{ 'checked' if contest.is_public }}>
+          <span>公开（所有人可见）</span>
+        </label>
+      </div>
+      <button class="oc-btn" type="submit">保存</button>
+    </form>
+  </div>
+
+  <div class="oc-card">
+    <h2>题目 <span class="cnt">（{{ problems|length }} 道）</span></h2>
+
+    {% if problems %}
+    <div class="oc-plist">
+      {% for p in problems %}
+      <div class="oc-pitem">
+        <div class="oc-pidx">{{ loop.index }}</div>
+        <div class="oc-pmain">
+          <span class="oc-pname">{{ p.title }}</span>
+          <span class="oc-pmeta">
+            {{ limits[p.id].time_text }} / {{ limits[p.id].mem_text }} ·
+            {{ p.test_count }} 个测试点
+            {% if not p.test_count %} · <b style="color:#c62828;">还没传数据</b>{% endif %}
+          </span>
+        </div>
+        <div class="oc-pact">
+          <a class="oc-btn sm" href="{{ url_for('oj_admin_problem', pid=p.id) }}">编辑</a>
+          <form method="post" action="{{ url_for('oj_admin_problem_delete', pid=p.id) }}"
+                onsubmit="return confirm(__('确定删除这道题？测试点也会删掉。'));">
+            <button class="oc-btn sm danger" type="submit">删除</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="oc-empty">还没有题目，在下面创建一道</div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('oj_admin_problem_new', cid=contest.id) }}"
+          style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+      <input class="oc-input" name="title" placeholder="题目标题，例如：A+B Problem"
+             maxlength="120" style="flex:1;min-width:200px;">
+      <button class="oc-btn" type="submit">创建题目</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

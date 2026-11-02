@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}题目审核 · MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .ojr-wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px;font-size:14px;color:#1a1a1a;}
+  .ojr-head{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .ojr-head h1{margin:0;font-size:20px;font-weight:700;}
+  .ojr-head a{margin-left:auto;font-size:13px;color:#2563eb;text-decoration:none;}
+  .ojr-head a:hover{text-decoration:underline;}
+
+  .ojr-item{border:1px solid #e6e8eb;border-radius:10px;margin-bottom:10px;background:#fff;
+            overflow:hidden;}
+  .ojr-sum{padding:13px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;
+           list-style:none;user-select:none;}
+  .ojr-sum::-webkit-details-marker{display:none;}
+  .ojr-sum:hover{background:#f8fafc;}
+  .ojr-id{font-size:12px;color:#a0a5aa;font-variant-numeric:tabular-nums;min-width:34px;}
+  .ojr-title{font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ojr-meta{font-size:12px;color:#8b9096;white-space:nowrap;}
+  .ojr-arrow{font-size:11px;color:#c0c4c9;transition:transform .15s;}
+  details[open] .ojr-arrow{transform:rotate(90deg);}
+
+  .ojr-body{padding:0 16px 16px;border-top:1px solid #f3f4f6;}
+  .ojr-sec{margin-top:14px;}
+  .ojr-sec h4{margin:0 0 6px;font-size:12.5px;color:#8b9096;font-weight:600;}
+  .ojr-sec p{margin:0;font-size:13.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;}
+  .ojr-sec pre{margin:0;padding:9px 11px;background:#f8fafc;border:1px solid #eef0f2;
+               border-radius:6px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;
+               white-space:pre-wrap;word-break:break-all;}
+
+  .ojr-acts{display:flex;gap:9px;align-items:center;margin-top:18px;flex-wrap:wrap;}
+  .ojr-btn{padding:8px 20px;border:none;border-radius:7px;font-size:13.5px;font-weight:500;
+           cursor:pointer;transition:background .12s;}
+  .ojr-btn.ok{background:#16a34a;color:#fff;}
+  .ojr-btn.ok:hover{background:#15803d;}
+  .ojr-btn.no{background:#fee2e2;color:#b91c1c;}
+  .ojr-btn.no:hover{background:#fecaca;}
+  .ojr-btn.ghost{background:#f3f4f6;color:#374151;}
+  .ojr-btn.ghost:hover{background:#e5e7eb;}
+  .ojr-input{flex:1;min-width:180px;padding:8px 11px;border:1px solid #d8dce1;border-radius:7px;
+             font-size:13px;font-family:inherit;}
+  .ojr-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+
+  .ojr-empty{padding:44px 20px;text-align:center;color:#9aa0a6;border:1px dashed #e0e3e7;
+             border-radius:10px;background:#fcfcfd;}
+  .ojr-empty .ico{font-size:30px;margin-bottom:8px;}
+  .ojr-empty p{margin:0;font-size:14px;color:#6b7280;}
+</style>
+
+<div class="ojr-wrap">
+  <div class="ojr-head">
+    <h1>题目审核</h1>
+    <a href="{{ url_for('oj_home') }}">← 返回题库</a>
+  </div>
+
+  {% if pending %}
+  <div style="font-size:13px;color:#8b9096;margin-bottom:12px;">
+    {{ pending|length }} 道题等待审核。展开看题面，通过或驳回。
+  </div>
+
+  {% for p in pending %}
+  <details class="ojr-item">
+    <summary class="ojr-sum">
+      <span class="ojr-id">#{{ p.id }}</span>
+      <span class="ojr-title">{{ p.title }}</span>
+      <span class="ojr-meta">
+        {{ p.author }} · {{ p.difficulty or '未标注' }} ·
+        {% if p.visibility == 'contest' %}比赛赛题{% else %}公开题{% endif %}
+      </span>
+      <span class="ojr-arrow">▶</span>
+    </summary>
+
+    <div class="ojr-body">
+      <div class="ojr-acts" style="margin-top:14px;">
+        <a class="ojr-btn ghost" href="{{ url_for('oj_problem_edit', pid=p.id) }}" target="_blank">
+          查看完整题面 / 测试数据 →
+        </a>
+      </div>
+
+      <form method="post" action="{{ url_for('oj_admin_review_do', pid=p.id) }}"
+            class="ojr-acts">
+        <button class="ojr-btn ok" type="submit" name="action" value="approve">✓ 通过</button>
+        <input class="ojr-input" name="reason" maxlength="200" placeholder="驳回原因（驳回时填）">
+        <button class="ojr-btn no" type="submit" name="action" value="reject">✗ 驳回</button>
+      </form>
+    </div>
+  </details>
+  {% endfor %}
+
+  {% else %}
+  <div class="ojr-empty">
+    <div class="ico">✅</div>
+    <p>没有待审核的题目</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

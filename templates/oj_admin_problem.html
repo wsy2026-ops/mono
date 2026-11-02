@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+{% block title %}{{ problem.title }} - 题目编辑{% endblock %}
+
+{% block content %}
+<style>
+  .op-wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px;}
+  .op-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .op-title{font-size:20px;font-weight:800;margin:0;}
+  .op-back{
+    font-size:13px;color:var(--fg-3);text-decoration:none;
+    padding:4px 10px;border-radius:7px;border:1px solid var(--line);
+  }
+  .op-back:hover{background:var(--soft);color:var(--fg);}
+  .op-navs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .op-nav-view{color:var(--fg);}
+  .op-sub{font-size:12.5px;color:var(--fg-3);margin:0 0 18px;line-height:1.7;}
+
+  .op-card{
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    padding:18px 20px;margin-bottom:14px;
+  }
+  .op-card h2{
+    margin:0 0 16px;font-size:14.5px;font-weight:700;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .op-card h2 .cnt{font-size:12px;font-weight:400;color:var(--fg-3);}
+  .op-card h2 .req{
+    font-size:11px;font-weight:700;color:#c62828;
+    padding:1px 6px;border-radius:4px;background:#fdecea;
+  }
+
+  .op-field{margin-bottom:16px;}
+  .op-field:last-child{margin-bottom:0;}
+  .op-label{
+    display:flex;align-items:center;gap:8px;
+    font-size:12.5px;font-weight:700;color:var(--fg-2);margin:0 0 7px;
+  }
+  .op-label .tip{font-weight:400;font-size:11.5px;color:var(--fg-3);}
+  .op-input,.op-textarea{
+    width:100%;box-sizing:border-box;
+    padding:9px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg-sunken);color:var(--fg);
+    font-size:13.5px;font-family:inherit;outline:none;
+  }
+  .op-input:focus,.op-textarea:focus{border-color:var(--fg-3);}
+  .op-textarea{min-height:110px;resize:vertical;line-height:1.75;}
+  .op-textarea.tall{min-height:160px;}
+  .op-mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .op-derived{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:9px 12px;border:1px dashed var(--line);border-radius:8px;
+    background:var(--bg-sunken);font-size:13px;color:var(--fg-2);
+  }
+  .op-derived b{color:var(--fg);font-weight:700;}
+  .op-derived .sep{color:var(--fg-3);}
+  .op-derived .tip{font-size:11.5px;color:var(--fg-3);}
+
+  .op-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+
+  .op-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:8px 18px;border:0;border-radius:8px;cursor:pointer;
+    font-size:13.5px;font-weight:700;font-family:inherit;
+    background:var(--fg);color:var(--bg);text-decoration:none;
+  }
+  .op-btn:hover{opacity:.85;}
+  .op-btn.ghost{background:none;color:var(--fg);border:1px solid var(--line);}
+  .op-btn.ghost:hover{background:var(--soft);}
+  .op-btn.sm{padding:5px 12px;font-size:12.5px;}
+
+  .op-drop{
+    border:2px dashed var(--line);border-radius:11px;
+    padding:28px 20px;text-align:center;
+    background:var(--bg-sunken);cursor:pointer;
+    transition:border-color .15s,background .15s;
+  }
+  .op-drop:hover,.op-drop.over{border-color:var(--fg-3);background:var(--soft);}
+  .op-drop-ico{font-size:30px;line-height:1;margin-bottom:10px;opacity:.6;}
+  .op-drop-t{font-size:13.5px;font-weight:700;color:var(--fg-2);margin:0 0 5px;}
+  .op-drop-s{font-size:11.5px;color:var(--fg-3);line-height:1.7;}
+  .op-drop input[type=file]{display:none;}
+  .op-fname{
+    margin-top:10px;font-size:12.5px;color:var(--fg-2);
+    font-family:ui-monospace,Menlo,monospace;
+  }
+
+  .op-rules{
+    margin-top:14px;padding:13px 15px;border-radius:9px;
+    background:var(--bg-sunken);border:1px solid var(--line);
+    font-size:11.5px;color:var(--fg-3);line-height:1.85;
+  }
+  .op-rules b{color:var(--fg-2);}
+  .op-rules code{
+    font-family:ui-monospace,Menlo,monospace;
+    padding:1px 5px;border-radius:4px;background:var(--soft);color:var(--fg-2);
+  }
+
+  .op-tagbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .op-tagchip{
+    padding:3px 10px;border-radius:6px;cursor:pointer;
+    font-size:11.5px;font-weight:600;font-family:inherit;
+    background:var(--soft);color:var(--fg-2);border:1px solid var(--line);
+  }
+  .op-tagchip:hover{background:var(--bg-sunken);border-color:var(--fg-3);}
+  .op-tagchip.on{background:var(--fg);color:var(--bg);border-color:var(--fg);}
+
+  .op-sample{
+    border:1px solid var(--line);border-radius:10px;
+    background:var(--bg-sunken);padding:14px 16px;margin-bottom:12px;
+  }
+  .op-sample-head{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .op-sample-no{font-size:12.5px;font-weight:700;color:var(--fg-2);}
+  .op-sample-del{
+    border:0;background:none;cursor:pointer;padding:2px 8px;border-radius:6px;
+    font-size:12px;color:#c62828;font-family:inherit;
+  }
+  .op-sample-del:hover{background:#fdecea;}
+  .op-sample-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .op-sample-grid .op-label{font-size:11.5px;margin-bottom:5px;}
+  .op-sample-grid textarea{
+    width:100%;box-sizing:border-box;min-height:76px;resize:vertical;
+    padding:9px 11px;border:1px solid var(--line);border-radius:7px;
+    background:var(--bg-elev);color:var(--fg);
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12.5px;line-height:1.65;outline:none;
+  }
+  .op-sample-grid textarea:focus{border-color:var(--fg-3);}
+
+  .op-casebar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin-top:14px;margin-bottom:8px;
+  }
+  .op-casetip{font-size:12.5px;color:var(--fg-3);}
+  .op-casetip b{color:var(--fg);font-weight:700;}
+  .op-casebar .spacer{flex:1;}
+  .op-num{
+    width:100%;box-sizing:border-box;
+    padding:5px 8px;border:1px solid var(--line);border-radius:6px;
+    background:var(--bg-elev);color:var(--fg);
+    font-size:12.5px;font-family:inherit;outline:none;
+  }
+  .op-num:focus{border-color:var(--fg-3);}
+  .op-cases td.sz{color:var(--fg-3);font-size:12px;}
+
+  .op-cases{margin-top:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .op-cases table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .op-cases th{
+    padding:9px 12px;text-align:left;font-weight:600;
+    background:var(--soft);color:var(--fg-3);
+  }
+  .op-cases td{padding:9px 12px;border-top:1px solid var(--line);color:var(--fg-2);}
+  .op-cases td.idx{font-weight:700;color:var(--fg);}
+  .op-badge{
+    font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;
+    background:#e8f5e9;color:#1b5e20;
+  }
+  .op-empty{
+    text-align:center;padding:30px 20px;font-size:13px;color:var(--fg-3);
+  }
+
+  .op-flash{padding:11px 15px;border-radius:9px;margin-bottom:14px;font-size:13px;}
+  .op-flash.ok{background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}
+  .op-flash.error{background:#fdecea;color:#a32d2d;border:1px solid #f5b5b0;}
+  .op-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+
+  @media (max-width:640px){
+    .op-wrap{padding:14px 12px 50px;}
+    .op-card{padding:15px 14px;}
+    .op-grid{grid-template-columns:1fr;}
+    .op-sample-grid{grid-template-columns:1fr;}
+  }
+</style>
+
+<div class="op-wrap">
+  <div class="op-head">
+    <h1 class="op-title">{{ problem.title }}</h1>
+    <div class="op-navs">
+      {% if contest %}
+      <a class="op-back" href="{{ url_for('oj_admin_contest', cid=contest.id) }}">← {{ contest.title }}</a>
+      {% endif %}
+      <a class="op-back op-nav-view" href="{{ url_for('oj_problem', pid=problem.id) }}">查看题面 →</a>
+      <a class="op-back op-nav-view" href="{{ url_for('oj_records', pid=problem.id, scope='all' if me.is_super_admin else 'mine') }}">全部记录 →</a>
+    </div>
+  </div>
+  <p class="op-sub">题目内容 + 测试点。规则和洛谷一致。</p>
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}
+    <div class="op-flash {{ 'error' if cat == 'error' else 'ok' }}">{{ m }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="post" action="{{ url_for('oj_admin_problem_save', pid=problem.id) }}">
+
+    <div class="op-card">
+      <h2>基本信息</h2>
+      <div class="op-field">
+        <label class="op-label">题目标题 <span class="req">必填</span></label>
+        <input class="op-input" name="title" value="{{ problem.title }}" maxlength="120" required>
+      </div>
+      <div class="op-field">
+        <label class="op-label">时空限制 <span class="tip">由测试点自动汇总，不用手填</span></label>
+        <div class="op-derived">
+          时间 <b>{{ limits.time_text }}</b><span class="sep">·</span>内存 <b>{{ limits.mem_text }}</b>
+          <span class="tip">在下面的「测试点配置」里逐点设置，题目页显示的就是这里的范围</span>
+        </div>
+      </div>
+      <div class="op-field">
+        <label class="op-label">难度</label>
+        <select class="op-input" name="difficulty" id="opDiff">
+          <option value="">暂无评定</option>
+          <option value="入门">入门</option>
+          <option value="普及−">普及−</option>
+          <option value="普及/提高−">普及/提高−</option>
+          <option value="普及+/提高">普及+/提高</option>
+          <option value="提高">提高</option>
+          <option value="提高+/省选−">提高+/省选−</option>
+          <option value="省选/NOI−">省选/NOI−</option>
+          <option value="NOI/NOI+/CTSC">NOI/NOI+/CTSC</option>
+        </select>
+      </div>
+      <div class="op-field">
+        <label class="op-label">标签 <span class="tip">用空格或逗号分隔，最多 8 个</span></label>
+        <input class="op-input" name="tags" id="opTags" maxlength="200"
+               value="{{ problem.tags }}" placeholder="例如：模拟 贪心 二分">
+        <div class="op-tagbar" id="opTagBar"></div>
+      </div>
+    </div>
+
+    <div class="op-card">
+      <h2>题目内容 <span class="tip">支持 Markdown</span></h2>
+      <div class="op-field">
+        <label class="op-label">题目描述 <span class="req">必填</span></label>
+        <textarea class="op-textarea tall" name="description"
+                  placeholder="描述这道题要做什么。可以用 Markdown。">{{ problem.description }}</textarea>
+      </div>
+      <div class="op-field">
+        <label class="op-label">输入格式</label>
+        <textarea class="op-textarea" name="input_format"
+                  placeholder="说明输入数据长什么样。">{{ problem.input_format }}</textarea>
+      </div>
+      <div class="op-field">
+        <label class="op-label">输出格式</label>
+        <textarea class="op-textarea" name="output_format"
+                  placeholder="说明要输出什么。">{{ problem.output_format }}</textarea>
+      </div>
+      <div class="op-field">
+        <label class="op-label">提示 / 说明</label>
+        <textarea class="op-textarea" name="hint"
+                  placeholder="数据范围、样例解释、注意事项等。">{{ problem.hint }}</textarea>
+      </div>
+    </div>
+
+    <div class="op-card">
+      <h2>样例 <span class="cnt" id="opSampleCnt"></span></h2>
+      <div id="opSamples"></div>
+      <div class="op-actions" style="margin-top:12px;">
+        <button class="op-btn ghost" type="button" id="opAddSample">+ 添加样例</button>
+        <span style="font-size:11.5px;color:var(--fg-3);">样例是给做题的人看的，和判题用的测试点无关</span>
+      </div>
+    </div>
+
+    <div class="op-card">
+      <div class="op-actions">
+        <button class="op-btn" type="submit">保存题目</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="op-card">
+    <h2>测试点 <span class="cnt">（{{ cases|length }} 个）</span></h2>
+
+    <form method="post" action="{{ url_for('oj_admin_problem_upload', pid=problem.id) }}"
+          enctype="multipart/form-data" id="opUploadForm">
+      <label class="op-drop" id="opDrop">
+        <div class="op-drop-ico">📦</div>
+        <p class="op-drop-t">点击选择，或把 zip 拖进来</p>
+        <p class="op-drop-s">上传后自动替换当前所有测试点</p>
+        <input type="file" name="zipfile" id="opFile" accept=".zip">
+      </label>
+      <div class="op-fname" id="opFname"></div>
+
+      <div class="op-rules">
+        <b>打包规则（和洛谷一致）</b><br>
+        · 把测试点文件放进 zip 的<b>根目录</b>（子文件夹也认）<br>
+        · 命名：<code>1.in</code> <code>1.out</code>、<code>2.in</code> <code>2.out</code>…<br>
+        · 也支持 <code>input1.txt</code> / <code>output1.txt</code>、<code>answer1.txt</code><br>
+        · 编号<b>必须连续</b>，缺配对的会被跳过<br>
+        · 前 2 个测试点会当作样例展示<br>
+        · <b>只支持 .zip</b>（.rar 请先转成 zip）· 上限 64 MB
+      </div>
+
+      <div class="op-actions" style="margin-top:14px;">
+        <button class="op-btn" type="submit" id="opUpBtn" disabled>上传测试点</button>
+        <span style="font-size:12px;color:var(--fg-3);" id="opUpTip">先选一个 zip 文件</span>
+      </div>
+    </form>
+
+    {% if cases %}
+    <form method="post" action="{{ url_for('oj_admin_problem_cases', pid=problem.id) }}" id="opCaseForm">
+      <div class="op-casebar">
+        <span class="op-casetip">共 {{ cases|length }} 个测试点，总分 <b id="opTotalScore">{{ cases|sum(attribute='score') }}</b> 分</span>
+        <span class="spacer"></span>
+        <button class="op-btn sm ghost" type="button" id="opFillAll">批量填</button>
+        <button class="op-btn sm" type="submit">保存配置</button>
+      </div>
+
+      <div class="op-cases">
+        <table>
+          <tr>
+            <th style="width:52px;">编号</th>
+            <th style="width:74px;">输入</th>
+            <th style="width:74px;">输出</th>
+            <th style="width:96px;">时间 (ms)</th>
+            <th style="width:96px;">内存 (MB)</th>
+            <th style="width:76px;">分值</th>
+          </tr>
+          {% for c in cases %}
+          <tr>
+            <td class="idx">#{{ c.idx }}</td>
+            <td class="sz">{{ c.in_len }}</td>
+            <td class="sz">{{ c.out_len }}</td>
+            <td><input class="op-num" type="number" name="t_{{ c.idx }}"
+                       value="{{ c.time_limit_ms or problem.time_limit_ms }}"
+                       min="100" max="20000" step="100"></td>
+            <td><input class="op-num" type="number" name="m_{{ c.idx }}"
+                       value="{{ c.memory_limit_mb or problem.memory_limit_mb }}"
+                       min="16" max="1024" step="16"></td>
+            <td><input class="op-num" type="number" name="s_{{ c.idx }}"
+                       value="{{ c.score }}"
+                       min="0" max="1000" step="1"></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </form>
+    {% else %}
+    <div class="op-empty">还没有测试点，上传一个 zip</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function(){
+  var DIFF = {{ problem.difficulty|tojson }};
+  var diffSel = document.getElementById('opDiff');
+  if (diffSel && DIFF) diffSel.value = DIFF;
+
+  var TAGS = ['模拟','枚举','贪心','二分','排序','递推','递归','分治','搜索','剪枝',
+              'DP','背包','区间DP','树形DP','状压DP','数位DP','图论','最短路','生成树',
+              '拓扑排序','强连通','树','二叉树','LCA','树状数组','线段树','并查集',
+              '字符串','KMP','哈希','Trie','AC自动机','数学','数论','组合','概率',
+              '博弈','高精度','数据结构','栈','队列','堆','链表'];
+
+  var tagInput = document.getElementById('opTags');
+  var tagBar = document.getElementById('opTagBar');
+
+  function parseTags(){
+    if (!tagInput) return [];
+    return (tagInput.value || '').split(/[\s,，、]+/).map(function(x){ return x.trim(); })
+             .filter(function(x){ return x; });
+  }
+  function writeTags(arr){
+    if (!tagInput) return;
+    var seen = {}, out = [];
+    for (var i = 0; i < arr.length && out.length < 8; i++){
+      var t = arr[i];
+      if (!t || seen[t]) continue;
+      seen[t] = 1; out.push(t);
+    }
+    tagInput.value = out.join(' ');
+    syncChips();
+  }
+  function syncChips(){
+    if (!tagBar) return;
+    var cur = parseTags();
+    var chips = tagBar.querySelectorAll('.op-tagchip');
+    for (var i = 0; i < chips.length; i++){
+      var t = chips[i].getAttribute('data-tag');
+      if (cur.indexOf(t) >= 0) chips[i].classList.add('on');
+      else chips[i].classList.remove('on');
+    }
+  }
+  if (tagBar && tagInput){
+    tagBar.innerHTML = TAGS.map(function(t){
+      return '<button type="button" class="op-tagchip" data-tag="' + t + '">' + t + '</button>';
+    }).join('');
+    tagBar.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('.op-tagchip') : null;
+      if (!b) return;
+      var t = b.getAttribute('data-tag');
+      var cur = parseTags();
+      var i = cur.indexOf(t);
+      if (i >= 0) cur.splice(i, 1);
+      else {
+        if (cur.length >= 8){ alert(__('最多 8 个标签')); return; }
+        cur.push(t);
+      }
+      writeTags(cur);
+    });
+    tagInput.addEventListener('input', syncChips);
+    syncChips();
+  }
+
+  var SAMPLES = {{ samples|tojson }};
+  var sbox = document.getElementById('opSamples');
+  var scnt = document.getElementById('opSampleCnt');
+
+  function renumber(){
+    if (!sbox) return;
+    var items = sbox.querySelectorAll('.op-sample');
+    for (var i = 0; i < items.length; i++){
+      var no = items[i].querySelector('.op-sample-no');
+      if (no) no.textContent = '样例 #' + (i + 1);
+      var del = items[i].querySelector('.op-sample-del');
+      if (del) del.style.display = items.length > 1 ? '' : 'none';
+    }
+    if (scnt) scnt.textContent = items.length ? '（' + items.length + ' 组）' : '（还没加）';
+  }
+
+  function addSample(sin, sout){
+    if (!sbox) return;
+    var d = document.createElement('div');
+    d.className = 'op-sample';
+    d.innerHTML =
+      '<div class="op-sample-head">' +
+        '<span class="op-sample-no"></span>' +
+        '<button type="button" class="op-sample-del">删除</button>' +
+      '</div>' +
+      '<div class="op-sample-grid">' +
+        '<div>' +
+          '<label class="op-label">输入</label>' +
+          '<textarea name="sample_in" spellcheck="false"></textarea>' +
+        '</div>' +
+        '<div>' +
+          '<label class="op-label">输出</label>' +
+          '<textarea name="sample_out" spellcheck="false"></textarea>' +
+        '</div>' +
+      '</div>';
+    sbox.appendChild(d);
+    var tas = d.querySelectorAll('textarea');
+    tas[0].value = sin || '';
+    tas[1].value = sout || '';
+    d.querySelector('.op-sample-del').addEventListener('click', function(){
+      d.parentNode.removeChild(d);
+      renumber();
+    });
+    renumber();
+  }
+
+  if (sbox){
+    if (SAMPLES && SAMPLES.length){
+      for (var i = 0; i < SAMPLES.length; i++){
+        addSample(SAMPLES[i].in, SAMPLES[i].out);
+      }
+    } else {
+      addSample('', '');
+    }
+    var addBtn = document.getElementById('opAddSample');
+    if (addBtn) addBtn.addEventListener('click', function(){
+      if (sbox.querySelectorAll('.op-sample').length >= 20){
+        alert(__('样例最多 20 组')); return;
+      }
+      addSample('', '');
+      var all = sbox.querySelectorAll('.op-sample');
+      var last = all[all.length - 1];
+      if (last){ var ta = last.querySelector('textarea'); if (ta) ta.focus(); }
+    });
+  }
+
+  var fillBtn = document.getElementById('opFillAll');
+  if (fillBtn){
+    fillBtn.addEventListener('click', function(){
+      var t = prompt(__('把所有测试点的时间限制设为（毫秒）'), '1000');
+      if (t === null) return;
+      var m = prompt(__('把所有测试点的内存限制设为（MB）'), '256');
+      if (m === null) return;
+      var s = prompt(__('把所有测试点的分值设为'), '2');
+      if (s === null) return;
+      var form = document.getElementById('opCaseForm');
+      if (!form) return;
+      var ins = form.querySelectorAll('input[name^="t_"]');
+      for (var i = 0; i < ins.length; i++) ins[i].value = t;
+      ins = form.querySelectorAll('input[name^="m_"]');
+      for (var j = 0; j < ins.length; j++) ins[j].value = m;
+      ins = form.querySelectorAll('input[name^="s_"]');
+      for (var k = 0; k < ins.length; k++) ins[k].value = s;
+      updateTotal();
+    });
+  }
+
+  function updateTotal(){
+    var form = document.getElementById('opCaseForm');
+    var lab = document.getElementById('opTotalScore');
+    if (!form || !lab) return;
+    var ins = form.querySelectorAll('input[name^="s_"]');
+    var sum = 0;
+    for (var i = 0; i < ins.length; i++) sum += (parseInt(ins[i].value, 10) || 0);
+    lab.textContent = sum;
+  }
+  var cf = document.getElementById('opCaseForm');
+  if (cf){
+    cf.addEventListener('input', function(e){
+      if (e.target && e.target.name && e.target.name.indexOf('s_') === 0) updateTotal();
+    });
+  }
+
+  var drop = document.getElementById('opDrop');
+  var file = document.getElementById('opFile');
+  var fname = document.getElementById('opFname');
+  var btn = document.getElementById('opUpBtn');
+  var tip = document.getElementById('opUpTip');
+  if (!drop || !file) return;
+
+  function show(){
+    if (file.files && file.files[0]){
+      var f = file.files[0];
+      var mb = (f.size / 1048576).toFixed(2);
+      fname.textContent = f.name + '　' + mb + ' MB';
+      btn.disabled = false;
+      tip.textContent = '确认无误后点上传';
+    } else {
+      fname.textContent = '';
+      btn.disabled = true;
+      tip.textContent = '先选一个 zip 文件';
+    }
+  }
+
+  file.addEventListener('change', show);
+
+  ['dragenter','dragover'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){
+      e.preventDefault();
+      drop.classList.add('over');
+    });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){
+      e.preventDefault();
+      drop.classList.remove('over');
+    });
+  });
+  drop.addEventListener('drop', function(e){
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+      file.files = e.dataTransfer.files;
+      show();
+    }
+  });
+
+  document.getElementById('opUploadForm').addEventListener('submit', function(){
+    btn.disabled = true;
+    btn.textContent = '上传中…';
+    tip.textContent = '正在解析，请稍等';
+  });
+})();
+</script>
+{% endblock %}

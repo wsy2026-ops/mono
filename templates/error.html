@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - MONO 社区{% endblock %}
+{% block content %}
+<style>
+  .er-wrap{
+    max-width:520px;margin:8vh auto;text-align:center;
+    border:1px solid var(--line);border-radius:18px;background:var(--card);
+    padding:44px 30px;
+  }
+  .er-code{
+    font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1;
+    color:var(--muted);opacity:.45;font-variant-numeric:tabular-nums;
+  }
+  .er-title{font-size:19px;font-weight:700;margin:16px 0 10px;}
+  .er-msg{color:var(--muted);font-size:14px;line-height:1.85;margin:0 0 24px;}
+  .er-acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+</style>
+
+<div class="er-wrap">
+  <div class="er-code">{{ code }}</div>
+  <div class="er-title">{{ title }}</div>
+  <p class="er-msg">{{ msg }}</p>
+  <div class="er-acts">
+    <a href="{{ url_for('chat') }}" class="btn">回到聊天室</a>
+    <a href="/" class="btn ghost">回首页</a>
+  </div>
+</div>
+{% endblock %}

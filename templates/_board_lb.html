@@ -1,0 +1,61 @@
+<style>
+  .blb-wrap{
+    border:1px solid var(--line,#e6e6e6);border-radius:16px;background:var(--bg-elev);
+    padding:18px 20px;margin-bottom:18px;overflow:auto;
+  }
+  .blb-wrap h3{
+    font-size:15.5px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:8px;
+    color:var(--fg,#1a1a1a);
+  }
+  .blb-wrap table{width:100%;border-collapse:collapse;font-size:13px;}
+  .blb-wrap th{
+    text-align:left;color:var(--muted,#888);font-weight:600;font-size:12px;
+    padding:7px 6px;border-bottom:1px solid var(--line,#eee);
+  }
+  .blb-wrap td{padding:9px 6px;border-bottom:1px solid rgba(128,128,128,.12);}
+  .blb-wrap tr:last-child td{border-bottom:none;}
+  .blb-rank{
+    display:inline-flex;width:22px;height:22px;border-radius:50%;
+    align-items:center;justify-content:center;font-size:12px;font-weight:800;
+    background:var(--soft,#f0f0f0);color:var(--muted,#666);
+  }
+  .blb-rank.r1{background:#f7d774;color:#5a4300;}
+  .blb-rank.r2{background:#d9d9d9;color:#444;}
+  .blb-rank.r3{background:#e8b27a;color:#5a3000;}
+  .blb-name{font-weight:700;color:var(--fg,#1a1a1a);}
+  .blb-win{color:#dc2626;font-weight:800;font-variant-numeric:tabular-nums;}
+  .blb-num{font-variant-numeric:tabular-nums;}
+  .blb-wrap tr.blb-mine{background:#fff7e0;}
+  .blb-wrap tr.blb-mine .blb-name::after{
+    content:' · 我';color:#b8860b;font-size:11px;font-weight:600;
+  }
+  .blb-empty{text-align:center;color:var(--muted,#999);padding:22px 10px;font-size:13px;margin:0;}
+  .blb-crown{color:#b8860b;margin-left:4px;}
+  @media (max-width:640px){
+    .blb-wrap{padding:14px 12px;}
+    .blb-wrap th:nth-child(4),.blb-wrap td:nth-child(4){display:none;}
+  }
+</style>
+<div class="blb-wrap">
+  <h3>🏆 胜场排行榜</h3>
+  {% if blb_rows %}
+  <table>
+    <thead>
+      <tr><th style="width:34px;"></th><th>玩家</th><th>胜</th><th>和</th><th>负</th></tr>
+    </thead>
+    <tbody>
+      {% for r in blb_rows %}
+      <tr class="{{ 'blb-mine' if current_user and r['user_id']==current_user['id'] else '' }}">
+        <td><span class="blb-rank {{ 'r' + loop.index|string if loop.index <= 3 else '' }}">{{ loop.index }}</span></td>
+        <td class="blb-name">{{ r['username'] }}{% if loop.index == 1 %}<span class="blb-crown">👑</span>{% endif %}</td>
+        <td class="blb-win">{{ r['wins'] }}</td>
+        <td class="blb-num">{{ r['draws'] }}</td>
+        <td class="blb-num">{{ r['losses'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="blb-empty">还没有人对局记录，打完一局就能上榜</p>
+  {% endif %}
+</div>

@@ -1,0 +1,1161 @@
+{% extends "base.html" %}
+{% block title %}{{ room.name }} - 中国象棋{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .xq-wrap{max-width:980px;margin:0 auto;display:grid;grid-template-columns:minmax(560px, 1fr) 280px;gap:22px;align-items:start;}
+  .xq-main{min-width:0;}
+
+  .xq-info{
+    border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:14px;
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+  }
+  .xq-info h2{margin:0;font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .xq-info .tag{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;}
+  .xq-tag-pvp{background:#eef4ff;color:#2f6fed;}
+  .xq-tag-pvai{background:#fef0ee;color:#e0492f;}
+  .xq-tag-pub{background:#e7f9ef;color:#189a5d;}
+  .xq-tag-priv{background:#f2f3f5;color:#6b7280;}
+  .xq-tag-ai{background:#111;color:#fff;}
+  .xq-info .meta{font-size:12.5px;color:var(--muted,#888);display:flex;flex-wrap:wrap;gap:12px;}
+  .xq-info .meta b{color:#333;font-weight:600;}
+  .xq-status{font-size:13.5px;font-weight:700;margin-left:auto;}
+
+  .xq-bar{
+    border:2px solid #111;border-radius:12px;background:#fff;
+    padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;
+    align-items:center;gap:12px;box-shadow:0 4px 14px rgba(0,0,0,.10);flex-wrap:wrap;
+  }
+  .xq-bar .title{font-size:15px;font-weight:800;}
+  .xq-bar .small{font-size:12px;color:#666;margin-top:2px;}
+  .xq-bar .actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .xq-bar button{padding:8px 15px;border-radius:8px;border:1px solid #111;background:#111;color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  .xq-bar button.ghost{background:#fff;color:#111;}
+  .xq-bar button:hover{opacity:.85;}
+  .xq-pa-btn{
+    padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;
+    cursor:pointer;font-size:12px;font-weight:600;color:#444;
+  }
+  .xq-pa-btn.on{background:#111;color:#fff;border-color:#111;}
+
+  .xq-board{
+    position:relative;width:100%;max-width:560px;min-width:480px;aspect-ratio:9/10;margin:0 auto;
+    background:#ffffff;
+    border:4px solid #111;border-radius:6px;
+    box-shadow:0 4px 14px rgba(0,0,0,.12);
+    user-select:none;-webkit-user-select:none;
+    flex-shrink:0;
+  }
+  .xq-board svg{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;}
+  .xq-board .xq-corner-label{
+    position:absolute;font-size:11px;font-weight:700;color:#888;z-index:1;pointer-events:none;
+    font-family:Georgia,'Times New Roman',serif;opacity:.7;
+  }
+  .xq-pt{
+    position:absolute;width:calc(100% / 8 * 0.72);height:calc(100% / 9 * 0.72);
+    transform:translate(-50%,-50%);
+    cursor:pointer;z-index:2;border-radius:50%;
+  }
+  .xq-pt:hover:not(.disabled){background:rgba(0,0,0,.10);}
+  .xq-pt.disabled{cursor:default;}
+  .xq-hint{
+    position:absolute;width:calc(100% / 8 * 0.30);height:auto;aspect-ratio:1;
+    transform:translate(-50%,-50%);border-radius:50%;
+    background:rgba(20,120,60,.85);z-index:4;pointer-events:none;
+    box-shadow:0 0 0 3px rgba(20,120,60,.25);
+  }
+  .xq-hint.capture{
+    width:calc(100% / 8 * 0.78);height:auto;aspect-ratio:1;
+    background:transparent;border:3.5px solid rgba(210,40,30,.95);
+    box-shadow:0 0 0 4px rgba(210,40,30,.18), inset 0 0 0 2px rgba(210,40,30,.10);
+    border-radius:50%;
+  }
+  .xq-piece{
+    /* ⚠️ height 别再写 calc(100% / 8 * ...) —— 百分比的基准是棋盘**高度**，
+       而 width 的基准是**宽度**，棋盘 9:10 不是方的，算出来就是 38×43 的椭圆。
+       只给 width，靠 aspect-ratio:1 出正圆。 */
+    position:absolute;width:calc(100% / 8 * 0.86);height:auto;
+    aspect-ratio:1;flex-shrink:0;
+    border-radius:50%;transform:translate(-50%,-50%);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:900;z-index:3;pointer-events:none;box-sizing:border-box;
+    /* 字号由 JS 按棋盘真实宽度设置（见页尾 fitBoardFont），
+       calc(100%/8*0.48) 是错的 —— 百分比相对父字号而非宽度，算出来不到 1px */
+    font-size:1em;
+    background:#fff;color:#111;border:2px solid #111;
+    box-shadow:0 2px 4px rgba(0,0,0,.25), inset 0 -2px 3px rgba(0,0,0,.06), inset 0 2px 3px rgba(255,255,255,.85);
+    transition:box-shadow .15s;
+  }
+  .xq-piece.red{color:#c22b22;border-color:#111;}
+  .xq-piece.black{color:#111;border-color:#111;}
+  .xq-piece.last::after{
+    content:'';position:absolute;inset:-6px;border:3px solid #2563eb;
+    border-radius:50%;box-sizing:border-box;animation:xqFadeIn .25s;
+  }
+  .xq-piece.selected{outline:3px solid #f5b301;outline-offset:3px;box-shadow:0 0 0 5px rgba(245,179,1,.30), 0 2px 4px rgba(0,0,0,.25);}
+  .xq-piece.check{animation:xqCheckPulse 1s ease-in-out infinite;box-shadow:0 0 0 4px rgba(210,40,30,.55), 0 0 14px 4px rgba(210,40,30,.55);}
+  @keyframes xqCheckPulse{0%,100%{box-shadow:0 0 0 4px rgba(210,40,30,.45), 0 0 10px 3px rgba(210,40,30,.40);}50%{box-shadow:0 0 0 6px rgba(210,40,30,.75), 0 0 18px 6px rgba(210,40,30,.65);}}
+  @keyframes xqFadeIn{from{opacity:0;}to{opacity:1;}}
+
+  .xq-thinking{
+    position:absolute;inset:0;background:transparent;z-index:6;
+    display:flex;align-items:center;justify-content:center;pointer-events:none;
+    border-radius:8px;
+  }
+  .xq-thinking .box{
+    background:rgba(255,255,255,.95);border:1px solid #ccc;border-radius:20px;
+    padding:7px 16px;font-size:13px;font-weight:700;color:#333;
+    display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.18);
+  }
+  .xq-thinking .spinner{
+    width:13px;height:13px;border:2.5px solid #e0e0e0;border-top-color:#111;
+    border-radius:50%;animation:xqspin .8s linear infinite;
+  }
+  @keyframes xqspin{to{transform:rotate(360deg);}}
+
+  .xq-side{position:sticky;top:80px;display:flex;flex-direction:column;gap:12px;}
+  .xq-card{border:1px solid var(--line);border-radius:14px;padding:15px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+  .xq-card h4{margin:0 0 9px;font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:6px;}
+  .xq-card p{margin:0 0 8px;font-size:12.5px;color:var(--muted,#888);line-height:1.75;}
+  .xq-card p:last-child{margin-bottom:0;}
+  .xq-card .xq-btn-primary{width:100%;padding:9px;border-radius:9px;background:#111;color:#fff;border:1px solid #111;cursor:pointer;font-size:13px;font-weight:700;margin-top:8px;}
+  .xq-card .xq-btn-ghost{width:100%;padding:8px;border-radius:9px;background:#fff;color:#333;border:1px solid #ddd;cursor:pointer;font-size:13px;font-weight:600;margin-top:6px;}
+  .xq-card .xq-btn-ghost:hover{border-color:#999;}
+  .xq-card .xq-btn-del{width:100%;padding:8px;border-radius:9px;background:#fff;color:#dc2626;border:1px solid #f3c0c0;cursor:pointer;font-size:13px;font-weight:600;margin-top:6px;}
+  .xq-card .xq-btn-del:hover{background:#fef2f2;border-color:#dc2626;}
+  .xq-card .xq-btn-danger{width:100%;padding:9px;border-radius:9px;background:#fef0ee;color:#d43b25;border:1px solid #f3c6bd;cursor:pointer;font-size:13px;font-weight:700;margin-top:8px;}
+  .xq-card .xq-btn-danger:hover{background:#fde3df;}
+  .xq-ai-badge{display:inline-flex;align-items:center;gap:5px;background:#f4f5f7;border:1px solid #e3e5e8;border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:700;color:#333;}
+
+  .xq-moves{
+    max-height:200px;overflow-y:auto;margin-top:4px;
+    border:1px solid #ddd;border-radius:10px;padding:8px 10px;
+    font-size:12px;color:#333;line-height:1.8;background:#fff;
+  }
+  .xq-moves .mv{display:inline-block;margin:0 6px 2px 0;}
+  .xq-moves .mv.red{color:#c22b22;font-weight:700;}
+  .xq-moves .mv.black{color:#222;font-weight:700;}
+  .xq-moves .mv-num{color:#999;font-weight:600;margin-right:2px;}
+
+  @media (max-width:820px){
+    .xq-wrap{grid-template-columns:minmax(0, 1fr);}
+    .xq-side{position:static;}
+    .xq-status{margin-left:0;width:100%;}
+    /* ⚠️ 棋盘原来写死 min-width:480px —— 手机宽才 390，
+       棋盘被撑到 480 后右边一列棋子直接跑到屏幕外。
+       窄屏必须放开这个下限，让棋盘跟着容器走。 */
+    .xq-board{min-width:0;}
+  }
+</style>
+
+<div class="xq-wrap">
+  <div class="xq-main">
+    <div class="xq-info">
+      <h2>
+        ♟️ {{ room.name }}
+        <span class="tag {{ 'xq-tag-pvp' if room.mode==0 else 'xq-tag-pvai' }}">对战</span>
+        <span class="tag {{ 'xq-tag-pub' if room.is_public else 'xq-tag-priv' }}">{{ '公开' if room.is_public else '私密' }}</span>
+      </h2>
+      <div class="meta">
+        <span>房主 <b>{{ '你' if is_owner else (room.owner_name or room.owner_id) }}</b> 执红</span>
+        <span>黑方 <b>{{ room.ai_name or ('你' if is_guest else (room.guest_name or (room.guest_id if room.guest_id else '等待加入'))) }}</b></span>
+        <span>红先</span>
+      {% if is_super %}
+      <span class="tag" style="background:#dc2626;color:#fff;">👑 超管</span>
+      {% if not is_owner and not is_guest %}
+      <span class="tag" style="background:#374151;color:#fff;">👁 观战模式（仅旁观，不可操纵）</span>
+      {% endif %}
+      {% endif %}
+      </div>
+      <div class="xq-status" id="status"></div>
+    </div>
+
+    <div id="topBar"></div>
+
+    <div class="xq-board" id="board">
+      <div class="xq-corner-label" style="left:2.5%;top:1.5%;">黑</div>
+      <div class="xq-corner-label" style="right:2.5%;bottom:1.5%;">红</div>
+    </div>
+  </div>
+
+  <div class="xq-side">
+    <div class="xq-card">
+      <h4>🔧 操作</h4>
+      {% if not is_super or is_owner or is_guest %}
+      <button class="xq-btn-ghost" id="undoBtn" onclick="askUndo()">↩ 悔棋</button>
+      <button class="xq-btn-del" id="resignBtn" onclick="askResign()">🏳 认输</button>
+      {% endif %}
+      <p style="margin-top:10px;font-size:12px;color:#999;">对局结束后双方可自由退出，互不影响。</p>
+    </div>
+    <div class="xq-card">
+      <h4>📜 着法记录</h4>
+      <div class="xq-moves" id="moveList"><span style="color:#aaa;">（暂无）</span></div>
+    </div>
+    <div class="xq-card">
+      <h4>📖 规则</h4>
+      <p>9×10 棋盘 · 红先黑后。<br>帅仕相马车炮兵各按规则走子；蹩马腿、塞象眼、将帅不能照面。<br>把对方将/帅将死（或对方困毙、认输）即获胜。</p>
+    </div>
+  </div>
+</div>
+
+<script src="{{ cdn_url('js/socket.io.min.js') }}"></script>
+<script>
+const ROOM_ID = {{ room.id }};
+const ME_ID = {{ user.id }};
+const IS_OWNER = {{ 'true' if is_owner else 'false' }};
+const IS_GUEST = {{ 'true' if is_guest else 'false' }};
+// ── 观战模式（058）：非对局参与者可看，不可落子 ──
+const IS_SPECTATOR = !IS_OWNER && !IS_GUEST;
+
+// 对局结束后显示「看复盘」浮动按钮（058）
+{% if room.status == 'finished' %}
+if (true) {
+  var _rb = document.createElement('a');
+  _rb.href = '/board/replay/xq/{{ room.id }}';
+  _rb.textContent = '📺 看复盘';
+  _rb.style.cssText = 'position:fixed;right:16px;bottom:84px;z-index:9998;background:#2563eb;' +
+                      'color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;' +
+                      'font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.35);';
+  document.body.appendChild(_rb);
+}
+{% endif %}
+if (IS_SPECTATOR) {
+  var _sb = document.createElement('div');
+  _sb.textContent = '👁 观战模式 — 你正在旁观这局对局（不可落子）';
+  _sb.style.cssText = 'position:sticky;top:0;z-index:9999;background:#374151;color:#fff;' +
+                      'text-align:center;padding:9px 12px;font-size:14px;letter-spacing:.5px;';
+  document.body.insertBefore(_sb, document.body.firstChild);
+}
+const IS_SUPER = {{ 'true' if is_super else 'false' }};
+const MODE = {{ room.mode|tojson }};
+const W = 9, H = 10;
+
+const PIECE_NAME = {K:'帅',k:'将',A:'仕',a:'士',B:'相',b:'象',N:'马',n:'马',R:'车',r:'车',C:'炮',c:'炮',P:'兵',p:'卒'};
+const PIECE_CN_FULL = {K:'帅',k:'将',A:'仕',a:'士',B:'相',b:'象',N:'马',n:'马',R:'车',r:'车',C:'炮',c:'炮',P:'兵',p:'卒'};
+const X_FILES = '一二三四五六七八九';   // 红方视角坐标（用于着法记录）
+const X_FILES_BLACK = '123456789';
+
+let board = "{{ room.board_state|safe }}";
+let status = '{{ room.status }}';
+let winnerId = {{ room.winner_id if room.winner_id is not none else 'null' }};
+let turnUserId = {{ room.turn_user_id if room.turn_user_id is not none else 'null' }};
+let lastMove = null;
+{% if room.last_move %}
+try { const _lm = "{{ room.last_move }}".split(',').map(Number); if (_lm.length === 4) lastMove = _lm; } catch(e){}
+{% endif %}
+let pending = false;
+let selected = null;
+let legalMoves = null;      // 当前回合己方所有合法着法 [[x1,y1,x2,y2],...]
+let inCheck = false;         // 当前轮走方是否被将军
+let repInfo = null;          // 结局附加信息（长将/和棋）
+
+function pctX(x){ return ((x / (W - 1)) * 100) + '%'; }
+function pctY(y){ return ((y / (H - 1)) * 100) + '%'; }
+function at(x, y){ return board[y * W + x]; }
+function setAt(x, y, v){ board = board.slice(0, y*W+x) + v + board.slice(y*W+x+1); }
+function myTurn(){ if (IS_SUPER && !IS_OWNER && !IS_GUEST) return false; return status === 'playing' && turnUserId === ME_ID; }
+function isMine(p){
+  if (p === '.') return false;
+  return (IS_OWNER && p === p.toUpperCase()) || (IS_GUEST && p === p.toLowerCase());
+}
+
+function xqAt(b,x,y){return b[y*9+x];}
+function xqPieceMoves(b,x,y){
+  const p=xqAt(b,x,y); if(p==='.') return [];
+  const red = p === p.toUpperCase();
+  const moves=[];
+  const ok = (tx,ty) => { if(!(0<=tx&&tx<9&&0<=ty&&ty<10)) return false; const t=xqAt(b,tx,ty); return t==='.' || (t===t.toUpperCase())!==red; };
+  const inPalace = (tx,ty) => 3<=tx&&tx<=5 && (red?(7<=ty&&ty<=9):(0<=ty&&ty<=2));
+  if(p==='K'||p==='k'){
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const tx=x+dx,ty=y+dy; if(inPalace(tx,ty)&&ok(tx,ty)) moves.push([tx,ty]); }
+  } else if(p==='A'||p==='a'){
+    for(const [dx,dy] of [[1,1],[1,-1],[-1,1],[-1,-1]]){ const tx=x+dx,ty=y+dy; if(inPalace(tx,ty)&&ok(tx,ty)) moves.push([tx,ty]); }
+  } else if(p==='B'||p==='b'){
+    for(const [dx,dy] of [[2,2],[2,-2],[-2,2],[-2,-2]]){
+      const tx=x+dx,ty=y+dy;
+      if(!(0<=tx&&tx<9&&0<=ty&&ty<10)) continue;
+      if(red&&ty<5) continue; if(!red&&ty>4) continue;
+      if(xqAt(b,x+(dx/2)|0,y+(dy/2)|0)!=='.') continue;
+      if(ok(tx,ty)) moves.push([tx,ty]);
+    }
+  } else if(p==='N'||p==='n'){
+    for(const [dx,dy,lx,ly] of [[1,2,0,1],[-1,2,0,1],[1,-2,0,-1],[-1,-2,0,-1],[2,1,1,0],[-2,1,-1,0],[2,-1,1,0],[-2,-1,-1,0]]){
+      const tx=x+dx,ty=y+dy;
+      if(0<=tx&&tx<9&&0<=ty&&ty<10 && xqAt(b,x+lx,y+ly)==='.' && ok(tx,ty)) moves.push([tx,ty]);
+    }
+  } else if(p==='R'||p==='r'){
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      let tx=x+dx,ty=y+dy;
+      while(0<=tx&&tx<9&&0<=ty&&ty<10){
+        const t=xqAt(b,tx,ty);
+        if(t==='.'){ moves.push([tx,ty]); }
+        else { if((t===t.toUpperCase())!==red) moves.push([tx,ty]); break; }
+        tx+=dx; ty+=dy;
+      }
+    }
+  } else if(p==='C'||p==='c'){
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      let tx=x+dx,ty=y+dy, jumped=false;
+      while(0<=tx&&tx<9&&0<=ty&&ty<10){
+        const t=xqAt(b,tx,ty);
+        if(!jumped){ if(t==='.') moves.push([tx,ty]); else jumped=true; }
+        else {
+          if(t!=='.'){
+            if((t===t.toUpperCase())!==red) moves.push([tx,ty]);
+            break;
+          }
+        }
+        tx+=dx; ty+=dy;
+      }
+    }
+  } else if(p==='P'){
+    if(y-1>=0 && ok(x,y-1)) moves.push([x,y-1]);
+    if(y<5){ if(x-1>=0 && ok(x-1,y)) moves.push([x-1,y]); if(x+1<9 && ok(x+1,y)) moves.push([x+1,y]); }
+  } else if(p==='p'){
+    if(y+1<10 && ok(x,y+1)) moves.push([x,y+1]);
+    if(y>4){ if(x-1>=0 && ok(x-1,y)) moves.push([x-1,y]); if(x+1<9 && ok(x+1,y)) moves.push([x+1,y]); }
+  }
+  return moves;
+}
+function xqPathClear(b,x1,y1,x2,y2){
+  if(x1!==x2) return false;
+  const step = y2>y1?1:-1;
+  for(let yy=y1+step; yy!==y2; yy+=step) if(xqAt(b,x1,yy)!=='.') return false;
+  return true;
+}
+function xqInCheck(b, red){
+  const target = red?'K':'k';
+  let kx=-1, ky=-1;
+  for(let y=0;y<10;y++) for(let x=0;x<9;x++) if(xqAt(b,x,y)===target){kx=x;ky=y;break;}
+  if(kx<0) return true;
+  for(let y=0;y<10;y++) for(let x=0;x<9;x++){
+    const pp=xqAt(b,x,y);
+    if(pp==='.' || (pp===pp.toUpperCase())===red) continue;
+    const ms=xqPieceMoves(b,x,y);
+    if(ms.some(([tx,ty])=>tx===kx&&ty===ky)) return true;
+    if((pp==='K'||pp==='k')&&x===kx&&xqPathClear(b,x,y,kx,ky)) return true;
+  }
+  return false;
+}
+function xqLegalMoves(b, red){
+  const moves=[];
+  for(let y=0;y<10;y++) for(let x=0;x<9;x++){
+    const p=xqAt(b,x,y);
+    if(p==='.' || (p===p.toUpperCase())!==red) continue;
+    for(const [tx,ty] of xqPieceMoves(b,x,y)){
+      const t=xqAt(b,tx,ty);
+      if(t==='K'||t==='k') continue;  // 不允许吃将
+      const nb = b.slice(0,y*9+x)+'.'+b.slice(y*9+x+1);
+      const nb2 = nb.slice(0,ty*9+tx)+p+nb.slice(ty*9+tx+1);
+      if(!xqInCheck(nb2, red)) moves.push([x,y,tx,ty]);
+    }
+  }
+  return moves;
+}
+
+const ptEls = [];
+const hintEls = [];
+let pieceEls = {};   // key -> DOM
+let staticBuilt = false;
+let thinkingEl = null;
+
+function boardSvg(){
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 8 9');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const mk = (x1,y1,x2,y2,w) => {
+    const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+    l.setAttribute('stroke', '#111');
+    l.setAttribute('stroke-width', w);
+    l.setAttribute('stroke-linecap','round');
+    l.setAttribute('vector-effect','non-scaling-stroke');
+    svg.appendChild(l);
+  };
+  for (let x = 0; x < 9; x++) mk(x, 0, x, 9, (x===0||x===8) ? 2.6 : 1.2);
+  for (let y = 0; y <= 4; y++) mk(0, y, 8, y, (y===0) ? 2.6 : 1.2);
+  for (let y = 5; y <= 9; y++) mk(0, y, 8, y, (y===9) ? 2.6 : 1.2);
+  mk(3, 0, 5, 2, 1.2); mk(5, 0, 3, 2, 1.2);
+  mk(3, 7, 5, 9, 1.2); mk(5, 7, 3, 9, 1.2);
+  mk(0, 4, 1.0, 4, 1.0);          // 上沿左断口
+  mk(7.0, 4, 8, 4, 1.0);          // 上沿右断口
+  mk(0, 5, 1.0, 5, 1.0);          // 下沿左断口
+  mk(7.0, 5, 8, 5, 1.0);          // 下沿右断口
+  const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t1.setAttribute('x', 2.0); t1.setAttribute('y', 4.95);
+  t1.setAttribute('text-anchor', 'middle');
+  t1.setAttribute('dominant-baseline', 'central');
+  t1.setAttribute('fill', '#444');
+  t1.setAttribute('font-size', '0.72');
+  t1.setAttribute('font-weight', '700');
+  t1.setAttribute('font-family', 'KaiTi,STKaiti,"Microsoft YaHei","PingFang SC",serif');
+  t1.setAttribute('letter-spacing', '0.1');
+  t1.textContent = '楚 河';
+  const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t2.setAttribute('x', 6.0); t2.setAttribute('y', 4.95);
+  t2.setAttribute('text-anchor', 'middle');
+  t2.setAttribute('dominant-baseline', 'central');
+  t2.setAttribute('fill', '#444');
+  t2.setAttribute('font-size', '0.72');
+  t2.setAttribute('font-weight', '700');
+  t2.setAttribute('font-family', 'KaiTi,STKaiti,"Microsoft YaHei","PingFang SC",serif');
+  t2.setAttribute('letter-spacing', '0.1');
+  t2.textContent = '汉 界';
+  svg.appendChild(t1); svg.appendChild(t2);
+  return svg;
+}
+
+function ensureStatic(){
+  if (staticBuilt) return;
+  const el = document.getElementById('board');
+  el.appendChild(boardSvg());
+  for (let y = 0; y < H; y++){
+    for (let x = 0; x < W; x++){
+      const pt = document.createElement('div');
+      pt.className = 'xq-pt';
+      pt.dataset.x = x; pt.dataset.y = y;
+      pt.style.left = pctX(x); pt.style.top = pctY(y);
+      pt.addEventListener('click', onPtClick);
+      el.appendChild(pt);
+      ptEls.push(pt);
+    }
+  }
+  staticBuilt = true;
+}
+
+function syncPieces(){
+  const el = document.getElementById('board');
+  for (const key in pieceEls){
+    const k = key.split(','), x = +k[0], y = +k[1];
+    if (at(x, y) === '.'){
+      const node = pieceEls[key];
+      if (node && node.parentNode === el) el.removeChild(node);
+      delete pieceEls[key];
+    }
+  }
+  for (let y = 0; y < H; y++){
+    for (let x = 0; x < W; x++){
+      const p = at(x, y);
+      if (p === '.') continue;
+      const key = x + ',' + y;
+      let pc = pieceEls[key];
+      const name = PIECE_NAME[p] || p;
+      const isRed = p === p.toUpperCase();
+      if (!pc){
+        pc = document.createElement('div');
+        pc.className = 'xq-piece';
+        el.appendChild(pc);
+        pieceEls[key] = pc;
+      }
+      if (pc.textContent !== name) pc.textContent = name;
+      pc.classList.toggle('red', isRed);
+      pc.classList.toggle('black', !isRed);
+      const checkedRed = (turnUserId === ME_ID) ? IS_OWNER : !IS_OWNER;
+      pc.classList.toggle('check', !!(inCheck && p === (checkedRed ? 'K' : 'k')));
+      pc.style.left = pctX(x); pc.style.top = pctY(y);
+      const isLast = lastMove && lastMove[2] === x && lastMove[3] === y;
+      pc.classList.toggle('last', !!isLast);
+      pc.classList.toggle('selected', !!(selected && selected[0] === x && selected[1] === y));
+    }
+  }
+}
+
+function renderHints(){
+  clearHints();
+  if (!selected) return;
+  const el = document.getElementById('board');
+  const sx = selected[0], sy = selected[1];
+  const red = IS_OWNER;  // 房主执红
+  const ms = xqLegalMoves(board, red);
+  for (const m of ms){
+    if (m[0] !== sx || m[1] !== sy) continue;
+    const x = m[2], y = m[3];
+    const hint = document.createElement('div');
+    hint.className = 'xq-hint' + (at(x, y) !== '.' ? ' capture' : '');
+    hint.style.left = pctX(x); hint.style.top = pctY(y);
+    el.appendChild(hint);
+    hintEls.push(hint);
+  }
+}
+function clearHints(){
+  const el = document.getElementById('board');
+  for (const h of hintEls){ if (h.parentNode === el) el.removeChild(h); }
+  hintEls.length = 0;
+}
+
+function updateClickLayers(){
+  const on = status === 'playing' && myTurn();
+  for (const pt of ptEls){
+    pt.classList.toggle('disabled', !on);
+  }
+}
+
+function updateThinking(){
+  const el = document.getElementById('board');
+  const want = MODE === 1 && status === 'playing' && (pending || !myTurn());
+  if (want && !thinkingEl){
+    thinkingEl = document.createElement('div');
+    thinkingEl.className = 'xq-thinking';
+    thinkingEl.innerHTML = '<div class="box"><div class="spinner"></div>对手思考中…</div>';
+    el.appendChild(thinkingEl);
+  } else if (!want && thinkingEl){
+    el.removeChild(thinkingEl);
+    thinkingEl = null;
+  }
+}
+
+let uciMoves = '{{ room.uci_moves or "" }}';
+const XQ_INIT = "rnbakabnr" + "........." + ".c.....c." + "p.p.p.p.p" + "........." +
+                "........." + "P.P.P.P.P" + ".C.....C." + "........." + "RNBAKABNR";
+function _uciToXY(s){
+  s = (s || '').toLowerCase();
+  if (s.length < 2) return null;
+  const x = s.charCodeAt(0) - 97;
+  const y = 9 - parseInt(s.slice(1), 10);
+  if (isNaN(y) || x < 0 || x > 8 || y < 0 || y > 9) return null;
+  return {x, y};
+}
+function renderMoveList(){
+  const el = document.getElementById('moveList');
+  if (!el) return;
+  const parts = (uciMoves || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length){ el.innerHTML = '<span style="color:#aaa;">（暂无）</span>'; return; }
+  let lb = XQ_INIT;
+  let html = '';
+  for (let i = 0; i < parts.length; i++){
+    const u = parts[i].toLowerCase();
+    if (u.length < 4) continue;
+    const f = _uciToXY(u.slice(0,2)), t = _uciToXY(u.slice(2,4));
+    if (!f || !t) { html += '<span class="mv">' + u + '</span>'; continue; }
+    const p = lb[f.y * W + f.x];
+    if (p === '.') { html += '<span class="mv">' + u + '</span>'; continue; }
+    const red = p === p.toUpperCase();
+    const piece = PIECE_CN_FULL[p.toUpperCase()] || '子';
+    const file = red ? X_FILES[f.x] : X_FILES_BLACK[f.x];
+    const kind = p.toUpperCase();
+    let dir, dist;
+    if (t.y === f.y){ dir = '平'; dist = red ? X_FILES[t.x] : X_FILES_BLACK[t.x]; }
+    else if (t.y < f.y){ dir = '进'; }
+    else { dir = '退'; }
+    if (dir !== '平'){
+      if (kind === 'R' || kind === 'C' || kind === 'P'){
+        dist = String(Math.abs(t.y - f.y));
+      } else {
+        dist = red ? X_FILES[t.x] : X_FILES_BLACK[t.x];
+      }
+    }
+    const cls = red ? 'red' : 'black';
+    if (i % 2 === 0) html += '<span class="mv-num">' + (Math.floor(i / 2) + 1) + '.</span>';
+    html += '<span class="mv ' + cls + '">' + piece + file + dir + dist + '</span>';
+    lb = lb.slice(0, f.y*W+f.x) + '.' + lb.slice(f.y*W+f.x+1);
+    lb = lb.slice(0, t.y*W+t.x) + p + lb.slice(t.y*W+t.x+1);
+  }
+  el.innerHTML = html || '<span style="color:#aaa;">（暂无）</span>';
+}
+
+function winnerName(){
+  if (winnerId === ME_ID) return '你';
+  if (winnerId === -1) return '对手';
+  if (winnerId === 0) return '和棋';
+  if (winnerId > 0) return '对手';
+  return '';
+}
+function statusText(){
+  const el = document.getElementById('status');
+  if (status === 'waiting'){
+    if (IS_OWNER) el.innerHTML = '<span style="color:#d97706;">⌛ 等待对手加入…</span>';
+    else el.innerHTML = '<span style="color:#888;">等待房间开始</span>';
+    return;
+  }
+  if (status === 'finished'){
+    const who = winnerName();
+    if (winnerId === 0){
+      el.innerHTML = '<span style="color:#111;font-weight:800;">👋 和棋（三次重复局面）</span>';
+    } else {
+      el.innerHTML = '<span style="color:#111;font-weight:800;">🏁 ' + (who ? who + ' 获胜' : '对局结束') + '</span>';
+    }
+    return;
+  }
+  if (inCheck){
+    el.innerHTML = myTurn()
+      ? '<span style="color:#b91c1c;font-weight:800;">⚠️ 将军！轮到你走棋（必须应将）</span>'
+      : '<span style="color:#b91c1c;font-weight:800;">⚠️ 将军！等待对方应将…</span>';
+    return;
+  }
+  el.innerHTML = myTurn()
+    ? '<span style="color:#b91c1c;font-weight:800;">● 轮到你走棋</span>'
+    : '<span style="color:#888;">○ 等待对方走棋…</span>';
+}
+
+function renderTopBar(){
+  const bar = document.getElementById('topBar');
+  bar.innerHTML = '';
+  if (status === 'waiting'){
+    if (IS_OWNER){
+      bar.innerHTML = `
+        <div class="xq-bar">
+          <div>
+            <div class="title">⌛ 等待对手加入</div>
+            <div class="small">把邀请链接发给好友，对方打开即可加入对战</div>
+          </div>
+          <div class="actions"><button onclick="copyInvite()">📋 复制邀请链接</button></div>
+        </div>`;
+    } else {
+      bar.innerHTML = `
+        <div class="xq-bar">
+          <div>
+            <div class="title">♟️ 加入 {{ room.name|jsstr }}</div>
+            <div class="small">{{ '公开房间' if room.is_public else '私密房间 · 你通过房主分享的链接进入' }}</div>
+          </div>
+          <div class="actions"><button onclick="joinRoom()">⚡ 加入对战</button></div>
+        </div>`;
+    }
+    return;
+  }
+  if (status === 'finished'){
+    const who = winnerName();
+    bar.innerHTML = `
+      <div class="xq-bar">
+        <div>
+          <div class="title">🏁 ${who ? who + ' 获胜' : '对局结束'}</div>
+        </div>
+        <div class="actions">
+          <button class="ghost" onclick="location.href=\'/game/xq\'">返回大厅</button>
+        </div>
+      </div>`;
+    return;
+  }
+  bar.innerHTML = `
+    <div class="xq-bar">
+      <div>
+        <div class="title">${(IS_SUPER && !IS_OWNER && !IS_GUEST) ? '👁 观战模式（超管，仅旁观）' : (myTurn() ? '⬤ 轮到你走棋' : '○ 等待对方…')}</div>
+        <div class="small">${MODE === 1 && !myTurn() ? '对手正在思考，请稍候…' : '红方：' + (IS_OWNER ? '你' : '对手') + ' · 黑方：' + (IS_OWNER ? '对手' : '你')}</div>
+      </div>
+    </div>`;
+}
+
+function renderBoard(){
+  ensureStatic();
+  syncPieces();
+  renderHints();
+  updateClickLayers();
+  updateThinking();
+  statusText();
+  renderTopBar();
+  renderMoveList();
+}
+
+async function joinRoom(){
+  const r = await fetch('/api/xq/' + ROOM_ID + '/join', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.reload();
+  else alert(j.msg || __('加入失败'));
+}
+
+async function refreshLegal(){
+  if (status !== 'playing' || !myTurn()){ legalMoves = null; return; }
+  try{
+    const r = await fetch('/api/xq/' + ROOM_ID + '/legal');
+    const j = await r.json();
+    legalMoves = (j.ok && j.moves) ? j.moves : null;
+  }catch(e){ legalMoves = null; }
+}
+
+async function onPtClick(e){
+  if (pending) return;
+  if (status !== 'playing' || !myTurn()) return;
+  const pt = e.currentTarget;
+  if (pt.classList.contains('disabled')) return;
+  const x = parseInt(pt.dataset.x), y = parseInt(pt.dataset.y);
+  const p = at(x, y);
+
+  if (selected){
+    const sx = selected[0], sy = selected[1];
+    if (sx === x && sy === y){
+      selected = null; clearHints(); syncPieces(); return;
+    }
+    if (p !== '.' && isMine(p)){
+      selected = [x, y]; renderHints(); syncPieces(); return;
+    }
+    const red = IS_OWNER;
+    const ms = xqLegalMoves(board, red);
+    const ok = ms.some(m => m[0] === sx && m[1] === sy && m[2] === x && m[3] === y);
+    if (!ok){
+      alert(__('不符合走法规则')); return;
+    }
+    const sp = at(sx, sy);
+    setAt(x, y, sp); setAt(sx, sy, '.');
+    selected = null; clearHints();
+    pending = true; pendingSince = Date.now();
+    renderBoard();
+    try {
+      const r = await fetch('/api/xq/' + ROOM_ID + '/move', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body: 'x1=' + sx + '&y1=' + sy + '&x2=' + x + '&y2=' + y
+      });
+      const j = await r.json();
+      if (!j.ok){ alert(j.msg || __('走棋失败')); pending = false; location.reload(); return; }
+      applyState(j);
+    } catch(err){
+      alert(__('网络错误，请刷新页面查看最新局面'));
+      pending = false;
+      location.reload();
+    }
+  } else {
+    if (p !== '.' && isMine(p)){
+      selected = [x, y];
+      renderHints();
+      syncPieces();
+    }
+  }
+}
+
+async function resignGame(){
+  if (status !== 'playing'){ alert(__('对局未进行中')); return; }
+  if (!confirm(__('确定认输吗？'))) return;
+  pending = true; pendingSince = Date.now();
+  renderBoard();
+  try {
+    const r = await fetch('/api/xq/' + ROOM_ID + '/move', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'resign=1'
+    });
+    const j = await r.json();
+    if (!j.ok){ alert(j.msg || __('操作失败')); pending = false; renderBoard(); return; }
+    applyState(j);
+  } catch(e){
+    alert(__('网络错误，请刷新页面'));
+    pending = false;
+    renderBoard();
+  }
+}
+
+function applyState(s){
+  const boardChanged = s.board && s.board !== board;
+  if (boardChanged){
+    board = s.board;
+    lastMove = s.last_move || null;
+    syncPieces();
+  } else {
+    if (s.last_move) lastMove = s.last_move;
+  }
+  if (s.status) status = s.status;
+  if (s.winner_id !== null && s.winner_id !== undefined) winnerId = s.winner_id;
+  if (s.turn_user_id !== null && s.turn_user_id !== undefined) turnUserId = s.turn_user_id;
+  if (typeof s.uci_moves === 'string') uciMoves = s.uci_moves;
+  if (typeof s.in_check === 'boolean') inCheck = s.in_check;
+  if (boardChanged){
+    selected = null;
+    clearHints();
+  }
+  pending = false;
+  legalMoves = null;
+  updateClickLayers();
+  updateThinking();
+  statusText();
+  renderTopBar();
+  renderMoveList();
+  refreshLegal();
+  fxReact(boardChanged);
+}
+
+let fxKoDone = false;
+
+function mateName(redWins){
+  const atk = [];
+  for (let y = 0; y < 10; y++){
+    for (let x = 0; x < 9; x++){
+      const p = xqAt(board, x, y);
+      if (p === '.') continue;
+      const isRed = p === p.toUpperCase();
+      if (isRed === redWins) atk.push({ p: p.toLowerCase(), x: x, y: y });
+    }
+  }
+  const cnt = {};
+  for (let i = 0; i < atk.length; i++) cnt[atk[i].p] = (cnt[atk[i].p] || 0) + 1;
+  const n = function(k){ return cnt[k] || 0; };
+  const list = function(k){ const a = []; for (let i = 0; i < atk.length; i++) if (atk[i].p === k) a.push(atk[i]); return a; };
+
+  const red = redWins;
+  const tgt = red ? 'k' : 'K';
+  let kx = -1, ky = -1;
+  for (let y = 0; y < 10; y++){
+    for (let x = 0; x < 9; x++){ if (xqAt(board, x, y) === tgt){ kx = x; ky = y; } }
+  }
+  if (kx < 0) return '绝杀';
+
+  const R = list('r'), C = list('c'), N = list('n'), P = list('p');
+  const sameRank = function(o){ return o.y === ky; };
+  const sameFile = function(o){ return o.x === kx; };
+  const inPal = function(x, y){
+    if (x < 3 || x > 5) return false;
+    return red ? (y >= 0 && y <= 2) : (y >= 7 && y <= 9);
+  };
+
+  const cntBetween = function(x1, y1, x2, y2){
+    let k = 0;
+    if (x1 === x2){
+      const a = Math.min(y1, y2), b = Math.max(y1, y2);
+      for (let y = a + 1; y < b; y++) if (xqAt(board, x1, y) !== '.') k++;
+    } else if (y1 === y2){
+      const a = Math.min(x1, x2), b = Math.max(x1, x2);
+      for (let x = a + 1; x < b; x++) if (xqAt(board, x, y1) !== '.') k++;
+    }
+    return k;
+  };
+
+  if (n('r') >= 3) return '三車闹宫';
+
+  if (n('r') >= 2){
+    let adjacent = false, sameRankTwo = false;
+    for (let i = 0; i < R.length; i++){
+      for (let k = i + 1; k < R.length; k++){
+        if (R[i].x === R[k].x || Math.abs(R[i].x - R[k].x) === 1) adjacent = true;
+        if (R[i].y === R[k].y) sameRankTwo = true;
+      }
+    }
+    if (adjacent) return '双車错';
+    if (sameRankTwo) return '双車胁士';
+    return '双車错';
+  }
+
+  if (n('c') >= 3) return '三炮攻城';
+  if (n('r') >= 1 && n('c') >= 2) return '夹车炮';
+  if (n('c') >= 2) return '重炮';
+
+  if (n('r') >= 1 && n('c') >= 1){
+    let midCannon = false, deepRook = false;
+    for (let i = 0; i < C.length; i++){ if (C[i].x === 4) midCannon = true; }
+    for (let i = 0; i < R.length; i++){ if (sameFile(R[i])) deepRook = true; }
+    if (midCannon && deepRook) return '天地炮';
+    for (let i = 0; i < R.length; i++){
+      const r = R[i];
+      if (sameFile(r) && cntBetween(r.x, r.y, kx, ky) === 1) return '铁门栓';
+      if (sameFile(r) && cntBetween(r.x, r.y, kx, ky) === 0 && Math.abs(r.y - ky) >= 2) return '海底捞月';
+      if (sameRank(r) && Math.abs(r.x - kx) <= 1) return '大刀剜心';
+    }
+    for (let i = 0; i < C.length; i++){
+      if (sameRank(C[i]) && Math.abs(C[i].x - kx) <= 2) return '闷宫';
+    }
+    return '车炮配合';
+  }
+
+  if (n('n') >= 1 && n('c') >= 1) return '马后炮';
+
+  if (n('n') >= 2){
+    const a = N[0], b = N[1];
+    if (Math.abs(a.x - b.x) <= 3 && Math.abs(a.y - b.y) <= 3) return '双马饮泉';
+    return '双马盘宫';
+  }
+
+  if (n('n') >= 1 && n('r') >= 1){
+    for (let i = 0; i < N.length; i++){
+      const o = N[i];
+      const dx = Math.abs(o.x - kx), dy = Math.abs(o.y - ky);
+      if (sameFile(o) && Math.abs(o.y - ky) === 2) return '立马车';
+      if (dx === 1 && dy === 2) return '侧面虎';
+      if (dx === 3 && dy === 2) return '高钓马';
+    }
+    return '车马冷着';
+  }
+
+  if (n('n') >= 1){
+    for (let i = 0; i < N.length; i++){
+      const o = N[i];
+      const dx = Math.abs(o.x - kx), dy = Math.abs(o.y - ky);
+      if (dx === 1 && dy === 2 && inPal(o.x, o.y)) return '卧槽马';
+      if (dx === 2 && dy === 1) return '挂角马';
+      if (dx === 0 && dy === 2) return '钓鱼马';
+      if (dx === 2 && dy === 2) return '八角马';
+      if (dx === 1 && dy === 1) return '白马现蹄';
+    }
+    return '单马擒将';
+  }
+
+  if (n('p') >= 3) return '三进兵';
+  if (n('p') >= 2){
+    let near = false;
+    for (let i = 0; i < P.length; i++){ if (Math.abs(P[i].x - kx) <= 2) near = true; }
+    if (near) return '二鬼拍门';
+    return '双兵逼宫';
+  }
+
+  if (n('p') >= 1){
+    const o = P[0];
+    const dx = Math.abs(o.x - kx), dy = Math.abs(o.y - ky);
+    if (dx === 0 && dy === 1) return '小兵立功';
+    if (dx === 1 && dy === 1) return '送佛归殿';
+    if (dx === 0 && dy === 2) return '太监追皇帝';
+    if (dx === 1 && dy === 2) return '小刀剜心';
+    return '小兵立功';
+  }
+
+  if (n('r') >= 1){
+    for (let i = 0; i < R.length; i++){
+      const o = R[i];
+      if (inPal(o.x, o.y)) return '单車入宫';
+      if (sameFile(o) && cntBetween(o.x, o.y, kx, ky) === 0) return '海底捞月';
+    }
+    return '单車将军';
+  }
+
+  if (n('c') >= 1){
+    for (let i = 0; i < C.length; i++){
+      const o = C[i];
+      if (sameRank(o) && Math.abs(o.x - kx) <= 2) return '闷宫';
+      if (sameFile(o) && cntBetween(o.x, o.y, kx, ky) === 1) return '炮镇当头';
+      if (sameFile(o) && cntBetween(o.x, o.y, kx, ky) === 0) return '炮镇当头';
+    }
+    return '炮打将军';
+  }
+
+  let okx = -1, oky = -1;
+  const ownK = red ? 'K' : 'k';
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 9; x++){
+    if (xqAt(board, x, y) === ownK){ okx = x; oky = y; }
+  }
+  if (okx === kx) return '对面笑';
+  if (oky === ky) return '白脸将';
+
+  return '绝杀';
+}
+
+function fxReact(changed){
+  if (!window.MonoFX) return;
+  if (status === 'finished'){
+    if (fxKoDone) return;
+    if (winnerId === null || winnerId === undefined || winnerId === 0) return;
+    let redC = false, blkC = false;
+    try {
+      redC = xqInCheck(board, true);
+      blkC = xqInCheck(board, false);
+    } catch(e) { return; }
+    if (!redC && !blkC) return;
+    fxKoDone = true;
+    let cell = null;
+    try {
+      const want = redC ? 'k' : 'K';
+      const all = document.querySelectorAll('.xq-piece');
+      for (let i = 0; i < all.length; i++){
+        if (all[i].classList.contains(want) || all[i].dataset.p === want){ cell = all[i]; break; }
+      }
+    } catch(e) {}
+    let word = '绝杀';
+    try { word = mateName(!redC) || '绝杀'; } catch(e) {}
+    MonoFX.checkmate({ cell: cell, word: word });
+    return;
+  }
+  if (changed && inCheck){
+    MonoFX.check(document.getElementById('status'));
+  }
+}
+
+async function pollState(){
+  if (document.hidden || status === 'finished' || status === 'waiting') return;
+  try{
+    const r = await fetch('/api/xq/' + ROOM_ID + '/state');
+    if (r.redirected) { location.href = '/login'; return; }
+    const j = await r.json();
+    if (!j.ok) return;
+    applyState(j);
+  }catch(e){}
+}
+
+function copyInvite(){
+  const url = location.origin + '/game/xq/' + ROOM_ID;
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url)
+      .then(() => alert(__('✅ 邀请链接已复制：\n') + url))
+      .catch(() => prompt(__('复制邀请链接'), url));
+  } else {
+    prompt(__('复制邀请链接'), url);
+  }
+}
+
+async function restartGame(){
+  if (!IS_OWNER){ alert(__('仅房主可重开')); return; }
+  if (!confirm(__('确定重开一局？当前棋盘将清空。'))) return;
+  const r = await fetch('/api/xq/' + ROOM_ID + '/restart', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.reload(); else alert(j.msg || __('重开失败'));
+}
+
+async function deleteRoom(){
+  if (!confirm(__('确定删除该房间？删除后无法恢复，对局进行中也将结束。'))) return;
+  const r = await fetch('/api/room/xq/' + ROOM_ID + '/delete', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.href = '/game/xq';
+  else alert(j.msg || __('删除失败'));
+}
+
+renderBoard();
+refreshLegal();
+setInterval(pollState, 1000);
+
+let pendingSince = 0;
+const PENDING_TIMEOUT_MS = 25000;
+setInterval(function(){
+  if (pending && pendingSince && Date.now() - pendingSince > PENDING_TIMEOUT_MS){
+    pending = false; pendingSince = 0;
+    updateThinking();
+    updateClickLayers();
+    pollState();     // 主动补一次权威状态
+  }
+}, 3000);
+
+let socket = null;
+if (typeof io !== 'undefined'){
+  try {
+    socket = window.__monoSio();
+    window.__monoSioReady(() => {
+      socket.emit('join_xq', {rid: ROOM_ID});
+    });
+    socket.on('xq_move', (data) => {
+      if (!data) return;
+      if (data.closed){ location.href = '/game/xq'; return; }
+      applyState(data);
+    });
+    socket.on('xq_room_update', (data) => {
+      if (data && data.rid === ROOM_ID) location.reload();
+    });
+  } catch(e){
+    socket = null;
+  }
+}
+</script>
+
+<script>
+(function(){
+  var RID = {{ room.id }};
+  var GAME = 'xq';
+  function tip(t){ try { alert(t); } catch (e) {} }
+
+  window.askResign = function(){
+    if (!confirm(__('确定认输吗？这一局会判你负。'))) return;
+    fetch('/api/' + GAME + '/' + RID + '/resign', {method:'POST', credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (!j.ok) tip(j.msg || '认输失败，稍后再试'); })
+      .catch(function(){ tip('网络不太好，再试一次'); });
+  };
+
+  window.askUndo = function(){
+    fetch('/api/' + GAME + '/' + RID + '/undo', {method:'POST', credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok){ tip((j && j.msg) || '悔棋失败'); return; }
+        if (j.done){ tip('已悔棋，重新走一步吧'); setTimeout(function(){ location.reload(); }, 600); return; }
+        tip(j.msg || '已请求悔棋，等对手回应');
+      })
+      .catch(function(){ tip('网络不太好，再试一次'); });
+  };
+
+  var undoAsked = false;
+  setInterval(function(){
+    fetch('/api/' + GAME + '/' + RID + '/undo-poll', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) return;
+        if (!j.pending){ undoAsked = false; return; }
+        if (undoAsked) return;
+        undoAsked = true;
+        var yes = confirm(__('对手想悔一步棋，同意吗？'));
+        fetch('/api/' + GAME + '/' + RID + '/undo-reply', {
+          method:'POST', credentials:'same-origin',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body: yes ? 'accept=1' : 'accept=0'
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(j2){
+            undoAsked = false;
+            if (j2 && j2.done){ tip('已同意悔棋'); setTimeout(function(){ location.reload(); }, 600); }
+          })
+          .catch(function(){ undoAsked = false; });
+      })
+      .catch(function(){});
+  }, 2500);
+
+  // 打完一局显示评级变化。
+  // 不依赖各棋的「对局结束」检测（它们结构都不一样），直接定时比对评级 ——
+  // 评级一变就说明刚结算完。
+  var rating0 = 0, hadRating = false, ratingShown = false;
+
+  function ratingBar(text){
+    var bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translateX(-50%);'
+      + 'z-index:9999;padding:13px 22px;border-radius:14px;background:#111;color:#fff;'
+      + 'font-size:14.5px;font-weight:600;white-space:nowrap;'
+      + 'box-shadow:0 10px 30px rgba(0,0,0,.28);transition:opacity .5s ease;';
+    bar.textContent = text;
+    document.body.appendChild(bar);
+    setTimeout(function(){ bar.style.opacity = '0'; }, 7000);
+    setTimeout(function(){ try { bar.remove(); } catch (e) {} }, 7800);
+  }
+
+  function pullRating(){
+    fetch('/api/mm/me?game=' + GAME, {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) return;
+        if (!hadRating){
+          if (j.rating){
+            hadRating = true;
+            rating0 = j.rating;
+            ratingBar('本局评级 ' + j.rating.toFixed(1) + ' · 已下 ' + j.games + ' 局');
+          }
+          return;
+        }
+        if (ratingShown || !j.rating || j.rating === rating0) return;
+        ratingShown = true;
+        var d = j.rating - rating0;
+        ratingBar('本局评级 ' + rating0.toFixed(1) + ' → ' + j.rating.toFixed(1)
+                  + '（' + (d > 0 ? '+' : '') + d.toFixed(1) + '）');
+      })
+      .catch(function(){});
+  }
+
+  pullRating();
+  setInterval(pullRating, 6000);
+
+  // 每 30 秒报一次「我还在」—— 离开超过两分钟会被判负
+  function alive(){
+    fetch('/api/' + GAME + '/' + RID + '/alive', {method:'POST', credentials:'same-origin'})
+      .catch(function(){});
+  }
+  alive();
+  setInterval(alive, 30000);
+})();
+</script>
+
+
+<style>
+  /* AI 对局不显示「对手思考中」遮罩 —— 和真人对局一样静默。
+     这些遮罩本来就只在人机房出现（JS 里判断了 mode===1），所以隐藏它们不影响真人对局。 */
+  .gmk-thinking, .go-thinking, .cs-thinking, .jq-thinking, .xq-thinking,
+  .rv-thinking { display: none !important; }
+</style>
+
+<script>
+/* 棋子文字自适应棋盘宽度。
+   ⚠️ 原来 CSS 写的是 `font-size: calc(100% / 8 * 0.48)` —— 这是错的：
+   CSS 里 font-size 的百分比是相对**父元素字号**算的，不是相对宽度。
+   父元素 16px 时算出来只有 0.96px，棋子上的字根本看不见。
+   这里改成用棋盘真实宽度算：字号 = 棋盘宽 / 8 * 0.48。 */
+(function(){
+  function fitBoardFont(){
+    var bs = document.querySelectorAll('.xq-board');
+    for (var i = 0; i < bs.length; i++){
+      var w = bs[i].clientWidth;
+      if (w > 0) bs[i].style.fontSize = (w / 8 * 0.48) + 'px';
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fitBoardFont);
+  } else { fitBoardFont(); }
+  window.addEventListener('resize', fitBoardFont, { passive: true });
+  window.addEventListener('orientationchange', function(){ setTimeout(fitBoardFont, 240); });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}排行榜 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="lb-wrap">
+  <div class="lb-head">
+    <h1>排行榜</h1>
+    <div class="lb-tabs">
+      <button type="button" class="lb-tab on" data-tab="all">综合榜</button>
+      <button type="button" class="lb-tab" data-tab="mine">我的成绩</button>
+    </div>
+  </div>
+
+  <div class="lb-pane on" id="pane-all">
+    <div class="lb-note">
+      分数类越高越好，速通类越快越好 —— 两类分开排，秒数混进分数榜没有意义。
+    </div>
+    <div id="lbScore" class="lb-sect"><h2>分数榜</h2><div class="lb-loading">加载中…</div></div>
+    <div id="lbTime" class="lb-sect"><h2>速通榜</h2><div class="lb-loading">加载中…</div></div>
+  </div>
+
+  <div class="lb-pane" id="pane-mine">
+    <div id="lbRanks" class="lb-sect"><h2>我的排名</h2><div class="lb-loading">加载中…</div></div>
+    <div id="lbMine" class="lb-sect"><h2>我的成绩</h2><div class="lb-loading">加载中…</div></div>
+  </div>
+</div>
+
+<style>
+  .lb-wrap{max-width:860px;margin:0 auto;}
+  .lb-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 4px;}
+  .lb-head h1{font-size:22px;font-weight:700;margin:0;}
+  .lb-tabs{display:flex;gap:6px;}
+  .lb-tab{padding:5px 14px;border:1px solid var(--line);border-radius:16px;background:transparent;
+    color:inherit;font-size:13px;cursor:pointer;transition:all .15s;}
+  .lb-tab:hover{border-color:var(--fg);}
+  .lb-tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg);}
+  .lb-note{color:var(--muted);font-size:12.5px;margin:0 0 20px;line-height:1.7;}
+  .lb-pane{display:none;}
+  .lb-pane.on{display:block;}
+  .lb-sect{margin-bottom:30px;}
+  .lb-sect h2{font-size:15px;font-weight:700;margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid var(--line);}
+  .lb-grp{margin-bottom:16px;}
+  .lb-grp-t{font-size:12px;color:var(--muted);margin:0 0 6px;font-weight:600;}
+  .lb-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);}
+  .lb-row:last-child{border-bottom:none;}
+  .lb-no{width:22px;flex:0 0 22px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:center;}
+  .lb-no.top{font-weight:800;color:var(--fg);}
+  .lb-who{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lb-who.mine{font-weight:700;}
+  .lb-val{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .lb-val.t{font-weight:600;}
+  .lb-mine-row{display:flex;align-items:center;gap:10px;padding:9px 12px;
+    border:1px solid var(--line);border-radius:11px;margin-bottom:8px;}
+  .lb-mine-rank{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .lb-mine-rank b{color:var(--fg);font-size:14px;}
+  .lb-mine-game{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lb-mine-val{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .lb-loading,.lb-empty{color:var(--muted);font-size:13px;padding:12px 0;}
+  .lb-empty{text-align:center;}
+</style>
+
+<script>
+(function(){
+  'use strict';
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  var tabs = document.querySelectorAll('.lb-tab');
+  for (var i=0;i<tabs.length;i++){
+    tabs[i].addEventListener('click', function(){
+      for (var j=0;j<tabs.length;j++) tabs[j].classList.remove('on');
+      this.classList.add('on');
+      var t = this.getAttribute('data-tab');
+      document.getElementById('pane-all').className = 'lb-pane' + (t==='all'?' on':'');
+      document.getElementById('pane-mine').className = 'lb-pane' + (t==='mine'?' on':'');
+    });
+  }
+
+  function group(rows, key){
+    var m = {}, order = [];
+    for (var i=0;i<rows.length;i++){
+      var g = rows[i][key];
+      if (!m[g]) { m[g] = []; order.push(g); }
+      m[g].push(rows[i]);
+    }
+    var out = '';
+    for (var k=0;k<order.length;k++){
+      var name = order[k], list = m[name];
+      out += '<div class="lb-grp"><div class="lb-grp-t">' + esc(name) + '</div>';
+      for (var n=0;n<list.length;n++){
+        var r = list[n];
+        var val = r.lower_better ? r.display : String(r.score);
+        out += '<div class="lb-row">'
+          + '<span class="lb-no' + (n<3?' top':'') + '">' + (n+1) + '</span>'
+          + '<span class="lb-who' + (r.mine?' mine':'') + '">' + esc(r.username) + (r.mine?'（我）':'') + '</span>'
+          + '<span class="lb-val' + (r.lower_better?' t':'') + '">' + esc(val) + '</span>'
+          + '</div>';
+      }
+      out += '</div>';
+    }
+    return out;
+  }
+
+  fetch('/api/leaderboard/all', {headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (!j || !j.ok) return;
+      var sc = document.getElementById('lbScore');
+      var tm = document.getElementById('lbTime');
+      sc.innerHTML = '<h2>分数榜</h2>' + (
+        j.score_board.length ? group(j.score_board,'game')
+                             : '<div class="lb-empty">还没有人提交成绩</div>');
+      tm.innerHTML = '<h2>速通榜</h2>' + (
+        j.time_board.length ? group(j.time_board,'game')
+                            : '<div class="lb-empty">还没有人提交成绩</div>');
+
+      var rk = document.getElementById('lbRanks');
+      if (j.my_ranks.length){
+        var h = '<h2>我的排名</h2>';
+        for (var i=0;i<j.my_ranks.length;i++){
+          var r = j.my_ranks[i];
+          h += '<div class="lb-mine-row">'
+            + '<span class="lb-mine-rank">第 <b>' + r.rank + '</b> / ' + r.total + '</span>'
+            + '<span class="lb-mine-game">' + esc(r.game) + '</span>'
+            + '<span class="lb-mine-val">' + esc(r.display) + '</span></div>';
+        }
+        rk.innerHTML = h;
+      } else {
+        rk.innerHTML = '<h2>我的排名</h2><div class="lb-empty">还没有你的成绩，玩一局就有了</div>';
+      }
+
+      var mn = document.getElementById('lbMine');
+      if (j.mine.length){
+        var h2 = '<h2>我的成绩</h2>';
+        for (var k=0;k<j.mine.length;k++){
+          var m = j.mine[k];
+          h2 += '<div class="lb-mine-row">'
+            + '<span class="lb-mine-rank">' + (m.lower_better?'用时':'得分') + '</span>'
+            + '<span class="lb-mine-game">' + esc(m.game) + '</span>'
+            + '<span class="lb-mine-val">' + esc(m.display) + '</span></div>';
+        }
+        mn.innerHTML = h2;
+      } else {
+        mn.innerHTML = '<h2>我的成绩</h2><div class="lb-empty">还没有成绩记录</div>';
+      }
+    })
+    .catch(function(){
+      document.getElementById('lbScore').innerHTML = '<div class="lb-empty">加载失败</div>';
+    });
+})();
+</script>
+{% endblock %}

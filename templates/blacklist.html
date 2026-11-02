@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}黑名单 - MONO 社区{% endblock %}
+{% set active = 'friends' %}
+{% block content %}
+<h2>黑名单</h2>
+<p class="sub">被拉黑的用户无法向你发送私信、无法@你、无法查看你的主页与帖子，且不会收到任何提示</p>
+
+{% if blocked %}
+<div class="card table-scroll" style="padding:0;">
+  <table>
+    <thead><tr><th>用户</th><th>拉黑时间</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for u in blocked %}
+    <tr>
+      <td style="display:flex;align-items:center;gap:8px;">
+        <img src="{{ get_avatar_url(u) }}" alt="" class="avatar sm">
+        {{ u.username }}
+      </td>
+      <td>{{ u.blocked_at|fmttime }}</td>
+      <td>
+        <form method="post" action="{{ url_for('unblock_user', user_id=u.id) }}" style="display:inline;">
+          <button class="btn sm ghost" type="submit">移出黑名单</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card center" style="padding:40px;">
+  <p class="muted">黑名单为空</p>
+</div>
+{% endif %}
+<p style="margin-top:16px;"><a href="{{ url_for('friends') }}" class="btn sm ghost">← 返回好友</a></p>
+{% endblock %}

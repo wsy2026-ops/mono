@@ -1,0 +1,85 @@
+{% extends "_admin_base.html" %}
+{% block title %}处罚记录 · 管理后台{% endblock %}
+{% block admin_icon %}📕{% endblock %}
+{% block admin_heading %}处罚记录{% endblock %}
+{% block admin_desc %}永久存档，不可删除 · 记录每一次封禁与禁言的完整信息{% endblock %}
+
+{% block admin_content %}
+{% set effective = records|selectattr('status','equalto','effective')|list|length %}
+{% set lifted = records|selectattr('status','equalto','lifted')|list|length %}
+
+<div class="adm-card">
+  <div class="adm-grid">
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ records|length }}</div>
+      <div class="adm-stat-label">处罚总数</div>
+    </div>
+    <div class="adm-stat {{ 'warn' if effective else 'mute' }}">
+      <div class="adm-stat-num">{{ effective }}</div>
+      <div class="adm-stat-label">生效中</div>
+    </div>
+    <div class="adm-stat {{ 'ok' if lifted else 'mute' }}">
+      <div class="adm-stat-num">{{ lifted }}</div>
+      <div class="adm-stat-label">已解除</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ records|length - effective - lifted }}</div>
+      <div class="adm-stat-label">已撤销</div>
+    </div>
+  </div>
+</div>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>处罚明细</h3>
+    <span class="adm-hint">按时间倒序</span>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:70px;">ID</th>
+          <th style="width:130px;">用户</th>
+          <th style="width:130px;">操作管理员</th>
+          <th style="width:80px;">类型</th>
+          <th style="width:110px;">时长</th>
+          <th>原因</th>
+          <th style="width:100px;">状态</th>
+          <th style="width:160px;">时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td class="adm-id">{{ r.id }}</td>
+          <td><b>{{ r.username }}</b></td>
+          <td>{{ r.admin_name }}</td>
+          <td>
+            <span class="adm-pill {{ 'danger' if r.ptype == 'ban' else 'warn' }}">
+              {{ '封禁' if r.ptype == 'ban' else '禁言' }}
+            </span>
+          </td>
+          <td class="adm-nowrap">{{ r.duration_text }}</td>
+          <td class="adm-wrap">{{ r.reason or '—' }}</td>
+          <td>
+            {% if r.status == 'effective' %}<span class="adm-pill danger">生效中</span>
+            {% elif r.status == 'lifted' %}<span class="adm-pill on">已解除</span>
+            {% else %}<span class="adm-pill off">已撤销</span>{% endif %}
+          </td>
+          <td class="adm-nowrap adm-id">{{ r.created_at|fmttime }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="adm-empty">
+              <div class="adm-empty-ico">📕</div>
+              <div class="adm-empty-text">暂无处罚记录</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

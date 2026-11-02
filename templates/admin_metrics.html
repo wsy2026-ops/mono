@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}数据看板 - 管理后台{% endblock %}
+{% set active = 'admin' %}
+
+{% block content %}
+<style>
+  .mx-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;}
+  .mx-card{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--card);}
+  .mx-card h3{margin:0 0 14px;font-size:15px;font-weight:700;}
+  .mx-funnel-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px;}
+  .mx-funnel-row .lb{width:64px;flex:none;color:var(--fg-2);}
+  .mx-funnel-row .bar{height:18px;border-radius:5px;background:#111;min-width:2px;}
+  .mx-funnel-row .vl{flex:none;font-variant-numeric:tabular-nums;font-weight:700;}
+  .mx-table{width:100%;font-size:12.5px;border-collapse:collapse;}
+  .mx-table th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;}
+  .mx-table td{padding:6px 8px;border-bottom:1px solid var(--line);}
+  .mx-num{font-variant-numeric:tabular-nums;font-weight:700;}
+  .mx-bar{height:8px;border-radius:4px;background:#111;display:inline-block;vertical-align:middle;}
+  .mx-err{font-size:26px;font-weight:800;}
+</style>
+
+<h2>046 数据看板</h2>
+<p class="sub">埋点口径：近 30 天 · 数据源 user_actions（044/046 共用）· 前端 SDK 无感采集</p>
+
+<div class="mx-grid">
+  <div class="mx-card">
+    <h3>转化漏斗（近 30 天注册用户）</h3>
+    {% set base = funnel[0][1] or 1 %}
+    {% for lb, n in funnel %}
+    <div class="mx-funnel-row">
+      <span class="lb">{{ lb }}</span>
+      <span class="bar" style="width:{{ (n * 200 / base)|int }}px;{{ 'opacity:' ~ (1 - loop.index0 * 0.15) }}"></span>
+      <span class="vl">{{ n }}</span>
+      <span class="muted" style="font-size:11px;">{{ (n * 100 / base)|round(1) }}%</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mx-card">
+    <h3>JS 错误率（近 30 天）</h3>
+    <div class="mx-err">{{ (errs * 100 / visits)|round(2) }}%</div>
+    <p class="muted" style="font-size:12px;margin:6px 0 0;">
+      {{ errs }} 次错误 / {{ visits }} 次访问 · 目标 &lt; 1%</p>
+  </div>
+
+  <div class="mx-card">
+    <h3>页面停留 TOP10（近 30 天）</h3>
+    <table class="mx-table">
+      <tr><th>路径</th><th>访问</th><th>均停</th><th>最长</th></tr>
+      {% for s in stays %}
+      <tr>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ s.target_type|replace('web:','') }}</td>
+        <td class="mx-num">{{ s.n }}</td>
+        <td class="mx-num">{{ s.avg_s|round(1) }}s</td>
+        <td class="mx-num">{{ s.max_s }}s</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="mx-card">
+    <h3>来源渠道 TOP10（近 30 天）</h3>
+    <table class="mx-table">
+      <tr><th>来源</th><th>访问</th></tr>
+      {% for r in refs %}
+      <tr><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;">{{ r.ip or '直接访问' }}</td>
+          <td class="mx-num">{{ r.n }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="mx-card">
+    <h3>行为分布（近 30 天）</h3>
+    <table class="mx-table">
+      <tr><th>行为</th><th>次数</th><th></th></tr>
+      {% set mx = (dist[0].c if dist else 1) or 1 %}
+      {% for d in dist %}
+      <tr>
+        <td>{{ d.action }}</td>
+        <td class="mx-num">{{ d.c }}</td>
+        <td><span class="mx-bar" style="width:{{ (d.c * 120 / mx)|int }}px;"></span></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="mx-card">
+    <h3>近 14 天日活（有埋点的不重名用户）</h3>
+    <table class="mx-table">
+      <tr><th>日期</th><th>活跃</th><th></th></tr>
+      {% set dmx = (daily|map(attribute='u')|max if daily else 1) or 1 %}
+      {% for d in daily %}
+      <tr>
+        <td>{{ d.d }}</td>
+        <td class="mx-num">{{ d.u }}</td>
+        <td><span class="mx-bar" style="width:{{ (d.u * 120 / dmx)|int }}px;"></span></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endblock %}

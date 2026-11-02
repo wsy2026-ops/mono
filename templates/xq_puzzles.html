@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}象棋残局 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .pz-wrap{max-width:980px;margin:0 auto;}
+  .pz-head{margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .pz-head h2{margin:0;font-size:22px;font-weight:800;}
+  .pz-head p{color:var(--muted,#888);font-size:13px;margin:4px 0 0;}
+  .pz-head .btns{display:flex;gap:8px;}
+  .pz-btn{border:1px solid #111;background:#111;color:#fff;padding:9px 16px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .pz-btn.ghost{background:#fff;color:#111;}
+  .pz-btn:hover{opacity:.86;}
+  .pz-stats{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+  .pz-stat{flex:1;min-width:150px;border:1px solid var(--line,#e6e6e6);border-radius:14px;background:#fff;padding:13px 16px;}
+  .pz-stat b{font-size:20px;font-weight:800;display:block;}
+  .pz-stat span{font-size:12px;color:#888;}
+  .pz-section{margin-bottom:24px;}
+  .pz-section h3{font-size:16px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .pz-section h3 small{font-weight:500;color:#999;font-size:12px;}
+  .pz-table{border:1px solid var(--line,#e6e6e6);border-radius:14px;background:#fff;overflow:hidden;}
+  .pz-row{
+    display:grid;grid-template-columns:minmax(0, 1fr) auto auto auto auto auto auto;gap:12px;align-items:center;
+    padding:10px 16px;border-top:1px solid #f3f3f3;font-size:13px;
+  }
+  .pz-row:first-child{border-top:none;}
+  .pz-row:hover{background:#fafafa;}
+  .pz-row .nm{font-weight:700;color:#1a1a1a;display:flex;align-items:center;gap:8px;min-width:0;}
+  .pz-row .nm .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pz-row .nm .src{flex:0 0 auto;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:#f3f4f6;color:#6b7280;}
+  .pz-row .nm .src.user{background:#eef2ff;color:#4f46e5;}
+  .pz-row .nm .done{color:#189a5d;font-size:12px;}
+  .stars{color:#f5a623;letter-spacing:1px;font-size:12.5px;white-space:nowrap;}
+  .pz-row .cell{color:#666;white-space:nowrap;}
+  .pz-row .cell b{color:#1a1a1a;}
+  .pz-row .act{display:flex;gap:6px;justify-content:flex-end;}
+  .pz-row .act a{padding:5px 13px;border-radius:8px;text-decoration:none;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid #111;background:#111;color:#fff;}
+  .pz-row .act a:hover{opacity:.85;}
+  .pz-row .act button{padding:5px 10px;border-radius:8px;font-size:12px;cursor:pointer;background:#fff;color:#dc2626;border:1px solid #f3c0c0;}
+  .pz-empty{text-align:center;color:#999;padding:26px 10px;font-size:13px;}
+  @media (max-width:860px){ .pz-row{grid-template-columns:minmax(0, 1fr) auto;gap:6px;} .pz-row .cell{display:none;} }
+</style>
+
+<div class="pz-wrap">
+  <div class="pz-head">
+    <div>
+      <h2>💥 象棋残局闯关</h2>
+      <p>红方先行，将死黑将即通关 · AI 全力防守 · 亦可自创残局让大家挑战</p>
+    </div>
+    <div class="btns">
+      <a class="pz-btn ghost" href="{{ url_for('xq_list') }}">← 象棋大厅</a>
+      <a class="pz-btn" href="{{ url_for('xq_puzzle_new_page') }}">＋ 创作残局</a>
+    </div>
+  </div>
+
+  <div class="pz-stats">
+    <div class="pz-stat"><b>{{ total_sys }}</b><span>内置经典残局</span></div>
+    <div class="pz-stat"><b>{{ sys_done }} / {{ total_sys }}</b><span>我的破解进度</span></div>
+    <div class="pz-stat"><b>{{ user_rows|length }}</b><span>玩家共享残局</span></div>
+  </div>
+
+  <div class="pz-section">
+    <h3>📖 内置经典残局 <small>来自基本杀法 / 橘中秘 / 实用残局等经典棋谱，全部验证红先可胜</small></h3>
+    <div class="pz-table">
+      {% for p in sys_rows %}
+      <div class="pz-row">
+        <div class="nm">
+          <span class="t">{{ loop.index }}. {{ p.title }}</span>
+          <span class="src">内置</span>
+          {% if p.id in done_ids %}<span class="done" title="已破解">✅</span>{% endif %}
+        </div>
+        <div class="cell stars" title="难度 {{ p.diff }}/5">{% for i in range(5) %}{{ '★' if i < p.diff else '☆' }}{% endfor %}</div>
+        <div class="cell"><b>{% if p.mate_len %}{{ p.mate_len }} 回合杀{% else %}—{% endif %}</b></div>
+        <div class="cell">挑战 {{ p.plays }}</div>
+        <div class="cell">破解 {{ p.solves }}</div>
+        <div class="act"><a href="{{ url_for('xq_puzzle_page', pid=p.id) }}">去破解 →</a></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="pz-section">
+    <h3>👥 玩家共享残局 <small>用户自创 · 通过即可上榜破解数</small></h3>
+    <div class="pz-table">
+      {% if user_rows %}
+      {% for p in user_rows %}
+      <div class="pz-row">
+        <div class="nm">
+          <span class="t">{{ p.title }}</span>
+          <span class="src user">玩家</span>
+          {% if p.id in done_ids %}<span class="done" title="已破解">✅</span>{% endif %}
+        </div>
+        <div class="cell stars" title="难度 {{ p.diff }}/5">{% for i in range(5) %}{{ '★' if i < p.diff else '☆' }}{% endfor %}</div>
+        <div class="cell">作者 <b>{{ p.author_name }}</b></div>
+        <div class="cell">挑战 {{ p.plays }}</div>
+        <div class="cell">破解 {{ p.solves }}</div>
+        <div class="act"><a href="{{ url_for('xq_puzzle_page', pid=p.id) }}">挑战 →</a></div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="pz-empty">还没有玩家共享的残局，来当第一个创作者吧 →</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if mine_rows %}
+  <div class="pz-section">
+    <h3>🔧 我创作的残局</h3>
+    <div class="pz-table">
+      {% for p in mine_rows %}
+      <div class="pz-row">
+        <div class="nm">
+          <span class="t">{{ p.title }}</span>
+          <span class="src {{ 'user' if p.author_id != 0 else '' }}">{{ '玩家' if p.author_id != 0 else '内置' }}</span>
+        </div>
+        <div class="cell stars">{% for i in range(5) %}{{ '★' if i < p.diff else '☆' }}{% endfor %}</div>
+        <div class="cell">挑战 {{ p.plays }}</div>
+        <div class="cell">破解 {{ p.solves }}</div>
+        <div class="cell" style="color:#888;">{{ '已公开' if p.status=='approved' else p.status }}</div>
+        <div class="act">
+          <a href="{{ url_for('xq_puzzle_page', pid=p.id) }}">试玩</a>
+          <button type="button" onclick="delPuzzle({{ p.id }}, this)">删除</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+async function delPuzzle(pid, btn){
+  if (!confirm(__('确定删除该残局？删除后无法恢复。'))) return;
+  const r = await fetch('/api/xq/puzzle/' + pid + '/delete', {method:'POST'});
+  const j = await r.json();
+  if (j.ok){ location.reload(); }
+  else { alert(j.msg || __('删除失败')); }
+}
+</script>
+{% endblock %}

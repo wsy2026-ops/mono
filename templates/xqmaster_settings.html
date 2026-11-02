@@ -1,0 +1,98 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}设置{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-head">
+  <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="{{ url_for('xqmaster_page') }}">← 返回</a>
+  <h1>设置</h1>
+  <span class="xqm-hsub">只存本机</span>
+</div>
+<div class="xqm-set" id="xqmSet"></div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var ITEMS = [
+    { k:'xqm_sfx', nm:'音效', ds:'走子、命中、阵亡、胜负都有声音', def:true },
+    { k:'xqm_bgm', nm:'对局音乐', ds:'对局中放战斗音乐，其他页面放背景音乐', def:true },
+    { k:'xqm_motion', nm:'完整动画', ds:'关掉后刀光、震屏、碎片等特效从简，低端机更流畅', def:true },
+    { k:'xqm_confirm_resign', nm:'认输二次确认', ds:'关掉后点「认输」直接判负', def:true },
+    { k:'xqm_cracks', nm:'棋子裂纹', ds:'用裂纹表现棋子受损程度', def:true },
+    { k:'xqm_land', nm:'沉浸横屏', ds:'手机上全屏横排铺满屏幕，设备怎么拿着都看得到完整棋盘', def:true }
+  ];
+  var box = document.getElementById('xqmSet');
+
+  function get(k, def){
+    try{
+      var v = localStorage.getItem(k);
+      return v === null ? def : v === '1';
+    }catch(e){ return def; }
+  }
+  function set(k, v){
+    try{ localStorage.setItem(k, v ? '1' : '0'); }catch(e){}
+  }
+
+  function paint(){
+    box.innerHTML = ITEMS.map(function(it){
+      var on = get(it.k, it.def);
+      return '<div class="it"><div class="tx"><div class="nm">' + it.nm + '</div>'
+        + '<div class="ds">' + it.ds + '</div></div>'
+        + '<div class="xqm-sw' + (on ? ' on' : '') + '" data-k="' + it.k + '" role="switch" '
+        + 'aria-checked="' + (on ? 'true' : 'false') + '" tabindex="0"></div></div>';
+    }).join('')
+    + '<div class="it"><div class="tx"><div class="nm">音乐音量</div>'
+    + '<div class="ds">战斗音乐与背景音乐共用</div></div>'
+    + '<input class="xqm-vol" type="range" id="xqmBgmVol" min="0" max="100" step="5" value="'
+    + (X.bgm ? X.bgm.vol() : 45) + '"></div>'
+    + '<div class="it"><div class="tx"><div class="nm">本机对局缓存</div>'
+    + '<div class="ds">战报和上一步标记存在浏览器里，清掉只影响本机的显示</div></div>'
+    + '<button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmClearLocal">清空</button></div>'
+    + '<div class="it"><div class="tx"><div class="nm">关于</div>'
+    + '<div class="ds">棋盘主题跟随站点主题；对局数据存在服务器，清本机缓存不会丢战绩</div></div></div>';
+  }
+
+  function toggle(el){
+    var k = el.dataset.k, on = !el.classList.contains('on');
+    set(k, on);
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-checked', on ? 'true' : 'false');
+    if(k === 'xqm_land'){
+      /* 横屏舞台是全局的，改完立刻重排当前页 */
+      if (window.XQM_LAND) window.XQM_LAND.apply();
+      X.toast(on ? __('已开启强制横屏') : __('已恢复跟随设备方向'));
+      return;
+    }
+    if(k === 'xqm_bgm' && X.bgm){ X.bgm.setOn(on); X.toast(on ? __('音乐已开启') : __('音乐已关闭')); return; }
+    if(k === 'xqm_sfx' && X.sfx) X.sfx.set(on);
+    else X.sfx.click();
+  }
+
+  box.addEventListener('click', function(e){
+    var sw = e.target.closest('.xqm-sw');
+    if(sw){ toggle(sw); return; }
+    if(e.target.closest('#xqmClearLocal')){
+      try{
+        Object.keys(localStorage).forEach(function(k){
+          if(k.indexOf('xqm_log_') === 0 || k.indexOf('xqm_meta_') === 0) localStorage.removeItem(k);
+        });
+      }catch(e2){}
+      X.toast(__('已清空本机对局缓存'));
+    }
+  });
+  box.addEventListener('keydown', function(e){
+    var sw = e.target.closest('.xqm-sw');
+    if(sw && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); toggle(sw); }
+  });
+
+  paint();
+  var vs = document.getElementById('xqmBgmVol');
+  if(vs) vs.oninput = function(){
+    var v = +this.value;
+    if(X.bgm) X.bgm.setVol(v);
+    try{ localStorage.setItem('xqm_bgm_vol', String(v)); }catch(e){}
+  };
+})();
+</script>
+{% endblock %}

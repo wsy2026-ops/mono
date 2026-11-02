@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}揭棋大厅 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .jq-section{margin-bottom:24px;}
+  .jq-section h3{font-size:16px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .jq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .jq-room{
+    border:1px solid var(--line,#e6e6e6);border-radius:14px;padding:14px;background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.04);transition:all .18s;
+  }
+  .jq-room:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.08);}
+  .jq-room-name{font-size:15px;font-weight:700;color:#1a1a1a;display:flex;justify-content:space-between;align-items:center;}
+  .jq-room-name .tag{font-size:11px;font-weight:500;}
+  .jq-room-meta{font-size:12px;color:#888;display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+  .jq-tag{padding:1px 7px;border-radius:8px;font-size:11px;}
+  .jq-tag.pvp{background:#f0f4ff;color:#3b82f6;}
+  .jq-tag.pvai{background:#fef3f2;color:#ef4444;}
+  .jq-tag.public{background:#d1fae5;color:#10b981;}
+  .jq-tag.private{background:#f3f4f6;color:#6b7280;}
+  .jq-tag.waiting{background:#fef3c7;color:#d97706;}
+  .jq-tag.playing{background:#dbeafe;color:#2563eb;}
+  .jq-tag.finished{background:#e5e7eb;color:#6b7280;}
+  .jq-actions{margin-top:8px;display:flex;gap:6px;}
+  .jq-actions a,.jq-actions button{flex:1;padding:7px 0;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;}
+  .jq-btn-primary{background:#111;color:#fff;border:1px solid #111;}
+  .jq-btn-ghost{background:#fff;color:#333;border:1px solid #ddd;}
+  .jq-btn-ghost:hover{border-color:#999;}
+  .jq-btn-del{background:#fff;color:#dc2626;border:1px solid #f3c0c0;}
+  .jq-btn-del:hover{background:#fef2f2;border-color:#dc2626;}
+  .jq-create{
+    border:1px solid var(--line,#e6e6e6);border-radius:14px;padding:14px 16px;background:#fff;
+    display:grid;grid-template-columns:1.4fr minmax(0, 1fr) minmax(0, 1fr) auto;gap:10px;align-items:end;
+  }
+  .jq-create label{font-size:12px;color:var(--muted,#888);display:block;margin-bottom:4px;}
+  .jq-create input[type=text],.jq-create select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%;background:#fff;}
+  .jq-create .jq-btn-primary{padding:8px 18px;}
+  .jq-empty{text-align:center;color:#999;padding:30px 10px;font-size:13px;}
+  .jq-lb{border:1px solid var(--line,#e6e6e6);border-radius:14px;background:#fff;padding:14px 16px;overflow:auto;}
+  .jq-lb table{width:100%;border-collapse:collapse;font-size:13px;}
+  .jq-lb th{text-align:left;color:#888;font-weight:600;font-size:12px;padding:8px 6px;border-bottom:1px solid var(--line,#eee);}
+  .jq-lb td{padding:9px 6px;border-bottom:1px solid #f3f3f3;}
+  .jq-lb tr:last-child td{border-bottom:none;}
+  .jq-lb .rank{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:#f0f0f0;color:#666;}
+  .jq-lb .rank.r1{background:#f7d774;color:#5a4300;}
+  .jq-lb .rank.r2{background:#d9d9d9;color:#444;}
+  .jq-lb .rank.r3{background:#e8b27a;color:#5a3000;}
+  .jq-lb .name{font-weight:700;color:#1a1a1a;}
+  .jq-lb .win{color:#dc2626;font-weight:800;}
+  .jq-lb .mine{background:#fff7e0;}
+  .jq-lb .mine .name::after{content:' · 我';color:#b8860b;font-size:11px;font-weight:600;}
+  .jq-lb .crown{color:#b8860b;margin-right:4px;}
+  .jq-me{margin-top:10px;font-size:12.5px;color:#777;background:#fafafa;border-radius:8px;padding:8px 10px;}
+  @media (max-width:700px){ .jq-create{grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);} }
+</style>
+
+{% set mm_game = 'jq' %}
+{% set mm_room = '/game/jq/' %}
+{% set mm_has_ai = false %}
+{% set mm_ai = url_for('jq_create') %}
+{% include "_mm_panel.html" %}
+{% include "_board_lb.html" %}
+
+
+
+<script src="{{ cdn_url('js/socket.io.min.js') }}"></script>
+<script>
+async function joinRoom(btn){
+  const rid = btn.dataset.rid;
+  const r = await fetch('/api/jq/' + rid + '/join', {method:'POST'});
+  const j = await r.json();
+  if (j.ok){ location.href = '/game/jq/' + rid; return; }
+  alert(j.msg || __('加入失败'));
+}
+async function randomJoin(){
+  const r = await fetch('/api/jq/random-join', {method:'POST'});
+  const j = await r.json();
+  if (j.ok){ location.href = '/game/jq/' + j.rid; return; }
+  alert(j.msg || __('暂无可加入的房间'));
+}
+async function deleteRoom(game, btn){
+  const rid = btn.dataset.rid;
+  if (!confirm(__('确定删除该房间？对局进行中删除将无法恢复。'))) return;
+  btn.disabled = true; btn.textContent = '删除中…';
+  const r = await fetch('/api/room/' + game + '/' + rid + '/delete', {method:'POST'});
+  const j = await r.json();
+  if (j.ok){ location.reload(); }
+  else { alert(j.msg || __('删除失败')); btn.disabled = false; btn.textContent = '删除'; }
+}
+let socket = null;
+if (typeof io !== 'undefined'){
+  try {
+    socket = window.__monoSio();
+    window.__monoSioReady(() => { socket.emit('join_jq_lobby'); });
+    socket.on('jq_lobby_update', () => { location.reload(); });
+  } catch(e){ socket = null; }
+}
+</script>
+{% endblock %}

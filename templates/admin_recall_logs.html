@@ -1,0 +1,47 @@
+{% extends "_admin_base.html" %}
+{% block title %}撤回日志 · 管理后台{% endblock %}
+{% block admin_icon %}↩️{% endblock %}
+{% block admin_heading %}撤回操作日志{% endblock %}
+{% block admin_desc %}记录被撤回的消息，便于处理纠纷与核查{% endblock %}
+
+{% block admin_content %}
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>撤回记录</h3>
+    <span class="adm-hint">按时间倒序 · 共 {{ logs|length }} 条</span>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:70px;">ID</th>
+          <th style="width:140px;">操作人</th>
+          <th style="width:140px;">场景</th>
+          <th>消息内容</th>
+          <th style="width:160px;">时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in logs %}
+        <tr>
+          <td class="adm-id">{{ l.id }}</td>
+          <td><b>{{ l.operator_name }}</b></td>
+          <td><span class="adm-pill">{{ l.scene }}</span></td>
+          <td class="adm-wrap">{{ l.content }}</td>
+          <td class="adm-nowrap adm-id">{{ l.recalled_at|fmttime }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">
+            <div class="adm-empty">
+              <div class="adm-empty-ico">↩️</div>
+              <div class="adm-empty-text">暂无撤回记录</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

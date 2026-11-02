@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}围棋大厅 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .go-section{margin-bottom:24px;}
+  .go-section h3{font-size:16px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .go-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .go-room{
+    border:1px solid var(--line,#e6e6e6);border-radius:14px;padding:14px 16px;background:#fff;
+    transition:all .2s;display:flex;flex-direction:column;gap:6px;
+  }
+  .go-room:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.08);}
+  .go-room-name{font-size:15px;font-weight:700;color:#1a1a1a;display:flex;justify-content:space-between;align-items:center;}
+  .go-room-name .tag{font-size:11px;font-weight:500;}
+  .go-room-meta{font-size:12px;color:#888;display:flex;gap:10px;flex-wrap:wrap;}
+  .go-tag{padding:1px 7px;border-radius:8px;font-size:11px;}
+  .go-tag.pvp{background:#f0f4ff;color:#3b82f6;}
+  .go-tag.pvai{background:#fef3f2;color:#ef4444;}
+  .go-tag.public{background:#d1fae5;color:#10b981;}
+  .go-tag.private{background:#f3f4f6;color:#6b7280;}
+  .go-tag.waiting{background:#fef3c7;color:#d97706;}
+  .go-tag.playing{background:#dbeafe;color:#2563eb;}
+  .go-tag.finished{background:#e5e7eb;color:#6b7280;}
+  .go-tag.size{background:#f3f0ff;color:#7c3aed;}
+  .go-actions{margin-top:8px;display:flex;gap:6px;}
+  .go-actions a,.go-actions button{flex:1;padding:7px 0;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;}
+  .go-btn-primary{background:#111;color:#fff;border:1px solid #111;}
+  .go-btn-ghost{background:#fff;color:#333;border:1px solid #ddd;}
+  .go-btn-ghost:hover{border-color:#999;}
+  .go-btn-del{background:#fff;color:#dc2626;border:1px solid #f3c0c0;}
+  .go-btn-del:hover{background:#fef2f2;border-color:#dc2626;}
+  .go-create{
+    border:1px solid var(--line);border-radius:14px;padding:18px;background:#fff;
+    display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;gap:10px;align-items:end;
+  }
+  .go-create label{font-size:12px;color:var(--muted,#888);display:block;margin-bottom:4px;}
+  .go-create input[type=text]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%;}
+  .go-create select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:100%;background:#fff;}
+  .go-create .go-btn-primary{padding:8px 18px;}
+  .go-empty{text-align:center;color:#999;padding:30px 10px;font-size:13px;}
+  .go-lb{border:1px solid var(--line,#e6e6e6);border-radius:14px;background:#fff;padding:14px 16px;overflow:auto;}
+  .go-lb table{width:100%;border-collapse:collapse;font-size:13px;}
+  .go-lb th{text-align:left;color:#888;font-weight:600;font-size:12px;padding:8px 6px;border-bottom:1px solid var(--line,#eee);}
+  .go-lb td{padding:9px 6px;border-bottom:1px solid #f3f3f3;}
+  .go-lb tr:last-child td{border-bottom:none;}
+  .go-lb .rank{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:#f0f0f0;color:#666;}
+  .go-lb .rank.r1{background:#f7d774;color:#5a4300;}
+  .go-lb .rank.r2{background:#d9d9d9;color:#444;}
+  .go-lb .rank.r3{background:#e8b27a;color:#5a3000;}
+  .go-lb .name{font-weight:700;color:#1a1a1a;}
+  .go-lb .win{color:#dc2626;font-weight:800;}
+  .go-lb .mine{background:#fff7e0;}
+  .go-lb .mine .name::after{content:' · 我';color:#b8860b;font-size:11px;font-weight:600;}
+  .go-lb .crown{color:#b8860b;margin-right:4px;}
+  .go-me{margin-top:10px;font-size:12.5px;color:#777;background:#fafafa;border-radius:8px;padding:8px 10px;}
+</style>
+
+{% set mm_game = 'go' %}
+{% set mm_room = '/game/go/' %}
+{% set mm_has_ai = true %}
+{% include "_mm_panel.html" %}
+{% include "_board_lb.html" %}
+
+
+
+<script>
+async function randomJoin(){
+  const btn = document.getElementById('randomJoinBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true; btn.textContent = '匹配中…';
+  try{
+    const r = await fetch('/api/go/random-join', {method:'POST'});
+    const j = await r.json();
+    if (j.ok){ location.href = '/game/go/' + j.rid; return; }
+    alert(j.msg || __('暂无可加入的房间'));
+  }catch(e){
+    alert(__('加入失败，请重试'));
+  }
+  btn.disabled = false; btn.textContent = '🎲 随机加入';
+}
+async function joinRoom(btn){
+  const rid = btn.dataset.rid;
+  if (!rid || btn.disabled) return;
+  btn.disabled = true; btn.textContent = '加入中…';
+  try{
+    const r = await fetch('/api/go/' + rid + '/join', {method:'POST'});
+    const j = await r.json();
+    if (j.ok){ location.href = '/game/go/' + rid; return; }
+    alert(j.msg || __('加入失败'));
+  }catch(e){
+    alert(__('网络错误，请重试'));
+  }
+  btn.disabled = false; btn.textContent = '加入';
+}
+async function deleteRoom(game, btn){
+  const rid = btn.dataset.rid;
+  if (!confirm(__('确定删除该房间？对局进行中删除将无法恢复。'))) return;
+  btn.disabled = true; btn.textContent = '删除中…';
+  const r = await fetch('/api/room/' + game + '/' + rid + '/delete', {method:'POST'});
+  const j = await r.json();
+  if (j.ok){ location.reload(); }
+  else { alert(j.msg || __('删除失败')); btn.disabled = false; btn.textContent = '删除'; }
+}
+</script>
+<script src="{{ cdn_url('js/socket.io.min.js') }}"></script>
+<script>
+if (typeof io !== 'undefined'){
+  try {
+    const s = window.__monoSio();
+    window.__monoSioReady(() => { s.emit('join_go_lobby'); });
+    s.on('go_lobby_update', () => { location.reload(); });
+  } catch(e){}
+}
+</script>
+
+{% endblock %}

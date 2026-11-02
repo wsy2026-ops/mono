@@ -1,0 +1,831 @@
+{% extends "base.html" %}
+{% block title %}音乐台 - MONO 社区{% endblock %}
+{% block content %}
+<style>
+  #musicPage .mono-tbl tbody tr{transition:background .12s;}
+  #musicPage .mono-tbl tbody tr:hover{background:var(--soft);}
+  #musicPage .mono-tbl td{border-bottom:1px solid var(--line);}
+  #musicPage .mono-tbl tbody tr:last-child td{border-bottom:0;}
+  #musicPage .mp-dur{font-variant-numeric:tabular-nums;}
+  #musicPage .js-play{min-width:76px;}
+  #musicPage .js-listbtn{min-width:82px;}
+  #musicPage .js-delbtn{color:#a3a3a3;padding:6px 9px;}
+  #musicPage .js-delbtn:hover{color:#c0392b;background:#fdecea;border-color:#f0c9c4;}
+
+  @media (max-width: 640px){
+    #musicPage .mono-tbl,
+    #musicPage .mono-tbl tbody,
+    #musicPage .mono-tbl tr,
+    #musicPage .mono-tbl td{display:block;width:auto;}
+
+    #musicPage .mono-tbl tr{
+      display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;
+      border:1px solid var(--line);border-radius:10px;background:var(--bg-elev);
+      padding:12px 14px;margin:0 0 10px;
+    }
+    #musicPage .mono-tbl tr:hover{background:var(--soft);}
+    #musicPage .mono-tbl td{
+      border:0 !important;padding:0 !important;
+      white-space:normal !important;text-align:left !important;
+    }
+
+    #musicPage #allTable td:nth-child(1){
+      flex:1 1 100%;font-size:15px !important;font-weight:600 !important;line-height:1.45;
+    }
+    #musicPage #myTable td:nth-child(1){
+      flex:0 0 auto;font-size:11px;color:var(--fg-2);background:var(--soft);
+      border-radius:20px;padding:1px 9px !important;
+    }
+    #musicPage #myTable td:nth-child(2){
+      flex:1 1 auto;min-width:0;font-size:15px !important;font-weight:600 !important;line-height:1.45;
+    }
+
+    #musicPage #allTable td:nth-child(2),
+    #musicPage #allTable td:nth-child(3),
+    #musicPage #allTable td:nth-child(4),
+    #musicPage #myTable td:nth-child(3),
+    #musicPage #myTable td:nth-child(4){flex:0 1 auto;font-size:12px;color:var(--muted);}
+    #musicPage #allTable td:nth-child(2)::after,
+    #musicPage #allTable td:nth-child(3)::after,
+    #musicPage #myTable td:nth-child(3)::after{content:'·';margin-left:10px;color:#d5d5d5;}
+    #musicPage #allTable td:nth-child(2):empty::after,
+    #musicPage #myTable td:nth-child(3):empty::after{display:none;}
+
+    #musicPage #allTable td:nth-child(5),
+    #musicPage #myTable td:nth-child(5){flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+    #musicPage #allTable td:nth-child(5) .btn,
+    #musicPage #myTable td:nth-child(5) .btn{min-width:0;flex:1 1 auto;}
+    #musicPage .js-delform{display:flex !important;margin-left:0 !important;flex:0 0 auto;}
+
+    #musicPage .mono-tbl tr.mp-empty-row{
+      display:block;padding:22px 14px;text-align:center;border-style:dashed;background:var(--soft);
+    }
+    #musicPage .mono-tbl tr.mp-empty-row td{
+      display:block !important;text-align:center !important;font-size:13px;
+    }
+
+    #uploadForm{flex-direction:column;align-items:stretch;}
+    #uploadForm > *{width:100% !important;min-width:0 !important;box-sizing:border-box;}
+
+    #musicPage .btn.sm{min-height:44px;}
+    #musicPage .js-delbtn{min-width:44px;}
+  }
+</style>
+<div id="musicPage" style="max-width:860px;margin:16px auto;padding:0 12px;">
+  <h2 style="font-size:20px;margin:4px 0 12px;">🎵 音乐台</h2>
+
+  <div class="card" style="padding:16px;margin-bottom:14px;">
+    <h3 style="font-size:15px;margin:0 0 8px;">上传音乐</h3>
+    <form id="uploadForm" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <input type="file" id="upFile" accept=".mp3,.wav,.ogg,.m4a,.flac,.aac,.opus" multiple required style="font-size:13px;">
+      <input type="text" id="upTitle" placeholder="歌名（留空取文件名）" maxlength="80"
+             style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+      <input type="text" id="upArtist" placeholder="歌手 / 备注" maxlength="40"
+             style="flex:1;min-width:120px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+      <button class="btn" type="submit" id="upBtn">⬆ 上传</button>
+    </form>
+    <div id="upProgWrap" style="display:none;margin-top:10px;">
+      <div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;">
+        <div id="upProgBar" style="height:100%;width:0;background:#111;transition:width .15s;"></div>
+      </div>
+      <div class="muted" id="upProgText" style="font-size:12px;margin-top:4px;">上传中 0%</div>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0;">
+      支持 mp3 / wav / ogg / m4a / flac / aac / opus，可<b>多选批量上传</b>，单个文件 ≤ 50MB。上传后全站可听；加入歌单后可在任何页面用右下角播放器连续播放。
+    </p>
+  </div>
+
+  <div class="card" style="padding:16px;margin-bottom:14px;">
+    <h3 style="font-size:15px;margin:0 0 4px;">🔍 找歌</h3>
+    <p class="muted" style="font-size:12px;margin:0 0 10px;">输入歌名或歌手，找到就能直接播</p>
+    <input type="search" id="mSearch" placeholder="搜歌名 / 歌手…" autocomplete="off"
+           style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--fg);font-size:14px;font-family:inherit;">
+    <div id="mResWrap" style="display:none;margin-top:14px;">
+      <div class="m-cap">搜索结果 <span id="mResCount">0</span> 首</div>
+      <table class="mono-tbl" style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tbody id="mResBody"></tbody>
+      </table>
+    </div>
+    <div id="mHotWrap" style="margin-top:16px;">
+      <div class="m-cap" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🎵 为你推荐</span>
+        <button class="btn sm ghost" id="mRecRefresh" style="padding:3px 10px;font-size:12px;">换一批</button>
+      </div>
+      <table class="mono-tbl" style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tbody id="mHotBody"><tr><td class="muted" style="padding:14px;">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="padding:16px;">
+    <div style="display:flex;align-items:center;margin-bottom:8px;">
+      <h3 style="font-size:15px;margin:0;">🎶 我的歌单（<span id="myCount">{{ mylist|length }}</span>）</h3>
+      <button class="btn sm" id="playMyBtn" style="margin-left:auto;{% if not mylist %}display:none;{% endif %}" onclick="MonoPlay.playMyList()">▶ 播放我的歌单</button>
+    </div>
+    <table class="mono-tbl" id="myTable" style="width:100%;border-collapse:collapse;font-size:13px;">
+      <tbody id="myBody">
+      {% for t in mylist %}
+      <tr data-tid="{{ t.id }}" data-duration="{{ t.duration or 0 }}">
+        <td class="muted" style="padding:8px 4px;width:26px;">{{ loop.index }}</td>
+        <td style="padding:8px 4px;font-weight:500;">{{ t.title }}</td>
+        <td class="muted" style="padding:8px 4px;">{{ t.artist }}</td>
+        <td class="muted mp-dur" style="padding:8px 4px;white-space:nowrap;">{% if t.duration %}{{ '%d:%02d' % (t.duration // 60 | int, t.duration % 60 | int) }}{% else %}--:--{% endif %}</td>
+        <td style="padding:8px 4px;white-space:nowrap;text-align:right;">
+          <button class="btn sm js-play" data-tid="{{ t.id }}">▶ 播放</button>
+          <button class="btn sm ghost js-myremove" data-tid="{{ t.id }}">移除</button>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not mylist %}
+      <tr id="myEmptyRow" class="mp-empty-row"><td colspan="5" class="muted" style="padding:16px;text-align:center;">歌单还是空的——点上面的「＋歌单」把喜欢的歌加进来。</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="padding:16px;margin-top:16px;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <h3 style="font-size:15px;margin:0;">📚 自建歌单</h3>
+      <button class="btn sm" style="margin-left:auto;" onclick="togglePlForm()">＋ 新建歌单</button>
+    </div>
+
+    <form id="plForm" method="post" action="{{ url_for('playlist_create') }}"
+          style="display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg-elev);">
+      <input type="text" name="name" maxlength="30" placeholder="歌单名字（最多 30 字）" required
+             style="flex:1;min-width:150px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--fg);font-size:13.5px;">
+      <label style="display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--fg-2);">
+        <input type="checkbox" name="is_public" value="1" checked> 公开
+      </label>
+      <button type="submit" class="btn sm">创建</button>
+    </form>
+
+    <div id="plMine" class="pl-list"></div>
+
+    <details id="plPubWrap" style="margin-top:14px;display:none;">
+      <summary style="cursor:pointer;font-size:13.5px;color:var(--muted);padding:4px 0;">
+        看看大家的歌单（<span id="plPubCount">0</span>）
+      </summary>
+      <div id="plPublic" class="pl-list" style="margin-top:10px;"></div>
+    </details>
+  </div>
+</div>
+
+<style>
+  .pl-list{display:grid;gap:9px;}
+  .pl-item{
+    display:flex;align-items:center;gap:11px;flex-wrap:wrap;
+    border:1px solid var(--line);border-radius:12px;
+    padding:11px 13px;background:var(--bg-elev);
+    transition:border-color .18s;
+  }
+  .pl-item:hover{border-color:var(--muted);}
+  .pl-item .pl-body{flex:1;min-width:0;}
+  .pl-item .pl-nm{font-size:13.5px;font-weight:600;word-break:break-all;}
+  .pl-item .pl-sub{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .pl-item .pl-acts{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+  .pl-badge{
+    font-size:10.5px;padding:2px 8px;border-radius:20px;font-weight:600;
+    background:var(--soft);color:var(--fg-2);
+  }
+  .pl-badge.pub{background:#dbeafe;color:#1d4ed8;}
+  .pl-badge.pri{background:#fef3c7;color:#b45309;}
+  .pl-badge.top{background:#fde68a;color:#92400e;}
+  .pl-empty{font-size:13px;color:var(--muted);padding:14px 2px;}
+  .m-cap{
+    font-size:11.5px;font-weight:700;color:var(--fg-3);
+    letter-spacing:.4px;margin-bottom:8px;
+  }
+  .m-plays{
+    font-size:11px;color:var(--muted);
+    background:var(--soft);padding:2px 7px;border-radius:20px;
+    font-variant-numeric:tabular-nums;
+  }
+  .pl-link{text-decoration:none;color:inherit;display:block;border-radius:8px;}
+  .pl-link:hover .pl-nm{color:var(--accent);}
+  .pl-go{
+    font-size:12px;color:var(--muted);
+    opacity:0;transition:opacity .15s, transform .15s;
+    display:inline-block;
+  }
+  .pl-link:hover .pl-go{opacity:1;transform:translateX(2px);}
+
+  .pl-picker{
+    position:fixed;inset:0;z-index:4000;display:none;
+    background:rgba(0,0,0,.5);
+    align-items:center;justify-content:center;padding:20px;
+  }
+  .pl-picker.on{display:flex;}
+  .plp-box{
+    width:100%;max-width:340px;max-height:70vh;overflow-y:auto;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    box-shadow:0 20px 50px rgba(0,0,0,.3);
+  }
+  .plp-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;border-bottom:1px solid var(--line);
+    font-size:14.5px;font-weight:700;
+    position:sticky;top:0;background:var(--card);z-index:1;
+  }
+  .plp-x{
+    border:0;background:transparent;color:var(--muted);
+    font-size:16px;cursor:pointer;padding:2px 8px;line-height:1;
+  }
+  .plp-list{padding:8px;}
+  .plp-sep{
+    font-size:11px;color:var(--fg-3);font-weight:600;
+    padding:10px 13px 5px;letter-spacing:.4px;
+  }
+  .plp-item{
+    display:block;width:100%;text-align:left;
+    padding:11px 13px;border-radius:11px;
+    border:1px solid transparent;background:transparent;
+    cursor:pointer;font-family:inherit;
+  }
+  .plp-item:hover{background:var(--soft);border-color:var(--line);}
+  .plp-nm{display:block;font-size:13.5px;font-weight:600;color:var(--fg);}
+  .plp-sub{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .plp-tip{font-size:12.5px;color:var(--muted);padding:14px 12px;line-height:1.75;}
+  .plp-loading{font-size:13px;color:var(--muted);padding:18px;text-align:center;}
+  @media (max-width:640px){
+    .pl-item{padding:11px;}
+    .pl-item .pl-acts{width:100%;justify-content:flex-start;}
+    .pl-item .pl-acts .btn{flex:1;text-align:center;min-width:0;}
+  }
+</style>
+
+<script>
+(function(){
+  function monoFetch(url, opts, retries){
+    opts = opts || {};
+    retries = (retries == null) ? 1 : retries;
+    var ctrl = new AbortController();
+    var tm = setTimeout(function(){ ctrl.abort(); }, 8000);
+    opts.signal = ctrl.signal;
+    return fetch(url, opts).finally(function(){ clearTimeout(tm); }).catch(function(err){
+      if (retries > 0) return monoFetch(url, opts, retries - 1);
+      throw err;
+    });
+  }
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmtDur(s){ if(!isFinite(s)||s<=0) return '--:--'; var m=Math.floor(s/60), x=Math.floor(s%60); return m+':'+(x<10?'0':'')+x; }
+
+  var state = { tid: null, playing: false };
+  var rows = {};
+
+  var HOT_LIST = [], RES_LIST = [], MY_LIST = [];
+
+  function bindRows(){
+    rows = {};
+    document.querySelectorAll('.js-play').forEach(function(b){
+      var tid = b.getAttribute('data-tid');
+      (rows[tid] = rows[tid] || []).push(b);
+    });
+    syncButtons();
+  }
+  function syncButtons(){
+    Object.keys(rows).forEach(function(tid){
+      rows[tid].forEach(function(b){
+        if (state.playing && String(state.tid) === tid){
+          if (b.getAttribute('data-mode') !== 'pause'){
+            b.setAttribute('data-mode','pause');
+            b.innerHTML = '❙❙ 暂停';
+            b.onclick = function(){ if (window.parent.MonoPlayer) window.parent.MonoPlayer.togglePause(); };
+          }
+        } else {
+          b.removeAttribute('data-mode');
+          b.innerHTML = '▶ 播放';
+          b.onclick = function(){
+            var tr = b.closest ? b.closest('tr') : null;
+            var tb = tr ? tr.parentNode : null;
+            var list = null;
+            if (tb){
+              if (tb.id === 'mHotBody') list = HOT_LIST;
+              else if (tb.id === 'mResBody') list = RES_LIST;
+              else if (tb.id === 'myBody') list = MY_LIST;
+            }
+            MonoPlay.playNow(tid, list);
+          };
+        }
+      });
+    });
+  }
+  window.addEventListener('message', function(e){
+    if (e.data && e.data.type === 'mono_music_state'){
+      state.tid = e.data.trackId; state.playing = e.data.playing;
+      syncButtons();
+    }
+  });
+  /* ⚠️ postMessage 只在播放器刻意调用 broadcast() 时才发，会漏 ✗
+     反馈 #52：按钮上的「▶播放 / ❙❙暂停」经常停在旧状态，看着就不是实时的。
+     这里加 400ms 轮询主动问播放器拿状态，无论对方发不发消息都是准的 ✓ */
+  (function pollState(){
+    window.setTimeout(function(){
+      try{
+        var P = window.parent.MonoPlayer;
+        if (P && P.currentState){
+          var s = P.currentState();
+          if (s && (s.tid !== state.tid || s.playing !== state.playing)){
+            state.tid = s.tid; state.playing = s.playing;
+            syncButtons();
+          }
+        }
+      }catch(e){}
+      pollState();
+    }, 400);
+  })();
+  if (window.parent !== window && window.parent.MonoPlayer){
+    setTimeout(function(){
+      try {
+        var s = window.parent.MonoPlayer.currentState();
+        state.tid = s.tid; state.playing = s.playing; syncButtons();
+      } catch(e){}
+    }, 300);
+  }
+
+  function listBtnText(tid, isIn){
+    var b = document.querySelector('.js-listbtn[data-tid="'+tid+'"]');
+    if (!b) return;
+    b.setAttribute('data-in', isIn ? '1' : '0');
+    b.textContent = isIn ? '已在歌单' : '＋歌单';
+  }
+  function myRowHtml(t, idx){
+    return '<tr data-tid="'+t.id+'" data-duration="'+(t.duration||0)+'">'
+      + '<td class="muted" style="padding:8px 4px;width:26px;">'+idx+'</td>'
+      + '<td style="padding:8px 4px;font-weight:500;">'+esc(t.title)+'</td>'
+      + '<td class="muted" style="padding:8px 4px;">'+esc(t.artist)+'</td>'
+      + '<td class="muted mp-dur" style="padding:8px 4px;white-space:nowrap;">'+fmtDur(t.duration)+'</td>'
+      + '<td style="padding:8px 4px;white-space:nowrap;text-align:right;">'
+      + '<button class="btn sm js-play" data-tid="'+t.id+'">▶ 播放</button>'
+      + '<button class="btn sm ghost js-myremove" data-tid="'+t.id+'">移除</button></td></tr>';
+  }
+  function refreshMyList(){
+    monoFetch('/api/music/playlist').then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok) return;
+      var ts = j.tracks || [];
+      document.getElementById('myCount').textContent = ts.length;
+      var tbody = document.getElementById('myBody');
+      var html = '';
+      ts.forEach(function(t, i){ html += myRowHtml(t, i+1); });
+      if (!ts.length) html = '<tr id="myEmptyRow" class="mp-empty-row"><td colspan="5" class="muted" style="padding:16px;text-align:center;">歌单还是空的——点上面的「＋歌单」把喜欢的歌加进来。</td></tr>';
+      tbody.innerHTML = html;
+      var pmb = document.getElementById('playMyBtn');
+      if (pmb) pmb.style.display = ts.length ? '' : 'none';
+      bindMyRemove(); bindRows();
+    });
+  }
+  function bindMyRemove(){
+    document.querySelectorAll('.js-myremove').forEach(function(b){
+      b.onclick = function(){
+        var tid = b.getAttribute('data-tid');
+        monoFetch('/api/music/playlist/remove', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'track_id='+tid})
+          .then(function(r){ return r.json(); }).then(function(j){
+            if (j.ok){ listBtnText(tid, false); refreshMyList();
+              if (window.parent !== window && window.parent.MonoPlayer) window.parent.MonoPlayer.refreshQueue(); }
+          });
+      };
+    });
+  }
+  var _plPick = null;
+  function ensurePicker(){
+    if (_plPick) return _plPick;
+    var d = document.createElement('div');
+    d.className = 'pl-picker';
+    d.innerHTML = '<div class="plp-box">'
+      + '<div class="plp-head"><span>加入哪个歌单？</span>'
+      + '<button type="button" class="plp-x" aria-label="关闭">✕</button></div>'
+      + '<div class="plp-list"></div></div>';
+    document.body.appendChild(d);
+    d.addEventListener('click', function(e){
+      if (e.target === d || (e.target.classList && e.target.classList.contains('plp-x'))){
+        d.classList.remove('on');
+      }
+    });
+    _plPick = d;
+    return d;
+  }
+
+  window.openPlPicker = function(tid){
+    var box = ensurePicker();
+    var list = box.querySelector('.plp-list');
+    list.innerHTML = '<div class="plp-loading">加载中…</div>';
+    box.classList.add('on');
+    fetch('/api/music/playlists')
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var mine = (j && j.mine) || [];
+        var html = '<button type="button" class="plp-item" data-pid="0" data-tid="' + tid + '">'
+          + '<span class="plp-nm">⭐ 默认歌单</span>'
+          + '<span class="plp-sub">就是上面那个「我的歌单」</span></button>';
+        if (mine.length){
+          html += '<div class="plp-sep">我建的歌单</div>';
+          html += mine.map(function(p){
+            return '<button type="button" class="plp-item" data-pid="' + p.id + '" data-tid="' + tid + '">'
+              + '<span class="plp-nm">' + escPl(p.name) + '</span>'
+              + '<span class="plp-sub">' + (p.cnt || 0) + ' 首 · '
+              + (p.is_public ? '公开' : '私密') + '</span></button>';
+          }).join('');
+        } else {
+          html += '<div class="plp-tip">还没有自建歌单 —— 往下翻到「📚 自建歌单」建一个，'
+            + '就能把歌分门别类收好了。</div>';
+        }
+        list.innerHTML = html;
+      })
+      .catch(function(){ list.innerHTML = '<div class="plp-tip">加载失败，稍后再试</div>'; });
+  };
+
+  document.addEventListener('click', function(e){
+    var it = e.target.closest ? e.target.closest('.plp-item') : null;
+    if (!it) return;
+    var pid = it.getAttribute('data-pid');
+    var tid = it.getAttribute('data-tid');
+    var box = ensurePicker();
+    box.classList.remove('on');
+    if (pid === '0'){
+      monoFetch('/api/music/playlist/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'track_id=' + tid
+      }).then(function(r){ return r.json(); }).then(function(j){
+        if (j.ok){
+          listBtnText(tid, true);
+          refreshMyList();
+          if (window.parent !== window && window.parent.MonoPlayer) window.parent.MonoPlayer.refreshQueue();
+        } else alert(j.msg || __('操作失败'));
+      }).catch(function(){ alert(__('操作失败，稍后再试')); });
+    } else {
+      fetch('/music/playlist/' + pid + '/add/' + tid, { method: 'POST', credentials: 'same-origin' })
+        .then(function(){
+          fetch('/api/music/playlists').then(function(r){ return r.json(); })
+            .then(function(j2){ if (j2 && j2.ok) renderPlaylists(j2); });
+          var nm = it.querySelector('.plp-nm');
+          alert(__('已加入：') + (nm ? nm.textContent : __('歌单')));
+        })
+        .catch(function(){ alert(__('操作失败，稍后再试')); });
+    }
+  });
+
+  document.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.js-listbtn') : null;
+    if (!b) return;
+    {
+      var tid = b.getAttribute('data-tid');
+      var isIn = b.getAttribute('data-in') === '1';
+      if (isIn){
+        monoFetch('/api/music/playlist/remove', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'track_id=' + tid
+        }).then(function(r){ return r.json(); }).then(function(j){
+          if (j.ok){
+            listBtnText(tid, false);
+            refreshMyList();
+            if (window.parent !== window && window.parent.MonoPlayer) window.parent.MonoPlayer.refreshQueue();
+          } else alert(j.msg || __('操作失败'));
+        });
+      } else {
+        openPlPicker(tid);   // 未加入 → 弹选择器，选加到哪个歌单
+      }
+    }
+  });
+  bindMyRemove();
+
+  function addTrackRow(t){
+    loadRecommend();
+  }
+  document.getElementById('uploadForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var files = document.getElementById('upFile').files;
+    if (!files || !files.length) return alert(__('请选择音频文件'));
+    var btn = document.getElementById('upBtn');
+    btn.disabled = true;
+    if (window.parent !== window && window.parent.MonoPlayer) window.parent.MonoPlayer.pauseForUpload();
+    document.getElementById('upProgWrap').style.display = 'block';
+    var bar = document.getElementById('upProgBar'), txt = document.getElementById('upProgText');
+    var fileArr = Array.prototype.slice.call(files);
+    var singleTitle = document.getElementById('upTitle').value;
+    var artist = document.getElementById('upArtist').value;
+    var done = 0, okCount = 0;
+
+    function uploadOne(idx, attempt){
+      if (idx >= fileArr.length){
+        btn.disabled = false;
+        if (window.parent !== window && window.parent.MonoPlayer) window.parent.MonoPlayer.resumeAfterUpload();
+        txt.textContent = '✓ 完成：成功 ' + okCount + ' / ' + fileArr.length;
+        document.getElementById('upFile').value = '';
+        document.getElementById('upTitle').value = '';
+        setTimeout(function(){ document.getElementById('upProgWrap').style.display='none'; }, 2000);
+        probeDurations();   // 新上传的曲目时长为 0，探测补齐
+        return;
+      }
+      var file = fileArr[idx];
+      var label = '第 ' + (idx+1) + '/' + fileArr.length + ' 个「' + file.name + '」';
+      var fd = new FormData();
+      fd.append('file', file);
+      if (fileArr.length === 1){
+        fd.append('title', singleTitle);
+        fd.append('artist', artist);
+      }
+      fd.append('ajax', '1');
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '{{ url_for("music_upload") }}');
+      xhr.timeout = 15000 + file.size;
+      var retried = !!attempt;
+      function setPct(pc){
+        var overall = ((idx + pc/100) / fileArr.length) * 100;
+        bar.style.width = overall + '%';
+        txt.textContent = label + ' ' + pc + '%（' + (file.size*pc/100/1048576).toFixed(1) + ' / ' + (file.size/1048576).toFixed(1) + ' MB）';
+      }
+      xhr.upload.onprogress = function(ev){
+        if (ev.lengthComputable) setPct(Math.round(ev.loaded/ev.total*100));
+      };
+      function handle(respText, status){
+        var j = null;
+        try { j = JSON.parse(respText); } catch(e){}
+        if (status === 200 && j && j.results){
+          for (var k = 0; k < j.results.length; k++){
+            var r = j.results[k];
+            if (r.ok && r.track){ addTrackRow(r.track); okCount++; }
+            else if (!r.ok) alert(r.msg || __('部分文件失败'));
+          }
+          if (window.parent !== window && window.parent.MonoPlayer) window.parent.MonoPlayer.refreshQueue();
+          uploadOne(idx + 1, false);
+        } else if (status === 200 && j && j.track){
+          addTrackRow(j.track); okCount++; uploadOne(idx + 1, false);
+        } else if (!retried && (status === 0 || status >= 500)){
+          txt.textContent = label + ' 网络抖动，正在重试…';
+          uploadOne(idx, true);
+        } else {
+          txt.textContent = '✗ ' + label + ' 失败（HTTP ' + status + '）';
+          btn.disabled = false;
+          if (window.parent !== window && window.parent.MonoPlayer) window.parent.MonoPlayer.resumeAfterUpload();
+        }
+      }
+      xhr.onload = function(){ handle(xhr.responseText, xhr.status); };
+      xhr.onerror = function(){
+        if (!retried){ txt.textContent = label + ' 网络抖动，正在重试…'; uploadOne(idx, true); }
+        else { txt.textContent = '✗ ' + label + ' 网络错误'; btn.disabled = false; }
+      };
+      xhr.ontimeout = function(){
+        if (!retried){ txt.textContent = label + ' 超时，正在重试…'; uploadOne(idx, true); }
+        else { txt.textContent = '✗ ' + label + ' 超时'; btn.disabled = false; }
+      };
+      xhr.send(fd);
+    }
+    uploadOne(0, false);
+  });
+
+  function probeDurations(){
+    var jobs = [];
+    document.querySelectorAll('#mHotBody tr[data-tid], #mResBody tr[data-tid]').forEach(function(tr){
+      if (parseFloat(tr.getAttribute('data-duration') || '0') <= 0) jobs.push(tr.getAttribute('data-tid'));
+    });
+    var i = 0;
+    function next(){
+      if (i >= jobs.length) return;
+      var tid = jobs[i++];
+      var a = new Audio('/music/audio/' + tid + '.ogg?fmt=ogg');
+      a.preload = 'metadata';
+      var moved = false;
+      a.addEventListener('loadedmetadata', function(){
+        if (moved) return; moved = true;
+        var d = a.duration;
+        if (isFinite(d) && d > 0){
+          monoFetch('/api/music/duration/' + tid, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'duration='+d});
+          document.querySelectorAll('tr[data-tid="'+tid+'"] .mp-dur').forEach(function(cell){ cell.textContent = fmtDur(d); });
+          var tr = document.querySelector('#mHotBody tr[data-tid="'+tid+'"], #mResBody tr[data-tid="'+tid+'"]');
+          if (tr) tr.setAttribute('data-duration', d);
+        }
+        a.src = '';
+        setTimeout(next, 200);
+      });
+      a.addEventListener('error', function(){
+        if (moved) return; moved = true;
+        setTimeout(next, 200);
+      });
+      a.src = '/music/audio/' + tid + '.ogg?fmt=ogg';
+    }
+    if (jobs.length) next();
+  }
+
+  window.MonoPlay = {
+    playNow: function(tid, list){
+      if (window.parent !== window && window.parent.MonoPlayer){
+        if (list && list.length){
+          window.parent.MonoPlayer.playQueue(list, null, tid);
+        } else {
+          window.parent.MonoPlayer.playTrack(tid);
+        }
+        return;
+      }
+      var a = new Audio('/music/audio/' + tid + '.ogg?fmt=ogg');
+      a.play().catch(function(){ alert(__('播放失败')); });
+    },
+    playMyList: function(){
+      if (window.parent !== window && window.parent.MonoPlayer){
+        window.parent.MonoPlayer.playMyQueue();
+        return;
+      }
+      alert(__('请在正常浏览模式下使用（播放器在右下角）'));
+    }
+  };
+  var ME_ID = {{ (current_user.id if current_user else 0) }};
+  var IS_ADMIN = {{ 'true' if (current_user and (current_user.is_admin or current_user.is_super_admin)) else 'false' }};
+
+  function trackRow(t){
+    var dur = t.duration ? fmtDur(t.duration) : '--:--';
+    var plays = '<span class="m-plays">' + (t.plays || 0) + ' 次</span>';
+    var del = '';
+    if (t.user_id === ME_ID || IS_ADMIN){
+      del = '<form action="/music/delete/' + t.id + '" method="post" style="display:inline;margin-left:4px;" '
+        + 'onsubmit="return confirm(\'确定删除这首歌？\');">'
+        + '<button class="btn sm ghost js-delbtn" type="submit">🗑</button></form>';
+    }
+    return '<tr data-tid="' + t.id + '" data-duration="' + (t.duration || 0) + '">'
+      + '<td style="padding:8px 4px;font-weight:500;">' + esc(t.title) + '</td>'
+      + '<td class="muted" style="padding:8px 4px;">' + esc(t.artist || '') + '</td>'
+      + '<td style="padding:8px 4px;white-space:nowrap;">' + plays + '</td>'
+      + '<td class="muted mp-dur" style="padding:8px 4px;white-space:nowrap;">' + dur + '</td>'
+      + '<td style="padding:8px 4px;white-space:nowrap;text-align:right;">'
+      + '<button class="btn sm js-play" data-tid="' + t.id + '">▶ 播放</button>'
+      + '<button class="btn sm ghost js-listbtn" data-tid="' + t.id + '" data-in="0">＋歌单</button>'
+      + del + '</td></tr>';
+  }
+
+  var REC_LAST = [];
+
+  function loadRecommend(){
+    var body = document.getElementById('mHotBody');
+    if (!body) return;
+    var qs = REC_LAST.length ? ('?exclude=' + REC_LAST.join(',')) : '';
+    fetch('/api/music/recommend' + qs).then(function(r){ return r.json(); }).then(function(j){
+      if (!j.ok || !j.tracks || !j.tracks.length){
+        body.innerHTML = '<tr><td class="muted" style="padding:14px;">还没有人上传音乐，来做第一个吧！</td></tr>';
+        return;
+      }
+      REC_LAST = j.tracks.map(function(t){ return t.id; });
+      HOT_LIST = j.tracks;
+      body.innerHTML = j.tracks.map(trackRow).join('');
+      bindRows();
+    }).catch(function(){});
+  }
+
+  (function(){
+    var btn = document.getElementById('mRecRefresh');
+    if (!btn) return;
+    btn.onclick = function(){
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = '换…';
+      loadRecommend();
+      setTimeout(function(){ btn.disabled = false; btn.textContent = '换一批'; }, 500);
+    };
+  })();
+
+  var _searchTimer = null;
+  function doSearch(){
+    var inp = document.getElementById('mSearch');
+    if (!inp) return;
+    var q = inp.value.trim();
+    var wrap = document.getElementById('mResWrap');
+    var body = document.getElementById('mResBody');
+    if (!q){ wrap.style.display = 'none'; body.innerHTML = ''; return; }
+    fetch('/api/music/search?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        wrap.style.display = 'block';
+        document.getElementById('mResCount').textContent = (j.tracks || []).length;
+        if (!j.tracks || !j.tracks.length){
+          body.innerHTML = '<tr><td class="muted" style="padding:14px;">没找到含「' + esc(q) + '」的歌</td></tr>';
+          return;
+        }
+        RES_LIST = j.tracks;
+        body.innerHTML = j.tracks.map(trackRow).join('');
+        bindRows();
+      })
+      .catch(function(){
+        wrap.style.display = 'block';
+        body.innerHTML = '<tr><td class="muted" style="padding:14px;">搜索失败，稍后再试</td></tr>';
+      });
+  }
+
+  (function(){
+    var si = document.getElementById('mSearch');
+    if (!si) return;
+    si.addEventListener('input', function(){
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(doSearch, 280);
+    });
+    si.addEventListener('keydown', function(e){
+      if (e.key === 'Enter'){ e.preventDefault(); clearTimeout(_searchTimer); doSearch(); }
+    });
+  })();
+  loadRecommend();
+
+  bindRows();
+  probeDurations();
+
+  function escPl(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  window.togglePlForm = function(){
+    var f = document.getElementById('plForm');
+    if (!f) return;
+    f.style.display = (f.style.display === 'flex') ? 'none' : 'flex';
+    if (f.style.display === 'flex'){
+      var i = f.querySelector('input[name=name]');
+      if (i) i.focus();
+    }
+  };
+
+  function renderPlaylists(data){
+    var mine = data.mine || [], pub = data.public || [];
+    var box = document.getElementById('plMine');
+    if (!mine.length){
+      box.innerHTML = '<div class="pl-empty">还没有歌单。点右上角「＋ 新建歌单」建一个，' +
+        '再到上面的歌单里点「＋歌单」把喜欢的歌收进去。</div>';
+    } else {
+      box.innerHTML = mine.map(function(p){
+        return '<div class="pl-item">'
+          + '<a class="pl-body pl-link" href="/music/playlist/' + p.id + '">'
+          + '<div class="pl-nm">' + escPl(p.name) + ' <span class="pl-go">→</span></div>'
+          + '<div class="pl-sub"><span>' + (p.cnt || 0) + ' 首</span>'
+          + '<span class="pl-badge ' + (p.is_public ? 'pub">公开' : 'pri">私密') + '</span>'
+          + '</div></a>'
+          + '<div class="pl-acts">'
+          + '<button class="btn sm" data-plplay="' + p.id + '">▶ 播放</button>'
+          + '<a class="btn sm ghost" href="/music/playlist/' + p.id + '">打开</a>'
+          + '<button class="btn sm ghost" data-plpub="' + p.id + '">'
+          + (p.is_public ? '设为私密' : '设为公开') + '</button>'
+          + '<form method="post" action="/music/playlist/' + p.id + '/delete" '
+          + 'style="display:contents;" onsubmit="return confirm(\'删除歌单「' + escPl(p.name) + '」？\');">'
+          + '<button type="submit" class="btn sm ghost">删除</button></form>'
+          + '</div></div>';
+      }).join('');
+    }
+    var wrap = document.getElementById('plPubWrap');
+    if (wrap){
+      document.getElementById('plPubCount').textContent = pub.length;
+      wrap.style.display = pub.length ? 'block' : 'none';
+      document.getElementById('plPublic').innerHTML = pub.map(function(p){
+        var badges = '';
+        if (p.is_super) badges += ' <span class="pl-badge top">超管</span>';
+        else if (p.is_admin) badges += ' <span class="pl-badge top">管理员</span>';
+        return '<div class="pl-item">'
+          + '<a class="pl-body pl-link" href="/music/playlist/' + p.id + '">'
+          + '<div class="pl-nm">' + escPl(p.name) + badges + ' <span class="pl-go">→</span></div>'
+          + '<div class="pl-sub"><span>by ' + escPl(p.username) + '</span>'
+          + '<span>' + (p.cnt || 0) + ' 首</span></div>'
+          + '</a>'
+          + '<div class="pl-acts">'
+          + '<button class="btn sm" data-plplay="' + p.id + '">▶ 播放</button>'
+          + '<a class="btn sm ghost" href="/music/playlist/' + p.id + '">打开</a>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+    }
+  }
+
+  fetch('/api/music/playlists')
+    .then(function(r){ return r.json(); })
+    .then(function(j){ if (j && j.ok) renderPlaylists(j); })
+    .catch(function(){});
+
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var b = t.closest('[data-plplay]');
+    if (b){
+      var pid = b.getAttribute('data-plplay');
+      fetch('/api/music/playlist/' + pid + '/tracks')
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (!j.ok){ alert(j.msg || '打不开这个歌单'); return; }
+          if (!j.tracks || !j.tracks.length){ alert(__('这个歌单还是空的')); return; }
+          if (window.parent !== window && window.parent.MonoPlayer){
+            window.parent.MonoPlayer.playQueue(j.tracks, j.name);
+          } else {
+            alert(__('请在正常浏览模式下使用（播放器在右下角）'));
+          }
+        })
+        .catch(function(){ alert(__('加载失败，稍后再试')); });
+      return;
+    }
+    var p2 = t.closest('[data-plpub]');
+    if (p2){
+      var f = document.createElement('form');
+      f.method = 'post';
+      f.action = '/music/playlist/' + p2.getAttribute('data-plpub') + '/edit';
+      var i = document.createElement('input');
+      i.type = 'hidden'; i.name = 'toggle_public'; i.value = '1';
+      f.appendChild(i);
+      document.body.appendChild(f);
+      f.submit();
+    }
+  });
+})();
+</script>
+{% endblock %}

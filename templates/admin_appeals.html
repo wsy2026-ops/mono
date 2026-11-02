@@ -1,0 +1,105 @@
+{% extends "_admin_base.html" %}
+{% block title %}申诉审核 · 管理后台{% endblock %}
+{% block admin_icon %}⚖️{% endblock %}
+{% block admin_heading %}用户申诉审核{% endblock %}
+{% block admin_desc %}{% if is_super %}你拥有唯一终审权，可维持或撤销处罚{% else %}普通管理员仅可查看，无审核权限，请等待超级管理员终审{% endif %}{% endblock %}
+
+{% block admin_content %}
+{% set pending = appeals|selectattr('status','equalto','pending')|list|length %}
+
+<div class="adm-card">
+  <div class="adm-grid">
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ appeals|length }}</div>
+      <div class="adm-stat-label">申诉总数</div>
+    </div>
+    <div class="adm-stat {{ 'warn' if pending else 'ok' }}">
+      <div class="adm-stat-num">{{ pending }}</div>
+      <div class="adm-stat-label">待审核</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ appeals|selectattr('status','equalto','upheld')|list|length }}</div>
+      <div class="adm-stat-label">维持处罚</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-num">{{ appeals|rejectattr('status','equalto','pending')|rejectattr('status','equalto','upheld')|list|length }}</div>
+      <div class="adm-stat-label">撤销处罚</div>
+    </div>
+  </div>
+</div>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>申诉明细</h3>
+    <span class="adm-hint">按时间倒序</span>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:64px;">ID</th>
+          <th style="width:110px;">申诉人</th>
+          <th style="width:80px;">处罚</th>
+          <th style="width:110px;">时长</th>
+          <th>处罚原因</th>
+          <th>申诉理由</th>
+          <th style="width:100px;">状态</th>
+          <th style="width:270px;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in appeals %}
+        <tr>
+          <td class="adm-id">{{ a.id }}</td>
+          <td><b>{{ a.username }}</b></td>
+          <td>
+            <span class="adm-pill {{ 'danger' if a.ptype == 'ban' else 'warn' }}">
+              {{ '封禁' if a.ptype == 'ban' else '禁言' }}
+            </span>
+          </td>
+          <td class="adm-nowrap">{{ a.duration_text }}</td>
+          <td class="adm-wrap">{{ a.punish_reason or '—' }}</td>
+          <td class="adm-wrap">
+            {{ a.reason }}
+            {% if a.screenshot %}
+            <br><a href="{{ a.screenshot }}" target="_blank" rel="noopener"
+                   style="font-size:12px;text-decoration:underline;text-underline-offset:3px;">查看凭证 ↗</a>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.status == 'pending' %}<span class="adm-pill warn">待审核</span>
+            {% elif a.status == 'upheld' %}<span class="adm-pill danger">维持处罚</span>
+            {% else %}<span class="adm-pill on">撤销处罚</span>{% endif %}
+          </td>
+          <td>
+            {% if a.status == 'pending' and is_super %}
+              <form method="post" action="{{ url_for('admin_appeal_review', aid=a.id, action='uphold') }}" class="adm-form-row">
+                <input type="text" name="admin_note" placeholder="审核备注" style="width:126px;">
+                <button class="btn sm" type="submit">维持处罚</button>
+              </form>
+              <form method="post" action="{{ url_for('admin_appeal_review', aid=a.id, action='revoke') }}" class="adm-form-row">
+                <input type="text" name="admin_note" placeholder="审核备注" style="width:126px;">
+                <button class="btn sm danger" type="submit">撤销处罚</button>
+              </form>
+            {% elif a.status == 'pending' %}
+              <span class="muted">等待超管终审</span>
+            {% else %}
+              <span class="muted">{{ a.reviewer_name or '—' }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8">
+            <div class="adm-empty">
+              <div class="adm-empty-ico">⚖️</div>
+              <div class="adm-empty-text">暂无申诉</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

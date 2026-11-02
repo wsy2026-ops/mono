@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+{% block title %}仙弈破阵 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="xy-page">
+<style>
+  .xy-page{
+    font-family:"Microsoft YaHei",sans-serif;
+    min-height:100vh;display:flex;justify-content:center;align-items:flex-start;
+    padding:86px 20px 40px;user-select:none;
+  }
+  .xy-topbar{position:fixed;top:76px;left:30px;font-size:14px;z-index:5;}
+  .xy-topbar a{color:#222;text-decoration:none;border-bottom:1px solid #000;}
+  .xy-userbar{position:fixed;top:76px;right:30px;background:#fff;border:1.5px solid #000;
+    padding:10px 15px;font-size:14px;z-index:5;}
+  .xy-userbar .hs{font-weight:700;margin-left:8px;}
+
+  .xy-wrap{display:flex;align-items:flex-start;gap:26px;flex-wrap:nowrap;}
+  @media (max-width:1040px){
+    .xy-wrap{flex-direction:column;align-items:center;}
+    .xy-rank{width:min(540px,94vw) !important;flex:none !important;}
+    .xy-container{width:min(600px,94vw) !important;box-sizing:border-box;}
+    #board{width:100% !important;}
+  }
+  @media (max-width:720px){
+    .xy-container{padding:12px !important;}
+    .xy-title{font-size:19px;letter-spacing:3px;}
+    .xy-sub{font-size:11px;letter-spacing:1px;margin-bottom:10px;}
+  }
+
+  .xy-container{background:#fff;border:2px solid #000;padding:22px 26px;width:fit-content;
+    box-shadow:6px 6px 0 rgba(0,0,0,.08);}
+  .xy-title{font-size:24px;font-weight:900;letter-spacing:6px;text-align:center;margin-bottom:4px;}
+  .xy-sub{font-size:12px;color:#999;text-align:center;margin-bottom:14px;letter-spacing:2px;}
+
+  .xy-hud{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13.5px;margin-bottom:10px;
+    border:1.5px solid #000;padding:9px 14px;background:#fafafa;}
+  .xy-hud b{font-weight:800;}
+  .xy-hud .chip{display:inline-block;border:1.5px solid #111;border-radius:50%;
+    width:24px;height:24px;line-height:21px;text-align:center;font-size:12.5px;font-weight:700;
+    background:#fff;margin:0 2px;vertical-align:middle;}
+  .xy-hud .chip.big{border-color:#c22b22;color:#c22b22;}
+  #xyMsg{min-height:22px;font-size:13px;font-weight:700;color:#c22b22;margin:6px 2px 8px;}
+
+  #board{display:grid;grid-template-columns:repeat(11,minmax(0, 1fr));
+    width:min(540px,92vw);border:2px solid #000;background:#fff;}
+  .cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
+    position:relative;border-right:1px solid #e4e4e4;border-bottom:1px solid #e4e4e4;
+    font-size:clamp(11px,1.7vw,15px);cursor:default;background:#fff;}
+  .cell:nth-child(11n){border-right:none;}
+  .cell:nth-child(n+111){border-bottom:none;}
+  .cell.sq{cursor:pointer;}
+  .cell.sq:hover{background:#f2f2f2;}
+  .cell.cansafe{background:rgba(20,140,70,.07);}
+  .cell.candead{background:rgba(210,40,30,.16);}
+  .cell.last{box-shadow:inset 0 0 0 2.5px rgba(217,119,6,.85);}
+  .pc{width:80%;height:80%;border-radius:50%;background:#fff;border:1.5px solid #111;
+    display:flex;align-items:center;justify-content:center;font-weight:800;
+    font-size:clamp(12px,2vw,17px);pointer-events:none;box-shadow:0 1.5px 0 rgba(0,0,0,.25);}
+  .pc.me{background:#111;color:#fff;border-color:#000;box-shadow:0 0 0 2.5px #fff,0 0 0 4px #111;}
+  .pc.t1,.pc.t2,.pc.t3{color:#8a8a8a;}
+  .pc.t4,.pc.t5,.pc.t6{color:#111;}
+  .pc.t7{color:#c22b22;border-color:#c22b22;}
+  .dot{width:30%;height:30%;border-radius:50%;pointer-events:none;}
+  .dot.safe{background:rgba(20,140,70,.85);}
+  .dot.dead{background:rgba(210,40,30,.9);}
+
+  .xy-overlay{position:absolute;inset:0;background:rgba(255,255,255,.94);z-index:8;
+    display:none;align-items:center;justify-content:center;padding:16px;}
+  .xy-overlay.on{display:flex;}
+  .xy-overlay .box{border:2px solid #000;background:#fff;padding:22px 26px;max-width:430px;
+    text-align:center;box-shadow:6px 6px 0 rgba(0,0,0,.1);}
+  .xy-overlay h2{margin:0 0 8px;font-size:22px;font-weight:900;letter-spacing:4px;}
+  .xy-overlay .desc{font-size:13px;color:#555;line-height:1.9;margin:0 0 14px;text-align:left;}
+  .xy-overlay .desc b{color:#c22b22;}
+  .xy-btn{display:block;width:100%;padding:10px;border-radius:0;border:2px solid #000;
+    background:#111;color:#fff;font-size:15px;font-weight:800;cursor:pointer;margin-top:10px;letter-spacing:2px;}
+  .xy-btn:hover{background:#333;}
+  .xy-btn.ghost{background:#fff;color:#111;}
+  .xy-btn.ghost:hover{background:#f2f2f2;}
+  .xy-btn small{display:block;font-size:11px;font-weight:400;opacity:.75;margin-top:2px;letter-spacing:0;}
+  #ccInput{width:90px;padding:6px;border:1.5px solid #000;font-size:15px;text-align:center;font-weight:700;}
+  .xy-fin{font-size:34px;font-weight:900;margin:6px 0 10px;}
+  .xy-newrec{color:#c22b22;font-weight:800;font-size:14px;margin-bottom:8px;}
+  .xy-reason{font-size:13.5px;color:#555;margin-bottom:4px;}
+
+  .xy-rank{background:#fff;border:2px solid #000;padding:22px;width:270px;height:fit-content;
+    box-shadow:6px 6px 0 rgba(0,0,0,.08);flex:0 0 270px;}
+  .xy-rank h3{margin:0 0 12px;font-size:18px;font-weight:800;text-align:center;
+    letter-spacing:3px;border-bottom:1px solid #000;padding-bottom:10px;}
+  .xy-rank ol{margin:0;padding:0 0 0 4px;list-style:none;}
+  .xy-rank li{display:flex;align-items:center;padding:8px 6px;border-bottom:1px solid #eee;font-size:14px;}
+  .xy-rank li:last-child{border-bottom:none;}
+  .xy-rank li.self{background:#f0f0f0;font-weight:700;}
+  .xy-rank .n{width:26px;text-align:center;font-weight:800;}
+  .xy-rank .u{flex:1;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .xy-rank .s{font-weight:800;}
+  .xy-rank .empty{color:#999;font-size:13px;text-align:center;padding:14px 0;}
+</style>
+
+  <div class="xy-topbar"><a href="{{ url_for('games_center') }}">← 返回游戏中心</a></div>
+  <div class="xy-userbar">👤 {{ user.username }}
+    <span class="hs">最高分：<span id="userHigh">{{ user.high_score_xianyi|default(0) }}</span></span>
+  </div>
+
+  <div class="xy-wrap">
+    <div class="xy-container">
+      <div class="xy-title">仙 弈 破 阵</div>
+      <div class="xy-sub">LUQI STUDIO · 单机版</div>
+
+      <div class="xy-hud">
+        <span>模式：<b id="hudMode">--</b></span>
+        <span>剩余发棋回合：<b id="hudCC">-</b></span>
+        <span>下轮将生成：<span id="hudNext">-</span></span>
+        <span>得分：<b id="hudScore">0</b></span>
+      </div>
+      <div id="xyMsg"></div>
+
+      <div style="position:relative;">
+        <div id="board"></div>
+
+        <div class="xy-overlay on" id="startOverlay">
+          <div class="box">
+            <h2>仙 弈 破 阵</h2>
+            <p class="desc">
+              你是棋盘上唯一的「<b>我</b>」，走法同<b>車</b>：沿横竖方向直行，撞上的第一颗棋子可以吃掉得分。<br><br>
+              但每回合棋子也会动一步，<b>凡是棋子能攻击到的格子，踩上去就炸！</b><br><br>
+              绿点 = 可走且安全　·　红点 = 可走但必死<br>
+              撑得越久、吃得越多，分数越高。
+            </p>
+            <button class="xy-btn" onclick="startGame(1)">竞赛模式<small>每 2 回合发棋 · 计入排行榜</small></button>
+            <button class="xy-btn ghost" onclick="showCasual()">娱乐模式<small>自定义发棋回合（1-50）· 不计分</small></button>
+            <div id="casualBox" style="display:none;margin-top:12px;">
+              <p style="font-size:13px;margin:0 0 6px;">每几回合发一次棋？（1-50）</p>
+              <input id="ccInput" type="number" min="1" max="50" value="3">
+              <button class="xy-btn" onclick="startGame(2)">开始游戏</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="xy-overlay" id="overOverlay">
+          <div class="box">
+            <h2>游戏结束</h2>
+            <div class="xy-reason" id="overReason"></div>
+            <div class="xy-fin" id="overScore">0</div>
+            <div class="xy-newrec" id="overNew" style="display:none;">🎉 新纪录！</div>
+            <button class="xy-btn" onclick="restartSame()">再来一局</button>
+            <button class="xy-btn ghost" onclick="backToStart()">返回模式选择</button>
+            <button class="xy-btn ghost" onclick="location.href='{{ url_for('games_center') }}'">返回游戏中心</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="xy-rank">
+      <h3>排 行 榜</h3>
+      <ol id="rankList">
+        {% for item in rank_list %}
+        <li class="{% if item.username == user.username %}self{% endif %}">
+          <span class="n">{{ loop.index }}</span>
+          <span class="u">{{ item.username }}</span>
+          <span class="s">{{ item.score }}</span>
+        </li>
+        {% endfor %}
+        {% if user_rank > 10 %}
+        <li class="self">
+          <span class="n">{{ user_rank }}</span>
+          <span class="u">{{ user.username }}</span>
+          <span class="s">{{ user.high_score_xianyi|default(0) }}</span>
+        </li>
+        {% endif %}
+        {% if not rank_list %}
+        <div class="empty">还没有人上榜，快来抢占第一！</div>
+        {% endif %}
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+var N = 11;
+var LX = ["", "兵", "仕", "象", "马", "炮", "車", "将", "我"];
+var SC = [0, 8, 8, 15, 15, 20, 30, 100, 0];
+var PRIO = [0, 10, 20, 30, 40, 60, 80, 100];
+var PLAYER = 8;
+
+window.MONO_GAME = { game: 'xianyi', sub: '', kind: 'score' };
+window.MONO_GAME_RENDER = function(s, el){
+  var o = {lx: leixing, go: go, m: M, ai: lastAI, mo: moshi, cc: cc, cn: cnt, q1: qi1, q2: qi2, sc: score};
+  window.__monoReplay = true;
+  leixing = s.lx; go = s.go; M = s.m; lastAI = s.ai; moshi = s.mo;
+  cc = s.cc; cnt = s.cn; qi1 = s.q1; qi2 = s.q2; score = s.sc;
+  render();
+  var bd = document.getElementById('board');
+  var c = bd.cloneNode(true);
+  var kill = c.querySelectorAll('[onclick]');
+  for (var i = 0; i < kill.length; i++) kill[i].removeAttribute('onclick');
+  c.style.pointerEvents = 'none';
+  el.innerHTML = '';
+  el.appendChild(c);
+  leixing = o.lx; go = o.go; M = o.m; lastAI = o.ai; moshi = o.mo;
+  cc = o.cc; cnt = o.cn; qi1 = o.q1; qi2 = o.q2; score = o.sc;
+  render();
+  window.__monoReplay = false;
+};
+var W_MATE  = 900000;   // 玩家下一步必死（没有任何安全落点）
+var W_MATE1 = 500000;   // 玩家落子后 AI 可一步吃掉
+var AI_BUDGET_MS = 80;  // 每回合 AI 思考的时间预算（毫秒）
+
+var W_SAFE  = 1600;   // 每个「可走且安全」的落点
+var W_REACH = 40;     // 每个可走落点（含危险格）
+var W_RAY   = 90;     // 最长的一条可走射线
+var W_OPEN  = 45;     // 身边 5×5 空地
+var W_EDGE  = 180;    // 离边界越近越危险
+var W_PRESS = 70;     // 四周棋子压迫感
+var W_POT   = 500;    // 逃生格旁边已经埋了棋子（下一步就能封）
+
+var DIR4  = [[-1,0],[1,0],[0,-1],[0,1]];
+var DIAG4 = [[-1,-1],[-1,1],[1,-1],[1,1]];
+var TIAN4 = [[-2,-2],[-2,2],[2,-2],[2,2]];
+var MA8   = [[-2,-1],[-2,1],[2,-1],[2,1],[-1,-2],[-1,2],[1,-2],[1,2]];
+var MAL8  = [[-1,0],[-1,0],[1,0],[1,0],[0,-1],[0,1],[0,-1],[0,1]];  // 与 MA8 对应的蹩腿格
+
+var leixing = [], M = [], go = [];
+var x = 6, y = 6, cnt = 0, score = 0, qi1 = 1, qi2 = 1, cc = 2, moshi = 1;
+var lastAI = null, busy = false, over = false, submitted = false;
+/* 服务端复算用：吃子事件账（score = Σ SC[type]） */
+var eatLog = [];
+var msgTimer = null;
+
+function mk2d(v){ var a=[]; for(var i=0;i<=N+1;i++){ a.push(new Array(N+2).fill(v)); } return a; }
+function inBoard(i,j){ return i>=1 && i<=N && j>=1 && j<=N; }
+function cloneB(b){ var a=[]; for(var i=0;i<=N+1;i++) a.push(b[i].slice()); return a; }
+
+function cannonEatB(b, ci, cj, ti, tj){
+  if(ci===ti && cj===tj) return false;
+  if(ci!==ti && cj!==tj) return false;
+  var blocks=0, k;
+  if(ci===ti){
+    var s=Math.min(cj,tj), e=Math.max(cj,tj);
+    for(k=s+1;k<e;k++){ if(b[ci][k]!==0){ blocks++; if(blocks>1) return false; } }
+  }else{
+    var s2=Math.min(ci,ti), e2=Math.max(ci,ti);
+    for(k=s2+1;k<e2;k++){ if(b[k][cj]!==0){ blocks++; if(blocks>1) return false; } }
+  }
+  return blocks===1;
+}
+
+function clearLineB(b, i, j, pi, pj){
+  var a, c, k;
+  if(i===pi){
+    a=Math.min(j,pj); c=Math.max(j,pj);
+    for(k=a+1;k<c;k++) if(b[i][k]!==0) return false;
+    return true;
+  }
+  if(j===pj){
+    a=Math.min(i,pi); c=Math.max(i,pi);
+    for(k=a+1;k<c;k++) if(b[k][j]!==0) return false;
+    return true;
+  }
+  return false;
+}
+
+function analyzeB(b, px, py){
+  var M=[], go=[], i, j, k;
+  var bb = b;
+  if (b[px][py] === PLAYER){
+    bb = cloneB(b);
+    bb[px][py] = 0;
+  }
+  for(i=0;i<=N+1;i++){ M.push(new Array(N+2).fill(true)); go.push(new Array(N+2).fill(false)); }
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++){
+    var t=bb[i][j];
+    if(t===0 || t===PLAYER) continue;
+    if(t===1 || t===7){                                   // 兵 / 将：十字一格
+      M[i-1][j]=false; M[i+1][j]=false; M[i][j-1]=false; M[i][j+1]=false;
+    }else if(t===2){                                      // 仕：斜一格
+      M[i-1][j-1]=false; M[i-1][j+1]=false; M[i+1][j-1]=false; M[i+1][j+1]=false;
+    }else if(t===3){                                      // 象：田字（塞心）
+      for(k=0;k<4;k++){
+        var di=TIAN4[k][0], dj=TIAN4[k][1];
+        if(inBoard(i+di,j+dj) && bb[i+di/2][j+dj/2]===0) M[i+di][j+dj]=false;
+      }
+    }else if(t===4){                                      // 马：日字（蹩腿）
+      for(k=0;k<8;k++){
+        var mi=MA8[k][0], mj=MA8[k][1];
+        if(!inBoard(i+mi,j+mj)) continue;
+        if(bb[i+MAL8[k][0]][j+MAL8[k][1]]!==0) continue;
+        M[i+mi][j+mj]=false;
+      }
+    }else if(t===5){                                      // 炮：隔一子打全线
+      for(k=0;k<4;k++){
+        var ddi=DIR4[k][0], ddj=DIR4[k][1];
+        var a=i+ddi, c=j+ddj, blocked=false;
+        while(inBoard(a,c)){
+          if(!blocked){ if(bb[a][c]!==0) blocked=true; }
+          else { M[a][c]=false; if(bb[a][c]!==0) break; }
+          a+=ddi; c+=ddj;
+        }
+      }
+    }else if(t===6){                                      // 車：直线
+      for(k=0;k<4;k++){
+        var rdi=DIR4[k][0], rdj=DIR4[k][1];
+        var ra=i+rdi, rc=j+rdj;
+        while(inBoard(ra,rc)){ M[ra][rc]=false; if(bb[ra][rc]!==0) break; ra+=rdi; rc+=rdj; }
+      }
+    }
+  }
+  for(k=0;k<4;k++){
+    var pdi=DIR4[k][0], pdj=DIR4[k][1];
+    var pa=px+pdi, pc=py+pdj;
+    while(inBoard(pa,pc)){ go[pa][pc]=true; if(b[pa][pc]!==0) break; pa+=pdi; pc+=pdj; }
+  }
+  return {M:M, go:go};
+}
+
+function pieceCanReach(b, i, j, t, pi, pj){
+  if(i===pi && j===pj) return false;
+  var di=Math.abs(i-pi), dj=Math.abs(j-pj);
+  if(t===1 || t===7) return di+dj===1;
+  if(t===2) return di===1 && dj===1;
+  if(t===3) return di===2 && dj===2 && b[(i+pi)/2][(j+pj)/2]===0;
+  if(t===4) return ((di===2&&dj===1 && b[(i+pi)/2][j]===0) ||
+                    (di===1&&dj===2 && b[i][(j+pj)/2]===0));
+  if(t===5) return cannonEatB(b,i,j,pi,pj);
+  if(t===6) return (i===pi||j===pj) && clearLineB(b,i,j,pi,pj);
+  return false;
+}
+
+function canCapB(b, px, py){
+  for(var i=1;i<=N;i++) for(var j=1;j<=N;j++){
+    var t=b[i][j];
+    if(t<1 || t>7) continue;
+    if(pieceCanReach(b,i,j,t,px,py)) return true;
+  }
+  return false;
+}
+
+function genMovesB(b, px, py){
+  var out=[], i, j, k;
+  function push(si,sj,ni,nj,t){
+    if(!inBoard(ni,nj)) return;
+    var d=b[ni][nj];
+    if(d===PLAYER){ out.push({si:si,sj:sj,ni:ni,nj:nj,t:t}); return; } // 吃玩家永远合法
+    if(d>=1 && d<=7) return;                                           // 不吃友军
+    out.push({si:si,sj:sj,ni:ni,nj:nj,t:t});
+  }
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++){
+    var t=b[i][j];
+    if(t<1 || t>7) continue;
+    if(t===1 || t===7){
+      for(k=0;k<4;k++) push(i,j,i+DIR4[k][0],j+DIR4[k][1],t);
+    }else if(t===2){
+      for(k=0;k<4;k++) push(i,j,i+DIAG4[k][0],j+DIAG4[k][1],t);
+    }else if(t===3){
+      for(k=0;k<4;k++){
+        var ti=i+TIAN4[k][0], tj=j+TIAN4[k][1];
+        if(inBoard(ti,tj) && b[i+TIAN4[k][0]/2][j+TIAN4[k][1]/2]===0) push(i,j,ti,tj,t);
+      }
+    }else if(t===4){
+      for(k=0;k<8;k++){
+        var mi=i+MA8[k][0], mj=j+MA8[k][1];
+        if(!inBoard(mi,mj)) continue;
+        if(b[i+MAL8[k][0]][j+MAL8[k][1]]!==0) continue;
+        push(i,j,mi,mj,t);
+      }
+    }else if(t===5){
+      for(var a=1;a<=N;a++) for(var c=1;c<=N;c++)
+        if(b[a][c]!==0 && cannonEatB(b,i,j,a,c)) push(i,j,a,c,t);
+      for(k=0;k<4;k++){
+        var sa=i+DIR4[k][0], sc=j+DIR4[k][1];
+        while(inBoard(sa,sc) && b[sa][sc]===0){ push(i,j,sa,sc,t); sa+=DIR4[k][0]; sc+=DIR4[k][1]; }
+      }
+    }else if(t===6){
+      for(k=0;k<4;k++){
+        var ra=i+DIR4[k][0], rc=j+DIR4[k][1];
+        while(inBoard(ra,rc)){ push(i,j,ra,rc,t); if(b[ra][rc]!==0) break; ra+=DIR4[k][0]; rc+=DIR4[k][1]; }
+      }
+    }
+  }
+  return out;
+}
+
+function shallowScore(b, m, px, py, cap0){
+  if(b[m.ni][m.nj]===PLAYER) return 1e9;                                  // 直接吃玩家
+  var s = (24 - 2*(Math.abs(m.ni-px) + Math.abs(m.nj-py))) * 60;          // 向玩家施压
+  if(cap0[m.ni][m.nj]) s -= PRIO[m.t]*12;                                 // 别把子送到玩家嘴边
+  if(cap0[m.si][m.sj] && !cap0[m.ni][m.nj]) s += PRIO[m.t]*10;            // 从虎口里逃出来
+  s += (m.si*7 + m.sj*3 + m.ni*5 + m.nj) % 5;                             // 微扰，等价着法不抖动
+  return s;
+}
+
+function evalForPlayer(b2, px2, py2){
+  var an = analyzeB(b2, px2, py2);
+  var reach=0, safeN=0, maxRay=0, i, j, k;
+  for(k=0;k<4;k++){
+    var a=px2+DIR4[k][0], c=py2+DIR4[k][1], len=0;
+    while(inBoard(a,c)){ len++; if(b2[a][c]!==0) break; a+=DIR4[k][0]; c+=DIR4[k][1]; }
+    if(len>maxRay) maxRay=len;
+  }
+  var open=0;                                  // 身边 5×5 的空地越多越舒服
+  for(i=px2-2;i<=px2+2;i++) for(j=py2-2;j<=py2+2;j++)
+    if(inBoard(i,j) && b2[i][j]===0) open++;
+  var edge=Math.min(px2-1, N-px2, py2-1, N-py2);   // 越贴边越容易被围死
+
+  var near=[];
+  for(i=0;i<=N+1;i++) near.push(new Array(N+2).fill(0));
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++){
+    if(b2[i][j]<1 || b2[i][j]>7) continue;
+    for(var a=i-2;a<=i+2;a++) for(var c=j-2;c<=j+2;c++) if(inBoard(a,c)) near[a][c]=1;
+  }
+  var pot=0;
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++)
+    if(an.go[i][j] && an.M[i][j] && near[i][j]) pot++;
+
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++)
+    if(an.go[i][j]){ reach++; if(an.M[i][j]) safeN++; }
+
+  var v = safeN*W_SAFE + reach*W_REACH + maxRay*W_RAY + open*W_OPEN
+        - (5-edge)*W_EDGE - pot*W_POT;
+  if(safeN===0) v -= W_MATE;                   // 又没有安全落点了 → 再下一步必死
+  if(canCapB(b2,px2,py2)) v -= W_MATE1;        // AI 下一手可以直接吃掉
+  var press=0;                                 // 四周棋子带来的压迫感
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++){
+    var t=b2[i][j];
+    if(t<1||t>7) continue;
+    var d=Math.max(Math.abs(i-px2), Math.abs(j-py2));
+    if(d<=4) press += (5-d);
+  }
+  return v - press*W_PRESS;
+}
+
+function deepScore(nb, px, py){
+  var an = analyzeB(nb, px, py);
+  var safe=[], any=false, i, j, k;
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++)
+    if(an.go[i][j]){ any=true; if(an.M[i][j]) safe.push([i,j]); }
+  if(!any) return W_MATE;
+  if(!safe.length) return W_MATE - 1;          // 玩家所有落点都在攻击范围内 → 必死
+  var bestP=-Infinity;
+  var lim = safe.length < 24 ? safe.length : 24;
+  for(k=0;k<lim;k++){
+    var pi=safe[k][0], pj=safe[k][1];
+    var b2=cloneB(nb);
+    var eaten=b2[pi][pj];
+    b2[px][py]=0; b2[pi][pj]=PLAYER;
+    var v=evalForPlayer(b2, pi, pj);
+    if(eaten>0 && eaten<=7) v += SC[eaten]*150;   // 玩家吃子获益 = AI 受损
+    if(v>bestP) bestP=v;
+  }
+  return -bestP;
+}
+
+function aiMove(){
+  var b=leixing, px=x, py=y;
+  var an0=analyzeB(b, px, py);
+  var cap0=an0.go;                            // 玩家此刻能走（=能吃）到的格子
+  var moves=genMovesB(b, px, py);
+  if(!moves.length) return null;
+  var i;
+  for(i=0;i<moves.length;i++) moves[i].q = shallowScore(b, moves[i], px, py, cap0);
+  moves.sort(function(a,c){ return c.q - a.q; });
+  var pool = moves.length > 100 ? moves.slice(0, 100) : moves;
+  var t0 = Date.now();
+  var best=null, bestS=-Infinity;
+  for(i=0;i<pool.length;i++){
+    var m=pool[i];
+    if(b[m.ni][m.nj]===PLAYER){ best=m; bestS=1e9; break; }
+    var nb=cloneB(b);
+    var t=nb[m.si][m.sj];
+    nb[m.si][m.sj]=0; nb[m.ni][m.nj]=t;
+    var s=deepScore(nb, px, py);
+    if(s>bestS){ bestS=s; best=m; }
+    if(i>=11 && Date.now()-t0 > AI_BUDGET_MS) break;
+  }
+  return best;
+}
+
+function upd(){
+  var an=analyzeB(leixing, x, y);
+  M=an.M; go=an.go;
+}
+
+function spawnTwo(){
+  var empty=[], i, j;
+  for(i=1;i<=N;i++) for(j=1;j<=N;j++) if(leixing[i][j]===0) empty.push([i,j]);
+  var qs=[qi1,qi2];
+  for(var k=0;k<2;k++){
+    if(!empty.length) break;
+    var idx=Math.floor(Math.random()*empty.length);
+    var a=empty.splice(idx,1)[0];
+    leixing[a[0]][a[1]]=qs[k];
+  }
+}
+
+function turnStart(){
+  if(cnt % cc === 0){
+    spawnTwo();
+    cnt=0;
+    qi1=Math.floor(Math.random()*7)+1;
+    qi2=Math.floor(Math.random()*7)+1;
+  }
+  upd();
+  render();
+  cnt++;
+}
+
+/* ---- 键盘操作：方向键移动光标，Enter 落子，R 重开 ---- */
+var kbi = 1, kbj = 1, kbdOn = false;
+function kbdPaint(){
+  if(!kbdOn) return;
+  var bd = document.getElementById('board');
+  if(!bd) return;
+  var cells = bd.children;
+  var idx = (kbi - 1) * N + (kbj - 1);
+  var el = cells[idx];
+  if(!el) return;
+  el.style.outline = '2px solid #111';
+  el.style.outlineOffset = '-2px';
+}
+function kbdClear(){
+  var bd = document.getElementById('board');
+  if(!bd) return;
+  for(var i=0;i<bd.children.length;i++){
+    bd.children[i].style.outline = '';
+    bd.children[i].style.outlineOffset = '';
+  }
+}
+document.addEventListener('keydown', function(e){
+  if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  var k = e.key, moved = true;
+  if(k === 'ArrowUp' || k === 'w' || k === 'W'){ kbi = Math.max(1, kbi - 1); }
+  else if(k === 'ArrowDown' || k === 's' || k === 'S'){ kbi = Math.min(N, kbi + 1); }
+  else if(k === 'ArrowLeft' || k === 'a' || k === 'A'){ kbj = Math.max(1, kbj - 1); }
+  else if(k === 'ArrowRight' || k === 'd' || k === 'D'){ kbj = Math.min(N, kbj + 1); }
+  else moved = false;
+  if(moved){
+    e.preventDefault();
+    kbdOn = true;
+    kbdClear(); kbdPaint();
+    return;
+  }
+  if((k === 'Enter' || k === ' ') && kbdOn){
+    e.preventDefault();
+    onCell(kbi, kbj);
+    kbdClear(); kbdPaint();
+  }
+});
+
+function onCell(i,j){
+  if(over || busy) return;
+  if(!go[i][j]){ flash('只能走带提示点的格子（横竖方向直行）'); return; }
+  busy=true;
+  if(!M[i][j]){
+    die('你的马炸了！踩进了敌方棋子的攻击范围');
+    return;
+  }
+  if(leixing[i][j]!==0){
+    var g=SC[leixing[i][j]];
+    score+=g;
+    eatLog.push({t: leixing[i][j]});   // 服务端复算：吃子事件账
+    flash('吃掉了「'+LX[leixing[i][j]]+'」，+'+g+' 分', false);
+  }
+  leixing[x][y]=0; x=i; y=j; leixing[x][y]=PLAYER;
+  render();
+  setTimeout(aiPhase, 300);
+}
+
+function aiPhase(){
+  if(over) return;
+  var mv=aiMove();
+  if(mv){
+    var t=leixing[mv.si][mv.sj];
+    var ateMe = (leixing[mv.ni][mv.nj]===PLAYER);
+    leixing[mv.si][mv.sj]=0;
+    leixing[mv.ni][mv.nj]=t;
+    lastAI=mv;
+    if(ateMe){ render(); die('你的马被「'+LX[t]+'」吃掉了'); return; }
+  }
+  turnStart();
+  busy=false;
+}
+
+function die(reason){
+  over=true; busy=false;
+  render();
+  setTimeout(function(){
+    document.getElementById('overReason').textContent=reason;
+    document.getElementById('overScore').textContent=score;
+    document.getElementById('overOverlay').classList.add('on');
+    if(moshi===1 && !submitted){
+      submitted=true;
+      if (window.MONO_REC) window.MONO_REC.finish(score);
+      fetch('/api/game/submit/xianyi',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({score: score, seq: {eats: eatLog, cnt: cnt}})
+      }).then(function(r){ return r.json(); }).then(function(j){
+        if(j.ok){
+          if(j.new_best) document.getElementById('overNew').style.display='block';
+          renderRank(j.rank_list);
+        }
+      }).catch(function(){});
+    }
+  }, 900);
+}
+
+function flash(text, isWarn){
+  var el=document.getElementById('xyMsg');
+  el.textContent=(isWarn===false?'✅ ':'⚠️ ')+text;
+  el.style.color=isWarn===false?'#189a5d':'#c22b22';
+  clearTimeout(msgTimer);
+  msgTimer=setTimeout(function(){ el.textContent=''; }, 2200);
+}
+
+function render(){
+  if (window.MONO_REC && window.MONO_REC.active){
+    window.MONO_REC.snap({
+      lx: JSON.parse(JSON.stringify(leixing)), go: JSON.parse(JSON.stringify(go)),
+      m: JSON.parse(JSON.stringify(M)), ai: lastAI, mo: moshi,
+      cc: cc, cn: cnt, q1: qi1, q2: qi2, sc: score
+    });
+  }
+  var bd=document.getElementById('board');
+  var h='', i, j;
+  for(i=1;i<=N;i++){
+    for(j=1;j<=N;j++){
+      var cls='cell sq';
+      if(go[i][j]) cls += M[i][j] ? ' cansafe' : ' candead';
+      if(lastAI && ((lastAI.si===i&&lastAI.sj===j)||(lastAI.ni===i&&lastAI.nj===j))) cls+=' last';
+      var inner='';
+      var t=leixing[i][j];
+      if(t===PLAYER) inner='<span class="pc me">我</span>';
+      else if(t>0) inner='<span class="pc t'+t+'">'+LX[t]+'</span>';
+      else if(go[i][j]) inner='<span class="dot '+(M[i][j]?'safe':'dead')+'"></span>';
+      h+='<div class="'+cls+'" onclick="onCell('+i+','+j+')">'+inner+'</div>';
+    }
+  }
+  bd.innerHTML=h;
+  document.getElementById('hudMode').textContent = moshi===1?'竞赛':'娱乐';
+  document.getElementById('hudCC').textContent = Math.max(0, cc-cnt);
+  document.getElementById('hudNext').innerHTML =
+    '<span class="chip'+(qi1===7?' big':'')+'">'+LX[qi1]+'</span><span class="chip'+(qi2===7?' big':'')+'">'+LX[qi2]+'</span>';
+  document.getElementById('hudScore').textContent = score;
+}
+
+function renderRank(list){
+  var el=document.getElementById('rankList');
+  if(!list || !list.length) return;
+  var meName = {{ user.username|tojson }};
+  el.innerHTML=list.map(function(it,idx){
+    return '<li class="'+(it.username===meName?'self':'')+'">'+
+    '<span class="n">'+(idx+1)+'</span><span class="u">'+it.username+'</span>'+
+    '<span class="s">'+it.score+'</span></li>';
+  }).join('');
+  var me=list.filter(function(it){ return it.username===meName; })[0];
+  if(me) document.getElementById('userHigh').textContent=me.score;
+}
+
+function startGame(mode){
+  if (window.MONO_REC) window.MONO_REC.start();
+  moshi=mode;
+  if(mode===1){ cc=2; }
+  else{
+    var v=parseInt(document.getElementById('ccInput').value, 10);
+    if(!(v>=1 && v<=50)){ flash('发棋回合数请填 1-50'); return; }
+    cc=v;
+  }
+  leixing=mk2d(0); M=mk2d(true); go=mk2d(false);
+  x=6; y=6; cnt=0; score=0; qi1=1; qi2=1; lastAI=null; busy=false; over=false; submitted=false;
+  eatLog = [];   // 服务端复算：新局清空吃子账
+  leixing[x][y]=PLAYER;
+  document.getElementById('startOverlay').classList.remove('on');
+  document.getElementById('overOverlay').classList.remove('on');
+  document.getElementById('xyMsg').textContent='';
+  document.getElementById('overNew').style.display='none';   // 修复：上一局的新纪录提示残留
+  turnStart();
+}
+function showCasual(){
+  var b=document.getElementById('casualBox');
+  b.style.display = b.style.display==='none' ? 'block' : 'none';
+}
+function restartSame(){ startGame(moshi); }
+function backToStart(){
+  document.getElementById('overOverlay').classList.remove('on');
+  document.getElementById('startOverlay').classList.add('on');
+}
+
+leixing=mk2d(0); M=mk2d(true); go=mk2d(false);
+leixing[6][6]=PLAYER;
+render();
+</script>
+{% endblock %}

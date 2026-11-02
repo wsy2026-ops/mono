@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}完善资料 - MONO 社区{% endblock %}
+
+{% block content %}
+<style>
+  .ob-wrap{max-width:520px;margin:40px auto;}
+  .ob-card{border:1px solid var(--line);border-radius:16px;padding:32px 34px;
+    background:var(--card);box-shadow:0 10px 40px var(--shadow);}
+  .ob-card h1{font-size:22px;margin:0 0 6px;font-weight:700;}
+  .ob-sub{font-size:13px;color:var(--muted);margin:0 0 24px;line-height:1.7;}
+  .ob-gh{display:flex;align-items:center;gap:12px;border:1px solid var(--line);
+    border-radius:12px;padding:12px 16px;margin-bottom:20px;background:var(--bg-elev);}
+  .ob-gh img{width:40px;height:40px;border-radius:50%;background:#e8e8e8;}
+  .ob-gh .n{font-weight:700;font-size:14px;}
+  .ob-gh .l{font-size:12px;color:var(--muted);}
+  .ob-row{margin-bottom:16px;}
+  .ob-row label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;}
+  .ob-row input[type=text]{width:100%;padding:9px 13px;border:1px solid var(--line);
+    border-radius:10px;background:var(--bg-elev);color:var(--fg);font-size:14px;box-sizing:border-box;}
+  .ob-check{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--fg-2);
+    line-height:1.6;cursor:pointer;}
+  .ob-actions{display:flex;gap:10px;margin-top:22px;}
+  .ob-actions .btn{flex:1;}
+</style>
+
+<div class="ob-wrap">
+  <div class="ob-card">
+    <h1>👋 欢迎加入 MONO</h1>
+    <p class="ob-sub">你已通过 GitHub 登录。下面两步都可以跳过，随时能在个人设置里改。</p>
+
+    <div class="ob-gh">
+      {% if profile.avatar_url %}
+      <img src="{{ profile.avatar_url }}" alt="">
+      {% else %}
+      <img src="{{ url_for('static', filename='default_avatar.png') }}" alt="">
+      {% endif %}
+      <div>
+        <div class="n">{{ profile.name or profile.login }}</div>
+        <div class="l">GitHub · @{{ profile.login }}</div>
+      </div>
+    </div>
+
+    <form method="post">
+      <div class="ob-row">
+        <label>站内昵称（留空保持「{{ me.username }}」）</label>
+        <input type="text" name="username" maxlength="20" placeholder="{{ me.username }}">
+      </div>
+      {% if profile.avatar_url %}
+      <div class="ob-row">
+        <label class="ob-check">
+          <input type="checkbox" name="use_avatar" value="1" checked>
+          <span>使用 GitHub 头像作为站内头像</span>
+        </label>
+      </div>
+      {% endif %}
+      <div class="ob-actions">
+        <button type="submit" class="btn">保存并进站</button>
+        <a href="{{ url_for('index') }}" class="btn ghost" style="flex:0 0 auto;">跳过</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

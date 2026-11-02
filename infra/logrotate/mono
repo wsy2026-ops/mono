@@ -1,0 +1,46 @@
+# MONO 日志轮转（2026-11-02 重写）
+#
+# 旧配置有三个问题：
+#   1) postrotate 里 `systemctl kill -s HUP mono` —— **Python 不处理 SIGHUP**，
+#      等于每天 00:00 把服务杀一次（systemd 5 秒后拉起，用户看到 502）。
+#   2) 重复列了 /var/log/nginx/mono-*.log，而 /etc/logrotate.d/nginx 用的是
+#      `/var/log/nginx/*.log` 通配 → logrotate 报 duplicate，整个 nginx 配置被跳过，
+#      nginx 日志其实一直没轮转。
+#   3) 真正的大文件 /opt/mono/app/server.log（33MB）根本没在列表里。
+#
+# 现在：nginx 日志交给 /etc/logrotate.d/nginx 的通配；这里只管应用日志。
+# server.log 必须用 copytruncate —— systemd 用 `StandardOutput=append:` 持有 fd，
+# 改名（默认 create 模式）会让 systemd 继续写旧 inode，新文件永远是空的。
+
+/opt/mono/app/server.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+
+/opt/mono/app/logs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+
+# 巡检脚本（watchdog.py）自己的日志在 /opt/mono/logs/，不是 app/logs/。
+# 2026-11-02 发现：这个目录**根本不存在**，cron 的 `>>` 重定向直接失败，
+# 整条命令一行都没执行 —— 巡检从上线起一次都没跑过。
+/opt/mono/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

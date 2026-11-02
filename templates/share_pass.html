@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}需要密码{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="card" style="max-width:380px;margin:60px auto;padding:26px 24px;">
+    <h2 style="margin:0 0 8px;">这个分享需要密码</h2>
+    <p class="muted" style="margin:0 0 18px;font-size:13px;line-height:1.8;">
+      {% if bad %}密码不对，再试一次。{% else %}输入分享者设置的密码才能下载。{% endif %}
+    </p>
+    <form method="post">
+      <input type="password" name="pass" placeholder="请输入密码" maxlength="16" autofocus
+             style="width:100%;margin-bottom:12px;">
+      <button type="submit" class="btn" style="width:100%;">下载文件</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

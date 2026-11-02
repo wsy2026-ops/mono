@@ -1,0 +1,10 @@
+# MONO 社区 · 依赖清单（锁定版本组合，适配 Python 3.7 / 32 位 Windows）
+# 安装：pip install -r requirements.txt
+# 注意：不要单独升级 flask-socketio 到 5.5.0+（与 python-socketio 5.9+ 不兼容）
+flask==2.2.5
+flask-socketio==5.3.6
+python-socketio==5.11.0
+python-engineio==4.9.1
+waitress==2.1.2
+# AI 对话（智谱 GLM）依赖；2.31.0 是最后一个支持 Python 3.7 的版本
+requests==2.31.0

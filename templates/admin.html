@@ -1,0 +1,907 @@
+{% extends "_admin_base.html" %}
+{% block title %}数据看板 · 管理后台{% endblock %}
+{% block admin_icon %}📊{% endblock %}
+{% block admin_heading %}数据看板{% endblock %}
+{% block admin_desc %}全站概览 · 用户 / 内容 / 服务器 / 安全 四组指标实时汇总{% endblock %}
+
+{% block admin_actions %}
+<a href="{{ url_for('admin_monitor') }}" class="btn sm ghost">完整监控 →</a>
+{% endblock %}
+
+{% block admin_content %}
+
+<style>
+  .batch-bar{
+    position:sticky;bottom:152px;z-index:50;
+    display:none;align-items:center;gap:10px;flex-wrap:wrap;
+    margin:0 0 14px;padding:12px 16px;
+    background:#18181b;color:#fff;border-radius:12px;
+    box-shadow:0 -4px 20px rgba(0,0,0,.18);
+  }
+  .batch-bar.on{display:flex;}
+  .batch-bar .cnt{font-size:13.5px;font-weight:700;}
+  .batch-bar .cnt b{font-size:16px;}
+  .batch-bar select,
+  .batch-bar input[type="text"],
+  .batch-bar input[type="number"]{
+    background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);
+    color:#fff;border-radius:8px;padding:7px 11px;font-size:13px;
+    font-family:inherit;outline:none;
+  }
+  .batch-bar select option{background:#26262b;color:#fff;}
+  .batch-bar input::placeholder{color:rgba(255,255,255,.45);}
+  .batch-bar .sep{width:1px;height:22px;background:rgba(255,255,255,.18);}
+  .batch-bar .btn{background:var(--bg-elev);color:#18181b;border-color:#fff;}
+  .batch-bar .btn:hover{background:#e8e8ea;border-color:#e8e8ea;}
+  .batch-bar .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.28);}
+  .batch-bar .btn.ghost:hover{background:rgba(255,255,255,.12);}
+  .batch-bar .hint{font-size:12px;color:rgba(255,255,255,.55);}
+
+  .cred-box{
+    margin-top:10px;padding:12px 14px;border-radius:10px;
+    background:var(--soft);border:1px solid var(--line);
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px;
+    max-height:260px;overflow:auto;
+  }
+  .cred-box .row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;
+    border-bottom:1px dashed var(--line);}
+  .cred-box .row:last-child{border-bottom:none;}
+  .cred-box .pw{font-weight:700;color:#b42318;user-select:all;}
+
+  tr.row-picked{background:#fffbea !important;}
+  tr.row-picked:hover{background:#fff6d9 !important;}
+
+  @media (max-width:820px){
+    .batch-bar{padding:10px 12px;gap:8px;border-radius:10px;bottom:162px;}
+    .batch-bar .sep{display:none;}
+    .batch-bar select,
+    .batch-bar input[type="text"],
+    .batch-bar input[type="number"]{font-size:16px;flex:1 1 120px;min-width:0;}
+  }
+</style>
+
+<div class="adm-card">
+  <div class="adm-sec">
+    <div class="adm-sec-title">👥 用户</div>
+    <div class="adm-grid">
+      <div class="adm-stat"><div class="adm-stat-num">{{ dash.users_total }}</div><div class="adm-stat-label">总用户</div></div>
+      <div class="adm-stat ok"><div class="adm-stat-num">{{ dash.users_online }}</div><div class="adm-stat-label">当前在线</div></div>
+      <div class="adm-stat"><div class="adm-stat-num">{{ dash.users_today }}</div><div class="adm-stat-label">今日新增</div></div>
+      <div class="adm-stat"><div class="adm-stat-num">{{ dash.admins }}</div><div class="adm-stat-label">管理员</div></div>
+      <div class="adm-stat{{ ' warn' if dash.users_banned else ' mute' }}"><div class="adm-stat-num">{{ dash.users_banned }}</div><div class="adm-stat-label">封禁中</div></div>
+      <div class="adm-stat{{ ' warn' if dash.users_muted else ' mute' }}"><div class="adm-stat-num">{{ dash.users_muted }}</div><div class="adm-stat-label">禁言中</div></div>
+    </div>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-title">📝 内容与待办</div>
+    <div class="adm-grid">
+      <div class="adm-stat"><div class="adm-stat-num">{{ dash.posts_total }}</div><div class="adm-stat-label">帖子总数</div></div>
+      <div class="adm-stat"><div class="adm-stat-num">{{ dash.posts_today }}</div><div class="adm-stat-label">今日新帖</div></div>
+      <div class="adm-stat"><div class="adm-stat-num">{{ dash.comments_total }}</div><div class="adm-stat-label">评论总数</div></div>
+      <div class="adm-stat"><div class="adm-stat-num">{{ dash.dynamics_total }}</div><div class="adm-stat-label">动态总数</div></div>
+      <div class="adm-stat{{ ' warn' if dash.recycle_total else ' mute' }}"><div class="adm-stat-num">{{ dash.recycle_total }}</div><div class="adm-stat-label">回收站</div></div>
+      <div class="adm-stat{{ ' warn' if dash.reports_pending else ' mute' }}"><div class="adm-stat-num">{{ dash.reports_pending }}</div><div class="adm-stat-label">待审举报</div></div>
+      <div class="adm-stat{{ ' warn' if dash.appeals_pending else ' mute' }}"><div class="adm-stat-num">{{ dash.appeals_pending }}</div><div class="adm-stat-label">待审申诉</div></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;">
+    <div>
+      <div class="adm-sec-title">🖥 服务器</div>
+      {% if mon.sample %}
+        {% set s = mon.sample %}
+        {% set mem_used = s.mem_used_mb or 0 %}
+        {% set mem_total = s.mem_total_mb or 0 %}
+        {% set disk_used = s.disk_used_gb or 0 %}
+        {% set disk_total = s.disk_total_gb or 0 %}
+        {% set mem_pct = (mem_used * 100 / mem_total) if mem_total else 0 %}
+        {% set disk_pct = (disk_used * 100 / disk_total) if disk_total else 0 %}
+        {% set cpu = s.cpu_pct or 0 %}
+
+        <div style="font-size:12.5px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="muted">CPU</span><b>{{ '%.1f'|format(cpu) }}%</b>
+          </div>
+          <div class="adm-bar{{ ' danger' if cpu > 88 else (' warn' if cpu > 70 else '') }}">
+            <i style="width:{{ [cpu, 100]|min }}%"></i>
+          </div>
+        </div>
+
+        <div style="font-size:12.5px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="muted">内存</span><b>{{ mem_used }} / {{ mem_total }} MB</b>
+          </div>
+          <div class="adm-bar{{ ' danger' if mem_pct > 88 else (' warn' if mem_pct > 70 else '') }}">
+            <i style="width:{{ [mem_pct, 100]|min }}%"></i>
+          </div>
+        </div>
+
+        <div style="font-size:12.5px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="muted">磁盘</span><b>{{ '%.1f'|format(disk_used) }} / {{ '%.1f'|format(disk_total) }} GB</b>
+          </div>
+          <div class="adm-bar{{ ' danger' if disk_pct > 88 else (' warn' if disk_pct > 70 else '') }}">
+            <i style="width:{{ [disk_pct, 100]|min }}%"></i>
+          </div>
+        </div>
+
+        <div class="muted" style="font-size:12px;">
+          负载 {{ '%.2f'|format(s.load1 or 0) }} · 连接 {{ s.conn_estab or 0 }} · 进程 {{ s.proc_count or 0 }}
+          {% if s.net_rx_kb %}· 网卡收 {{ s.net_rx_kb }} KB{% endif %}
+        </div>
+      {% else %}
+        <div class="muted" style="font-size:12.5px;">暂无采样数据（监控模块可能未启动）</div>
+      {% endif %}
+
+      <div style="margin-top:12px;">
+        {% for svc, st in mon.services.items() %}
+          <span class="adm-svc {{ 'on' if st == 'active' else 'off' }}"><span class="d"></span>{{ svc }} {{ st }}</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <div class="adm-sec-title">🔒 安全</div>
+      {% set sm = mon.summary %}
+      <div class="adm-grid" style="grid-template-columns:repeat(auto-fill,minmax(112px,1fr));">
+        <div class="adm-stat{{ ' warn' if sm.today else ' mute' }}"><div class="adm-stat-num">{{ sm.today or 0 }}</div><div class="adm-stat-label">今日拦截</div></div>
+        <div class="adm-stat"><div class="adm-stat-num">{{ sm.total or 0 }}</div><div class="adm-stat-label">累计拦截</div></div>
+        <div class="adm-stat"><div class="adm-stat-num">{{ sm.blocked_total or 0 }}</div><div class="adm-stat-label">累计请求</div></div>
+      </div>
+      {% if sm.by_kind %}
+      <div style="margin-top:12px;">
+        {% for k in sm.by_kind[:5] %}
+        <div class="adm-rank"><span class="muted">{{ k.kind }}</span><b>{{ k.count }}</b></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div style="margin-top:12px;">
+        <a href="{{ url_for('admin_monitor') }}" class="btn sm ghost">拦截详情 →</a>
+      </div>
+    </div>
+  </div>
+
+  {% if game_ranks %}
+  <div class="adm-sec" style="margin-top:22px;">
+    <div class="adm-sec-title">🎮 各游戏榜首（前 3）</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:10px;">
+      {% for g in game_ranks %}
+      <div style="background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:6px;">{{ g.label }}</div>
+        {% for r in g.rows %}
+        <div class="adm-rank">
+          <span>{{ loop.index }}. {{ r.username }}</span>
+          <b>{{ r.v }}{{ ' ms' if g.is_time and 'ms' in g.field else '' }}</b>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="adm-card">
+  <div class="adm-sec-title">📣 全站公告</div>
+  <p class="muted" style="font-size:12.5px;margin-bottom:10px;">
+    公告发布后全站永久置顶，留空则不显示 · 支持 HTML
+  </p>
+  <textarea id="annContent" placeholder="在这里输入公告内容（留空 = 不显示）"
+            style="width:100%;min-height:92px;">{{ site_announcement.content if site_announcement else '' }}</textarea>
+  <div class="adm-form-row" style="margin-top:10px;">
+    <button class="btn" onclick="saveAnnouncement()">💾 保存公告</button>
+    <button class="btn ghost" onclick="clearAnnouncement()">🗑 清空公告</button>
+    <span id="annMsg" class="muted" style="font-size:12px;"></span>
+    {% if site_announcement %}
+    <span class="muted" style="font-size:12px;margin-left:auto;">
+      由 {{ site_announcement.updated_by or '管理员' }} 发布 · 永久置顶
+    </span>
+    {% endif %}
+  </div>
+</div>
+
+{% if current_user.is_super_admin %}
+<div class="adm-card">
+  <div class="adm-sec-title">📢 发布论坛公告</div>
+  <p class="muted" style="font-size:12.5px;margin-bottom:10px;">
+    发到论坛「官方公告区」板块 —— 是一条正式帖子，普通用户只能看不能发。
+    ⚠️ 和上面那个「全站公告」不是一回事：那个是全站永久置顶的横幅。
+  </p>
+  <div class="adm-form-row">
+    <a class="btn" href="{{ url_for('create_post') }}?section={{ ann_section_id }}">✍️ 去发公告</a>
+    <a class="btn ghost" href="{{ url_for('forum') }}?section={{ ann_section_id }}">👀 查看公告区</a>
+  </div>
+</div>
+{% endif %}
+
+{% if current_user.is_super_admin %}
+<div class="adm-card">
+  <div class="adm-sec-title">👑 管理员任免</div>
+  <form method="post" action="{{ url_for('admin_add_admin') }}" class="adm-form-row">
+    <input type="text" name="username" placeholder="输入用户名设为普通管理员" style="flex:1 1 200px;min-width:170px;">
+    <button class="btn" type="submit">添加普通管理员</button>
+  </form>
+  <div class="adm-form-row" style="margin-top:14px;">
+    {% for a in users %}{% if a.is_admin %}
+      <span class="adm-pill{{ ' dark' if a.is_super_admin else '' }}" style="padding:4px 11px;">
+        {{ a.username }}{% if a.is_super_admin %}（超管）{% endif %}
+        {% if not a.is_super_admin and a.id != current_user.id %}
+        <form method="post" action="{{ url_for('admin_remove_admin', user_id=a.id) }}" style="display:inline;">
+          <button class="xbtn" type="submit" title="移除"
+                  onclick="return confirm(__('确定移除该管理员？'));"
+                  style="border:none;background:none;cursor:pointer;color:inherit;opacity:.6;font-size:13px;padding:0 0 0 2px;">×</button>
+        </form>
+        {% endif %}
+      </span>
+    {% endif %}{% endfor %}
+  </div>
+</div>
+
+<div class="adm-card">
+  <div class="adm-sec-title">💰 积分管理</div>
+  <form id="pointsForm" class="adm-form-row">
+    <input type="text" id="pointsUser" placeholder="用户名" style="min-width:130px;">
+    <input type="number" id="pointsDelta" placeholder="积分（正加负扣）" style="width:160px;">
+    <input type="text" id="pointsReason" placeholder="原因（扣分必填）" style="flex:1 1 200px;min-width:170px;">
+    <button class="btn" type="submit">执行</button>
+  </form>
+  <p class="muted" style="font-size:12px;margin-top:9px;">
+    输入 100 = 加 100 积分，输入 -50 = 扣 50 积分（扣分必须填原因）· 操作写入积分账本留痕
+  </p>
+</div>
+
+<div class="adm-card">
+  <div class="adm-sec-title">🔧 超级工具</div>
+  <div class="adm-form-row">
+    <input type="text" id="toolUser" placeholder="用户名 / ID" style="min-width:150px;">
+    <button class="btn ghost" onclick="resetGameScore()">🎮 重置游戏成绩</button>
+    <button class="btn ghost" onclick="openGameSet()">🎯 任意修改游戏成绩</button>
+    <button class="btn ghost" onclick="forceUnfriend()">👥 强制解除好友</button>
+  </div>
+  <p class="muted" style="font-size:12px;margin-top:9px;">
+    操作立即生效，且全部记入超管日志
+  </p>
+</div>
+
+<div id="gameSetModal" class="modal-overlay">
+  <div class="modal" style="max-width:540px;">
+    <h3 style="margin:0 0 6px;">🎯 任意修改游戏成绩</h3>
+    <p class="muted" style="font-size:13px;margin-bottom:16px;">
+      把目标用户的指定游戏成绩改为任意值，会同步更新排行榜
+    </p>
+    <div class="adm-form-row">
+      <input type="text" id="gsUser" placeholder="用户名 / ID" style="flex:1 1 140px;min-width:120px;">
+      <select id="gsField" style="flex:1 1 180px;min-width:160px;">
+        {% for f, label in game_fields.items() %}
+        <option value="{{ f }}">{{ label }}{% if f in game_time_fields %}（越小越好）{% endif %}</option>
+        {% endfor %}
+      </select>
+      <input type="number" id="gsValue" min="0" placeholder="目标值" style="width:104px;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeGameSet()">取消</button>
+      <button class="btn" onclick="doGameSet()">确认修改</button>
+    </div>
+    <div id="gsMsg" class="muted" style="font-size:12px;margin-top:10px;"></div>
+  </div>
+</div>
+{% endif %}
+
+<div class="batch-bar" id="batchBar">
+  <span class="cnt">已选 <b id="batchCount">0</b> 个用户</span>
+  <span class="sep"></span>
+
+  <select id="batchAction">
+    <option value="">— 选择操作 —</option>
+    <optgroup label="处罚">
+      <option value="ban">封禁</option>
+      <option value="mute">禁言</option>
+      <option value="lift_ban">解除封禁</option>
+      <option value="lift_mute">解除禁言</option>
+    </optgroup>
+    <optgroup label="装扮">
+      <option value="effect_give">授予特效</option>
+      <option value="effect_remove">移除特效</option>
+      <option value="badge_give">授予荣誉牌子</option>
+      <option value="badge_remove">移除荣誉牌子</option>
+    </optgroup>
+    {% if current_user.is_super_admin %}
+    <optgroup label="超管专属">
+      <option value="ai_quota">设置 AI 配额</option>
+      <option value="reset_game">重置游戏成绩</option>
+      <option value="reset_password">重置密码</option>
+      <option value="deactivate">注销账号</option>
+    </optgroup>
+    {% endif %}
+  </select>
+
+  <span id="bpPunish" style="display:none;">
+    <input type="number" id="bpDays" min="0" max="99" value="1" style="width:62px;" title="天">
+    <span class="hint">天</span>
+    <input type="number" id="bpHours" min="0" max="23" value="0" style="width:56px;" title="时">
+    <span class="hint">时</span>
+    <input type="number" id="bpMinutes" min="0" max="59" value="0" style="width:56px;" title="分">
+    <span class="hint">分</span>
+    <input type="text" id="bpReason" placeholder="原因" style="width:130px;">
+  </span>
+
+  <span id="bpQuota" style="display:none;">
+    <input type="number" id="bpQuotaVal" value="-1" style="width:80px;" title="-1 不限 / 0 禁止 / N 每日轮数">
+    <span class="hint">-1 不限 · 0 禁止 · N 每日轮数</span>
+  </span>
+
+  <span id="bpEffect" style="display:none;">
+    <select id="bpEffectVal">
+      <option value="rainbow">彩虹</option><option value="fire">烈焰</option>
+      <option value="ocean">海洋</option><option value="forest">森林</option>
+      <option value="purple">紫晶</option><option value="sunset">日落</option>
+      <option value="neon">霓虹</option><option value="galaxy">银河</option>
+      <option value="popular">热门</option>
+    </select>
+  </span>
+
+  <span id="bpBadge" style="display:none;">
+    <input type="text" id="bpBadgeText" placeholder="牌子文字" maxlength="10" style="width:110px;">
+    <select id="bpBadgeEffect">
+      <option value="gold">金色</option><option value="silver">银色</option>
+      <option value="purple">紫晶</option><option value="fire">烈焰</option>
+      <option value="ocean">海洋</option><option value="forest">森林</option>
+      <option value="dark">暗夜</option><option value="neon">霓虹</option>
+    </select>
+  </span>
+
+  <button class="btn sm" onclick="runBatch()">执行</button>
+  <button class="btn sm ghost" onclick="clearPicked()">取消选择</button>
+</div>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>👥 用户管理</h3>
+    <span class="adm-hint">时长填「99 天 0 时 0 分」即为永久封禁 / 禁言</span>
+    <div class="adm-right" style="display:flex;align-items:center;gap:8px;">
+      <form method="get" style="display:flex;gap:6px;">
+        <input type="text" name="uq" value="{{ uq }}" placeholder="搜索用户名或 ID"
+               style="width:170px;padding:6px 10px;font-size:12.5px;border:1px solid var(--line);
+                      border-radius:8px;background:var(--bg);color:var(--fg);outline:none;">
+        <button type="submit" class="btn sm ghost">搜索</button>
+        {% if uq %}<a class="btn sm ghost" href="{{ url_for('admin') }}">清除</a>{% endif %}
+      </form>
+      <span class="adm-pill">共 {{ utotal }} 人</span>
+    </div>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:40px;">
+            <input type="checkbox" id="ckAll" title="全选 / 取消全选" style="cursor:pointer;">
+          </th>
+          <th style="width:56px;">ID</th>
+          <th style="width:150px;">用户名</th>
+          <th style="width:96px;">身份</th>
+          <th style="width:150px;">封禁状态</th>
+          <th style="width:150px;">禁言状态</th>
+          <th style="width:110px;">AI 配额</th>
+          <th style="min-width:400px;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr data-uid="{{ u.id }}" data-uname="{{ u.username }}">
+          <td>
+            {% if u.id != current_user.id %}
+            <input type="checkbox" class="ck-user" value="{{ u.id }}"
+                   data-uname="{{ u.username }}" style="cursor:pointer;">
+            {% else %}
+            <span class="muted" style="font-size:11px;" title="不能对自己操作">—</span>
+            {% endif %}
+          </td>
+          <td class="adm-id">{{ u.id }}</td>
+
+          <td>
+            <b>{{ u.username }}</b>
+            {% if u.badge_text and u.badge_effect %}
+            <br><span class="tag badge-{{ u.badge_effect }}" style="margin-top:3px;">{{ u.badge_text }}</span>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if u.is_admin %}<span class="tag admin">管理员</span>
+            {% else %}<span class="adm-pill off">普通</span>{% endif %}
+          </td>
+
+          <td>
+            {% if is_active_restriction(u.banned_until) %}
+            <span class="adm-pill danger">{{ status_text(u.banned_until) }}</span>
+            {% else %}<span class="muted">正常</span>{% endif %}
+          </td>
+
+          <td>
+            {% if is_active_restriction(u.muted_until) %}
+            <span class="adm-pill warn">{{ status_text(u.muted_until) }}</span>
+            {% else %}<span class="muted">正常</span>{% endif %}
+          </td>
+
+          <td>
+            {% if current_user.is_super_admin %}
+            <form method="post" action="{{ url_for('admin_set_ai_quota') }}" class="adm-form-row" style="gap:5px;">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <input type="number" name="ai_quota" min="-1"
+                     value="{{ u.ai_quota if u.ai_quota is defined else 30 }}"
+                     style="width:64px;" title="-1=不限 0=禁止">
+              <button type="submit" class="btn xs">设置</button>
+            </form>
+            <div class="muted" style="font-size:10.5px;margin-top:3px;">-1 不限 / 0 禁止 / N 每日轮数</div>
+            {% else %}
+            <span class="muted">{{ u.ai_quota if u.ai_quota is defined else 30 }}</span>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if (not u.is_admin) or current_user.is_super_admin %}
+              {% if u.id != current_user.id %}
+              <div class="punish-box" style="border:none;background:none;padding:0;">
+                <form method="post" action="{{ url_for('admin_ban') }}" class="punish-row">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <span class="punish-label">封禁</span>
+                  <input type="number" name="days" min="0" max="99" value="0" class="punish-num"><span class="punish-unit">天</span>
+                  <input type="number" name="hours" min="0" max="23" value="0" class="punish-num"><span class="punish-unit">时</span>
+                  <input type="number" name="minutes" min="0" max="59" value="0" class="punish-num"><span class="punish-unit">分</span>
+                  {% if is_active_restriction(u.banned_until) %}
+                  <input type="hidden" name="mode" value="lift">
+                  <button type="submit" class="btn xs">解除封禁</button>
+                  {% else %}
+                  <input type="hidden" name="mode" value="custom">
+                  <input type="text" name="reason" placeholder="原因" style="width:74px;">
+                  <button type="submit" class="btn xs danger">封禁</button>
+                  {% endif %}
+                </form>
+
+                <form method="post" action="{{ url_for('admin_mute') }}" class="punish-row">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <span class="punish-label">禁言</span>
+                  <input type="number" name="days" min="0" max="99" value="0" class="punish-num"><span class="punish-unit">天</span>
+                  <input type="number" name="hours" min="0" max="23" value="0" class="punish-num"><span class="punish-unit">时</span>
+                  <input type="number" name="minutes" min="0" max="59" value="0" class="punish-num"><span class="punish-unit">分</span>
+                  {% if is_active_restriction(u.muted_until) %}
+                  <input type="hidden" name="mode" value="lift">
+                  <button type="submit" class="btn xs">解除禁言</button>
+                  {% else %}
+                  <input type="hidden" name="mode" value="custom">
+                  <input type="text" name="reason" placeholder="原因" style="width:74px;">
+                  <button type="submit" class="btn xs">禁言</button>
+                  {% endif %}
+                </form>
+              </div>
+              {% else %}
+              <span class="muted">（你自己）</span>
+              {% endif %}
+            {% else %}
+            <span class="muted">仅超管可操作</span>
+            {% endif %}
+          </td>
+        </tr>
+
+        {# 超管给自己也能授荣誉牌子（2026-10-10 起）；特效仍然只给别人的，
+           因为特效路由 admin_give_effect 那边有「不能给自己」的限制。 #}
+        {% if current_user.is_super_admin %}
+        <tr style="background:var(--soft);">
+          <td colspan="8" style="padding:10px 16px;">
+            <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center;">
+              {% if u.id != current_user.id %}
+              <form method="post" action="{{ url_for('admin_give_effect', user_id=u.id) }}" class="adm-form-row" style="gap:6px;">
+                <span class="muted" style="font-size:12px;">特效</span>
+                <select name="effect_type" style="width:auto;">
+                  <option value="rainbow">彩虹</option>
+                  <option value="fire">烈焰</option>
+                  <option value="ocean">海洋</option>
+                  <option value="forest">森林</option>
+                  <option value="purple">紫晶</option>
+                  <option value="sunset">日落</option>
+                  <option value="neon">霓虹</option>
+                  <option value="galaxy">银河</option>
+                  <option value="popular">热门</option>
+                </select>
+                <button type="submit" name="action" value="give" class="btn xs ghost">授予</button>
+                <button type="submit" name="action" value="remove" class="btn xs ghost">移除</button>
+              </form>
+              {% endif %}
+
+              <form method="post" action="{{ url_for('admin_give_badge', user_id=u.id) }}" class="adm-form-row" style="gap:6px;">
+                <span class="muted" style="font-size:12px;">牌子</span>
+                <input type="text" name="badge_text" placeholder="自定义文字" maxlength="10" style="width:106px;">
+                <select name="badge_effect" style="width:auto;">
+                  <option value="gold">金色</option>
+                  <option value="silver">银色</option>
+                  <option value="purple">紫晶</option>
+                  <option value="fire">烈焰</option>
+                  <option value="ocean">海洋</option>
+                  <option value="forest">森林</option>
+                  <option value="dark">暗夜</option>
+                  <option value="neon">霓虹</option>
+                </select>
+                <button type="submit" name="action" value="give" class="btn xs ghost">授予</button>
+                <button type="submit" name="action" value="remove" class="btn xs ghost">移除</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if upages > 1 %}
+  <div class="adm-pager" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;">
+    {% if upage > 1 %}
+      <a class="btn sm ghost" href="{{ url_for('admin', uq=uq, upage=upage-1) }}">上一页</a>
+    {% endif %}
+    <span style="font-size:12.5px;color:var(--muted);">第 {{ upage }} / {{ upages }} 页</span>
+    {% if upage < upages %}
+      <a class="btn sm ghost" href="{{ url_for('admin', uq=uq, upage=upage+1) }}">下一页</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>📝 帖子管理</h3>
+    <span class="adm-hint">删除后进入回收站，可恢复</span>
+    <div class="adm-right">
+      <a href="{{ url_for('admin_recycle') }}" class="btn sm ghost">回收站 →</a>
+    </div>
+  </div>
+  <div class="adm-batch" id="admBatch" style="display:none;">
+    <span class="adm-batch-n">已选 <b id="admBatchN">0</b> 项</span>
+    <button type="button" class="btn sm ghost" data-act="pin">批量置顶</button>
+    <button type="button" class="btn sm ghost" data-act="unpin">取消置顶</button>
+    <button type="button" class="btn sm ghost" data-act="delete"
+            style="color:#b42318;border-color:#f2cfcb;">批量删除</button>
+    <button type="button" class="btn sm ghost" id="admBatchClear">取消选择</button>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:36px;"><input type="checkbox" id="admChkAll" title="全选"></th>
+          <th style="width:56px;">ID</th>
+          <th>标题</th>
+          <th style="width:130px;">作者</th>
+          <th style="width:80px;">点赞</th>
+          <th style="width:160px;">发布时间</th>
+          <th style="width:170px;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in posts %}
+        <tr>
+          <td><input type="checkbox" class="admChk" value="{{ p.id }}"></td>
+          <td class="adm-id">{{ p.id }}</td>
+          <td class="adm-clip">
+            <a href="{{ url_for('view_post', post_id=p.id) }}" style="font-weight:500;">{{ p.title }}</a>
+            {% if p.is_pinned %}<span class="tag on" style="margin-left:5px;">置顶</span>{% endif %}
+          </td>
+          <td>{{ p.username }}</td>
+          <td class="adm-id">{{ p.likes }}</td>
+          <td class="adm-nowrap adm-id">{{ p.created_at|fmttime }}</td>
+          <td class="adm-nowrap">
+            <form method="post" action="{{ url_for('admin_delete_post', post_id=p.id) }}" style="display:inline;"
+                  onsubmit="return confirm(__('确定删除此帖子？删除后可在回收站恢复。'));">
+              <button type="submit" class="btn xs ghost" style="color:#b42318;border-color:#f2cfcb;">删除</button>
+            </form>
+            <form method="post" action="{{ url_for('pin_post', post_id=p.id) }}" style="display:inline;">
+              <button type="submit" class="btn xs ghost">{{ '取消置顶' if p.is_pinned else '置顶' }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">
+            <div class="adm-empty">
+              <div class="adm-empty-ico">📝</div>
+              <div class="adm-empty-text">暂无帖子</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.getElementById('pointsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('pointsUser').value.trim();
+  const delta = parseInt(document.getElementById('pointsDelta').value, 10);
+  const reason = document.getElementById('pointsReason').value.trim();
+  if (!name || isNaN(delta)) return alert(__('请填写用户名和积分'));
+  if (delta < 0 && !reason) return alert(__('扣分必须填写原因'));
+  const r = await fetch('/api/admin/give-points', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'user_id=' + encodeURIComponent(name) + '&delta=' + delta + '&reason=' + encodeURIComponent(reason)
+  });
+  const j = await r.json();
+  alert(j.msg);
+});
+
+async function saveAnnouncement(){
+  const content = document.getElementById('annContent').value;
+  const msg = document.getElementById('annMsg');
+  msg.textContent = '保存中…';
+  const r = await fetch('/api/announcement', {
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'content=' + encodeURIComponent(content)
+  });
+  const j = await r.json();
+  msg.textContent = j.msg || (j.ok ? '已发布' : '保存失败');
+  if (j.ok) setTimeout(()=>location.reload(), 600);
+}
+
+async function clearAnnouncement(){
+  if (!confirm(__('确定清空公告？'))) return;
+  document.getElementById('annContent').value = '';
+  await saveAnnouncement();
+}
+
+async function resetGameScore(){
+  const name = (document.getElementById('toolUser').value || '').trim();
+  if (!name){ alert(__('请填写用户名')); return; }
+  if (!confirm(`确认重置 ${name} 的全部游戏成绩？此操作不可恢复。`)) return;
+  const r = await fetch('/api/admin/game/reset', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({user_id: name})
+  });
+  const j = await r.json();
+  alert(j.msg || (j.ok ? __('已重置') : __('操作失败')));
+}
+
+async function forceUnfriend(){
+  const name = (document.getElementById('toolUser').value || '').trim();
+  if (!name){ alert(__('请填写用户名')); return; }
+  if (!confirm(`确认强制解除 ${name} 的所有好友关系？`)) return;
+  const r = await fetch('/api/admin/force-unfriend', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({user_id: name})
+  });
+  const j = await r.json();
+  alert(j.msg || (j.ok ? __('已解除') : __('操作失败')));
+}
+
+function openGameSet(){
+  const name = (document.getElementById('toolUser').value || '').trim();
+  if (name) document.getElementById('gsUser').value = name;
+  document.getElementById('gameSetModal').classList.add('show');
+  document.getElementById('gsMsg').textContent = '';
+  document.getElementById('gsValue').value = '';
+}
+
+function closeGameSet(){
+  document.getElementById('gameSetModal').classList.remove('show');
+}
+
+async function doGameSet(){
+  const user = (document.getElementById('gsUser').value || '').trim();
+  const field = document.getElementById('gsField').value;
+  const value = parseInt(document.getElementById('gsValue').value, 10);
+  if (!user) return alert(__('请填写用户名'));
+  if (isNaN(value) || value < 0) return alert(__('请填写合法分数'));
+  if (!confirm(`确认将 ${user} 的 [${document.getElementById('gsField').selectedOptions[0].text}] 改为 ${value}？`)) return;
+  const msg = document.getElementById('gsMsg');
+  msg.textContent = '修改中…';
+  const r = await fetch('/api/admin/game/set', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({user_id: user, field: field, value: value})
+  });
+  const j = await r.json();
+  msg.textContent = j.msg || (j.ok ? '已修改' : '修改失败');
+  if (j.ok) setTimeout(() => { closeGameSet(); location.reload(); }, 800);
+}
+
+const picked = new Set();
+
+function pickedNames() {
+  return [...document.querySelectorAll('.ck-user:checked')].map(el => el.dataset.uname);
+}
+
+function syncBatchBar() {
+  const cks = [...document.querySelectorAll('.ck-user')];
+  cks.forEach(el => {
+    const tr = el.closest('tr');
+    if (tr) tr.classList.toggle('row-picked', el.checked);
+  });
+  const n = cks.filter(el => el.checked).length;
+  const bar = document.getElementById('batchBar');
+  const cnt = document.getElementById('batchCount');
+  if (cnt) cnt.textContent = n;
+  if (bar) bar.classList.toggle('on', n > 0);
+
+  const all = document.getElementById('ckAll');
+  if (all) {
+    all.checked = n > 0 && n === cks.length;
+    all.indeterminate = n > 0 && n < cks.length;
+  }
+}
+
+const ckAll = document.getElementById('ckAll');
+if (ckAll) {
+  ckAll.addEventListener('change', function () {
+    document.querySelectorAll('.ck-user').forEach(el => { el.checked = this.checked; });
+    syncBatchBar();
+  });
+}
+
+document.querySelectorAll('.ck-user').forEach(el => {
+  el.addEventListener('change', syncBatchBar);
+});
+
+function clearPicked() {
+  document.querySelectorAll('.ck-user').forEach(el => { el.checked = false; });
+  syncBatchBar();
+}
+
+const batchAction = document.getElementById('batchAction');
+function syncBatchParams() {
+  const a = batchAction ? batchAction.value : '';
+  const show = (id, on) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = on ? 'inline-flex' : 'none';
+  };
+  show('bpPunish', a === 'ban' || a === 'mute');
+  show('bpQuota', a === 'ai_quota');
+  show('bpEffect', a === 'effect_give');
+  show('bpBadge', a === 'badge_give');
+}
+if (batchAction) batchAction.addEventListener('change', syncBatchParams);
+
+const DANGER = {
+  deactivate: '注销账号',
+  reset_password: '重置密码',
+  reset_game: '重置游戏成绩',
+  ban: '封禁',
+  mute: '禁言',
+};
+
+async function runBatch() {
+  const action = batchAction ? batchAction.value : '';
+  if (!action) return alert(__('请先选择要执行的操作'));
+  const ids = [...document.querySelectorAll('.ck-user:checked')].map(el => el.value);
+  if (!ids.length) return alert(__('请先勾选用户'));
+
+  const label = batchAction.selectedOptions[0].text;
+  let extra = '';
+  if (DANGER[action]) {
+    extra = '\n\n⚠️ 这是「' + DANGER[action] + '」操作';
+    if (action === 'deactivate') extra += '，会封禁账号并释放原用户名，不可直接撤销。';
+  }
+  if (!confirm(__('确认对 {n} 个用户执行「{label}」？', {n: ids.length, label: label}) + extra)) return;
+
+  const body = { action: action, user_ids: ids };
+  if (action === 'ai_quota') body.ai_quota = parseInt(document.getElementById('bpQuotaVal').value, 10);
+  if (action === 'ban' || action === 'mute') {
+    body.days = parseInt(document.getElementById('bpDays').value, 10) || 0;
+    body.hours = parseInt(document.getElementById('bpHours').value, 10) || 0;
+    body.minutes = parseInt(document.getElementById('bpMinutes').value, 10) || 0;
+    body.reason = document.getElementById('bpReason').value.trim();
+  }
+  if (action === 'effect_give') body.effect_type = document.getElementById('bpEffectVal').value;
+  if (action === 'badge_give') {
+    body.badge_text = document.getElementById('bpBadgeText').value.trim();
+    body.badge_effect = document.getElementById('bpBadgeEffect').value;
+  }
+
+  try {
+    const r = await fetch('/api/admin/users/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (!j.ok) { alert(j.msg || __('操作失败')); return; }
+
+    if (j.credentials && j.credentials.length) {
+      const rows = j.credentials.map(c =>
+        '<div class="row"><span>' + c.username + '</span><span class="pw">' + c.password + '</span></div>'
+      ).join('');
+      const old = document.getElementById('credPanel');
+      if (old) old.remove();
+      const box = document.createElement('div');
+      box.id = 'credPanel';
+      box.className = 'adm-card';
+      box.innerHTML = '<div class="adm-sec-title">🔑 新密码（请立即保存，关闭后不再显示）</div>' +
+        '<div class="cred-box">' + rows + '</div>' +
+        '<div class="adm-form-row" style="margin-top:10px;">' +
+        '<button class="btn sm ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText(this.dataset.t)" ' +
+        'data-t="' + j.credentials.map(c => c.username + ' ' + c.password).join('\\n') + '">📋 全部复制</button>' +
+        '<button class="btn sm ghost" onclick="document.getElementById(\'credPanel\').remove()">关闭</button></div>';
+      const bar = document.getElementById('batchBar');
+      bar.parentNode.insertBefore(box, bar);
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      alert(j.msg + __('\n\n新密码已显示在页面上方，请立即保存。'));
+      clearPicked();
+      return;
+    }
+
+    alert(j.msg || __('已执行'));
+    location.reload();
+  } catch (e) {
+    alert(__('请求失败：') + e.message);
+  }
+}
+
+syncBatchBar();
+syncBatchParams();
+</script>
+
+<style>
+  .adm-batch{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:10px 14px;margin-bottom:10px;border-radius:10px;
+    background:#fff9e8;border:1px solid #f0e0b0;font-size:13px}
+  .adm-batch .adm-batch-n{font-weight:700;margin-right:4px}
+  .adm-chk-cell{text-align:center}
+  .adm-table input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#c9a227}
+</style>
+<script>
+(function(){
+  var all = document.getElementById('admChkAll');
+  var bar = document.getElementById('admBatch');
+  var num = document.getElementById('admBatchN');
+  if (!all || !bar) return;
+  var boxes = function(){ return Array.prototype.slice.call(document.querySelectorAll('.admChk')); };
+
+  function refresh(){
+    var sel = boxes().filter(function(b){ return b.checked; });
+    num.textContent = sel.length;
+    bar.style.display = sel.length ? '' : 'none';
+    all.checked = sel.length > 0 && sel.length === boxes().length;
+    all.indeterminate = sel.length > 0 && sel.length < boxes().length;
+  }
+
+  all.addEventListener('change', function(){
+    boxes().forEach(function(b){ b.checked = all.checked; });
+    refresh();
+  });
+  document.addEventListener('change', function(e){
+    if (e.target && e.target.classList && e.target.classList.contains('admChk')) refresh();
+  });
+  document.getElementById('admBatchClear').addEventListener('click', function(){
+    boxes().forEach(function(b){ b.checked = false; });
+    refresh();
+  });
+
+  bar.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button[data-act]') : null;
+    if (!b) return;
+    var act = b.getAttribute('data-act');
+    var ids = boxes().filter(function(x){ return x.checked; }).map(function(x){ return x.value; });
+    if (!ids.length){ alert(__('没有选中任何帖子')); return; }
+    var tip = act === 'delete'
+      ? ('确定批量删除 ' + ids.length + ' 个帖子？删除后可在回收站恢复。')
+      : ('确定批量' + (act === 'pin' ? '置顶' : '取消置顶') + ' ' + ids.length + ' 个帖子？');
+    if (!confirm(tip)) return;
+    var f = document.createElement('form');
+    f.method = 'post';
+    f.action = '/admin/batch-posts';
+    var a = document.createElement('input');
+    a.type = 'hidden'; a.name = 'act'; a.value = act;
+    f.appendChild(a);
+    ids.forEach(function(v){
+      var i = document.createElement('input');
+      i.type = 'hidden'; i.name = 'ids'; i.value = v;
+      f.appendChild(i);
+    });
+    document.body.appendChild(f);
+    f.submit();
+  });
+
+  refresh();
+})();
+</script>
+{% endblock %}

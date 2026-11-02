@@ -1,0 +1,195 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}军资抽赏{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-head">
+  <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="{{ url_for('xqmaster_codex_page') }}">← 返回</a>
+  <h1>军资抽赏</h1>
+  <span class="xqm-hsub">以弈铢易碎片</span>
+</div>
+<div class="xqm-ltp">
+  <div class="xqm-ltp-stage" id="xqmLtStage">
+    <div class="xqm-ltp-rays"></div>
+    <div class="xqm-ltp-ring"></div>
+    <div class="xqm-ltp-ring r2"></div>
+    <div class="xqm-ltp-seal" id="xqmLtSeal">弈</div>
+    <div id="xqmLtOut"></div>
+    <div class="xqm-ltp-flash"></div>
+  </div>
+
+  <div class="xqm-ltp-bar">
+    <div class="xqm-ltp-bal">弈铢 <b id="xqmLtBal">—</b></div>
+    <button class="xqm-btn xqm-btn-p" id="xqmLtBtn" style="margin-left:auto">抽一次 · 10 弈铢</button>
+    <button class="xqm-btn xqm-btn-g" id="xqmLtBtn10">十连 · 100 弈铢</button>
+  </div>
+  <div class="xqm-ltp-odds" id="xqmLtOdds"></div>
+  <div class="xqm-ltp-hist" id="xqmLtHist"></div>
+</div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var BAL = 0, COST = 10, busy = false;
+  var stage = document.getElementById('xqmLtStage');
+  var out = document.getElementById('xqmLtOut');
+  var btn = document.getElementById('xqmLtBtn');
+  var btn10 = document.getElementById('xqmLtBtn10');
+  var hist = [];
+
+  function paint(){
+    document.getElementById('xqmLtBal').textContent = BAL;
+    btn.disabled = busy || BAL < COST;
+    btn.textContent = BAL < COST ? '弈铢不足' : ('抽一次 · ' + COST + ' 弈铢');
+    if(btn10){
+      var need10 = COST * 10;
+      btn10.disabled = busy || BAL < need10;
+      btn10.textContent = BAL < need10 ? '弈铢不足' : ('抽十次 · ' + need10 + ' 弈铢');
+    }
+  }
+
+  function paintHist(){
+    var box = document.getElementById('xqmLtHist');
+    if(!hist.length){ box.innerHTML = ''; return; }
+    box.innerHTML = hist.slice(0, 14).map(function(h){
+      var gd = X.GRADE[h.grade];
+      return '<span class="h"><span class="d" style="background:' + gd.c + '"></span>'
+        + h.name + ' ×' + h.count + '</span>';
+    }).join('');
+  }
+
+  function sparks(grade, n){
+    var gd = X.GRADE[grade];
+    var host = stage;
+    for(var i=0;i<n;i++){
+      (function(){
+        var d = document.createElement('div');
+        var sz = 4 + Math.random()*7;
+        var ang = Math.random()*Math.PI*2, dist = 90 + Math.random()*170;
+        d.className = 'xqm-ltp-dot';
+        d.style.cssText = 'left:50%;top:52%;width:'+sz.toFixed(1)+'px;height:'+sz.toFixed(1)+'px;'
+          + 'background:radial-gradient(circle,' + gd.c + ',rgba(255,246,216,0) 72%);'
+          + 'box-shadow:0 0 10px ' + gd.c + ';'
+          + 'transition:transform .9s cubic-bezier(.15,.85,.3,1),opacity .9s ease-out;';
+        host.appendChild(d);
+        requestAnimationFrame(function(){
+          d.style.transform = 'translate(' + (Math.cos(ang)*dist).toFixed(1) + 'px,'
+            + (Math.sin(ang)*dist).toFixed(1) + 'px) scale(.3)';
+          d.style.opacity = '0';
+        });
+        setTimeout(function(){ d.remove(); }, 1000);
+      })();
+    }
+  }
+
+  var RARITY = { common:0, rare:1, epic:2, legend:3, mythic:4 };
+
+  function reveal(r){
+    var gd = X.GRADE[r.grade], d = X.PD[r.type];
+    var tier = RARITY[r.grade] == null ? 0 : RARITY[r.grade];
+    out.innerHTML = '<div class="xqm-ltp-card" id="xqmLtCard" style="border-color:' + gd.c + '">'
+      + '<div class="xqm-ltp-grade" style="color:' + gd.c + '">' + gd.zh + '</div>'
+      + X.pcHTML({t:r.type, s:'red', hp:d.hp, mh:d.hp, id:'lt-'+r.type}, {})
+      + '<div class="xqm-ltp-name">' + d.name + '</div>'
+      + '<div class="xqm-ltp-gain">碎片 +' + r.count + '</div></div>';
+    requestAnimationFrame(function(){
+      var c = document.getElementById('xqmLtCard');
+      if(c) c.classList.add('in');
+    });
+    sparks(r.grade, 10 + tier * 10);
+    if(tier >= 4) setTimeout(function(){ sparks(r.grade, 46); X.sfx.win(); }, 220);
+    else if(tier === 3) setTimeout(function(){ sparks(r.grade, 22); X.sfx.found(); }, 200);
+    else if(tier === 2) setTimeout(function(){ X.sfx.found(); }, 200);
+    else setTimeout(function(){ X.sfx.hit(); }, 180);
+  }
+
+  /* 十连：把抽到的**全部**结果按原始顺序依次摆出来 —— 不合并、不排序。
+     以前只显示 r.best 一张大卡，其余 9 个只在 toast 里提一句，等于没展示。 */
+  function revealList(list){
+    out.innerHTML = '<div class="xqm-ltp-list">' + list.map(function(r, i){
+      var gd = X.GRADE[r.grade] || {}, d = X.PD[r.type] || {};
+      return '<div class="xqm-ltp-item" style="border-color:' + (gd.c || '#bbb')
+        + ';animation-delay:' + (i * 55) + 'ms">'
+        + '<span class="gi" style="color:' + (gd.c || '#888') + '">' + (gd.zh || '') + '</span>'
+        + X.pcHTML({t:r.type, s:'red', hp:d.hp, mh:d.hp, id:'ltl-' + i + '-' + r.type}, {})
+        + '<span class="nm">' + (d.name || '') + '</span>'
+        + '<span class="ct">碎片 +' + r.count + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function draw(times){
+    times = times === 10 ? 10 : 1;
+    var need = COST * times;
+    if(busy) return;
+    if(BAL < need){ X.toast(__('弈铢不足')); X.sfx.error(); return; }
+    busy = true; paint();
+    out.innerHTML = '';
+    stage.className = 'xqm-ltp-stage charge';
+    X.sfx.click();
+    setTimeout(function(){ X.sfx.swing(); }, 240);
+    var t0 = Date.now();
+    X.api('/api/xqm/lottery', {method:'POST', body:{times:times}}).then(function(r){
+      if(!r || !r.ok){
+        X.toast((r && r.msg) || __('抽奖失败'));
+        X.sfx.error();
+        stage.className = 'xqm-ltp-stage';
+        busy = false; paint(); return;
+      }
+      BAL = r.balance;
+      paint();
+      var wait = Math.max(0, (times === 10 ? 1150 : 880) - (Date.now() - t0));
+      setTimeout(function(){
+        stage.className = 'xqm-ltp-stage burst';
+        X.sfx.hit();
+        setTimeout(function(){
+          stage.className = 'xqm-ltp-stage';
+          if(times === 10){
+            var list = r.results || [];
+            revealList(list);
+            var _best = r.best || list[0] || {};
+            var _bt = RARITY[_best.grade] == null ? 0 : RARITY[_best.grade];
+            sparks(_best.grade || 'common', 10 + _bt * 8);
+            if(_bt >= 4) setTimeout(function(){ sparks(_best.grade, 40); X.sfx.win(); }, 260);
+            else if(_bt >= 2) setTimeout(function(){ X.sfx.found(); }, 220);
+            else setTimeout(function(){ X.sfx.hit(); }, 200);
+            list.forEach(function(x){
+              hist.unshift({grade:x.grade, name:x.name || X.PD[x.type].name, count:x.count});
+            });
+            if(hist.length > 14) hist.length = 14;
+            paintHist();
+            var top = X.GRADE[(r.best || {}).grade];
+            X.toast(__('十连完成 · ') + list.length + __(' 发') + (top ? __('，最佳 ') + top.zh : ''));
+          } else {
+            reveal(r);
+            hist.unshift({grade:r.grade, name:r.name || X.PD[r.type].name, count:r.count});
+            if(hist.length > 14) hist.length = 14;
+            paintHist();
+          }
+          busy = false; paint();
+        }, 400);
+      }, wait);
+    }).catch(function(){
+      X.toast(__('网络异常')); X.sfx.error();
+      stage.className = 'xqm-ltp-stage';
+      busy = false; paint();
+    });
+  }
+
+  btn.addEventListener('click', function(){ draw(1); });
+  if(btn10) btn10.addEventListener('click', function(){ draw(10); });
+
+  X.api('/api/xqm/me').then(function(r){ if(r && r.ok){ BAL = r.yizhu || 0; paint(); } });
+  X.api('/api/xqm/grow').then(function(r){
+    if(!r || !r.ok) return;
+    var el = document.getElementById('xqmLtOdds');
+    if(!el || !r.lottery) return;
+    var g = r.lottery.grades.map(function(x){ return X.GRADE[x.grade].zh + ' ' + x.weight + '%'; }).join(' · ');
+    var a = r.lottery.amounts.map(function(x){ return x.count + ' 枚 ' + x.weight + '%'; }).join(' · ');
+    el.innerHTML = '掉落品质：' + g + '<br>碎片数量：' + a;
+  }).catch(function(){});
+
+  paint();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "_admin_base.html" %}
+{% block admin_icon %}📝{% endblock %}
+{% block admin_heading %}更新日志{% endblock %}
+{% block admin_desc %}加、改、删「更新日志」的条目。列表最上面那条会自动带「最新」标记，所以新加的内容排在最前。{% endblock %}
+
+{% block admin_content %}
+<style>
+  .cl-add{
+    display:flex;gap:9px;flex-wrap:wrap;align-items:flex-start;
+  }
+  .cl-add .cl-date{
+    flex:0 0 132px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+    background:var(--bg-sunken);color:var(--fg);font-size:13px;box-sizing:border-box;
+  }
+  .cl-add .cl-text{
+    flex:1 1 320px;min-width:0;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+    background:var(--bg-sunken);color:var(--fg);font-size:13px;line-height:1.7;
+    box-sizing:border-box;min-height:42px;
+  }
+  .cl-add .cl-date:focus,.cl-add .cl-text:focus{outline:none;border-color:#9a9aa2;background:var(--card);}
+
+  .cl-list td{padding:8px 10px;}
+  .cl-list .cl-date-in,.cl-list .cl-text-in{
+    width:100%;box-sizing:border-box;padding:7px 9px;
+    border:1px solid transparent;border-radius:8px;
+    background:transparent;color:var(--fg);font-size:13px;font-family:inherit;line-height:1.65;
+  }
+  .cl-list .cl-date-in{max-width:124px;font-variant-numeric:tabular-nums;}
+  .cl-list .cl-date-in:hover,.cl-list .cl-text-in:hover{border-color:var(--line);background:var(--bg-sunken);}
+  .cl-list .cl-date-in:focus,.cl-list .cl-text-in:focus{
+    outline:none;border-color:#9a9aa2;background:var(--card);
+  }
+  .cl-list tr:hover .cl-date-in,.cl-list tr:hover .cl-text-in{border-color:var(--line);}
+  .cl-list .cl-acts{white-space:nowrap;text-align:right;}
+  .cl-num{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;}
+</style>
+
+<div class="adm-card">
+  <div class="adm-card-head">
+    <h3>加一条</h3>
+    <span class="adm-hint">日期写成 <code>2026-09-29</code> 这种格式，不确定就写 <code>2026-09-XX</code></span>
+  </div>
+  <div class="adm-card-body">
+    <form method="post" class="cl-add">
+      <input class="cl-date" type="text" name="date" value="{{ today }}" maxlength="20"
+             placeholder="2026-09-29" required>
+      <input class="cl-text" type="text" name="text" maxlength="500" required
+             placeholder="这次改了什么？一句话说清楚就行">
+      <button type="submit" class="btn">添加</button>
+    </form>
+  </div>
+</div>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>全部条目</h3>
+    <span class="adm-hint">共 {{ entries|length }} 条 · 排在最上面的会显示「最新」</span>
+    <div class="adm-right">
+      <a class="btn ghost xs" href="{{ url_for('changelog_page') }}" target="_blank" rel="noopener">预览页面</a>
+    </div>
+  </div>
+  {% if entries %}
+  <div class="adm-table-wrap">
+    <table class="adm-table cl-list">
+      <thead>
+        <tr>
+          <th style="width:44px;">#</th>
+          <th style="width:140px;">日期</th>
+          <th>内容</th>
+          <th style="width:120px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td class="cl-num">{{ loop.index }}{% if loop.first %}<br><span class="adm-pill dark" style="margin-top:4px;">最新</span>{% endif %}</td>
+          <td colspan="2" style="padding:0;">
+            <form method="post" action="{{ url_for('admin_changelog_edit', cid=e.id) }}"
+                  style="display:flex;gap:6px;align-items:center;padding:8px 10px;">
+              <input class="cl-date-in" type="text" name="date" value="{{ e.date }}" maxlength="20" required>
+              <input class="cl-text-in" type="text" name="text" value="{{ e.text }}" maxlength="500" required>
+              <button type="submit" class="btn ghost xs">保存</button>
+            </form>
+          </td>
+          <td class="cl-acts">
+            <form method="post" action="{{ url_for('admin_changelog_delete', cid=e.id) }}"
+                  onsubmit="return confirm(__('删掉这条「{d}」？删了就没了。', {d: {{ e.date|tojson }}}));">
+              <button type="submit" class="btn ghost xs" style="color:#b42318;">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="adm-empty">
+    <div class="adm-empty-ico">📝</div>
+    <div class="adm-empty-text">还没有条目，用上面的表单加一条吧。</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

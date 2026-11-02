@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}邀请入群{% endblock %}
+{% set active = 'friends' %}
+{% block content %}
+<div class="card narrow" style="margin:24px auto;">
+  <h2>邀请 @{{ target.username }} 加入群组</h2>
+  <p class="sub">仅可邀请到你自己管理的群组</p>
+  {% if not my_groups %}
+  <div class="empty">你还没有可管理的群组</div>
+  {% else %}
+  <form method="post">
+    <label>选择群组</label>
+    <select name="gid" style="margin-bottom:16px;">
+      {% for g in my_groups %}
+      <option value="{{ g.id }}">{{ g.name }}（{{ g.member_count }} 人）</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn block">发送邀请</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+{% block title %}{{ contest.title }} - MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .ct-wrap{max-width:960px;margin:0 auto;padding:20px 16px 60px;}
+  .ct-crumb{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-size:12.5px;color:var(--fg-3);margin-bottom:14px;
+  }
+  .ct-crumb a{color:var(--fg-3);text-decoration:none;padding:3px 9px;border-radius:6px;border:1px solid var(--line);}
+  .ct-crumb a:hover{background:var(--soft);color:var(--fg);}
+
+  .ct-head{
+    border:1px solid var(--line);border-radius:14px;background:var(--card);
+    padding:22px 24px 18px;margin-bottom:16px;
+  }
+  .ct-title{font-size:22px;font-weight:800;margin:0 0 12px;line-height:1.4;}
+  .ct-badges{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .ct-state{font-size:12px;font-weight:700;padding:4px 12px;border-radius:7px;}
+  .ct-state.wait{background:#fff8e1;color:#8a5a00;}
+  .ct-state.running{background:#e8f5e9;color:#1b5e20;}
+  .ct-state.ended{background:var(--soft);color:var(--fg-3);}
+  .ct-time{font-size:12.5px;color:var(--fg-3);}
+  .ct-rule{font-size:12px;font-weight:700;padding:4px 12px;border-radius:7px;background:var(--soft);color:var(--fg-2);}
+
+  .ct-tabs{
+    display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;
+    overflow-x:auto;
+  }
+  .ct-tab{
+    flex:0 0 auto;padding:10px 18px;margin-bottom:-1px;cursor:pointer;
+    background:none;border:0;border-bottom:2px solid transparent;
+    font-family:inherit;font-size:13.5px;font-weight:700;color:var(--fg-3);
+    white-space:nowrap;
+  }
+  .ct-tab:hover{color:var(--fg-2);}
+  .ct-tab.on{color:var(--fg);border-bottom-color:var(--accent);}
+  .ct-panel{display:none;}
+  .ct-panel.on{display:block;}
+
+  .ct-desc{
+    border:1px solid var(--line);border-radius:14px;background:var(--card);
+    padding:20px 22px;font-size:13.5px;line-height:1.9;color:var(--fg-2);
+    margin:0;
+  }
+  .ct-desc:empty{display:none;}
+  .ct-note{
+    border:1px solid var(--line);border-radius:12px;background:var(--bg-sunken);
+    padding:13px 16px;margin:0 0 14px;font-size:12.5px;line-height:1.85;color:var(--fg-3);
+  }
+  .ct-warn{
+    border-radius:12px;background:#fff8e1;color:#8a5a00;
+    padding:12px 16px;margin:0 0 14px;font-size:12.5px;font-weight:700;line-height:1.8;
+  }
+
+  .ct-list{display:flex;flex-direction:column;gap:10px;}
+  .ct-item{
+    display:flex;align-items:center;gap:14px;
+    padding:16px 18px;border:1px solid var(--line);border-radius:12px;
+    background:var(--card);text-decoration:none;
+    transition:border-color .15s;
+  }
+  .ct-item:hover{border-color:var(--fg-3);}
+  .ct-idx{
+    flex-shrink:0;width:34px;height:34px;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--soft);color:var(--fg-2);
+    font-size:14px;font-weight:800;
+  }
+  .ct-main{flex:1;min-width:0;}
+  .ct-name{
+    display:block;font-size:15px;font-weight:700;color:var(--fg);
+    margin-bottom:6px;line-height:1.5;
+  }
+  .ct-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .ct-tag{
+    font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;
+    background:var(--soft);color:var(--fg-3);
+  }
+  .ct-tag.diff{background:#e8f5e9;color:#1b5e20;}
+  .ct-tag.done{background:#c8e6c9;color:#1b5e20;}
+  .ct-tag.tried{background:#fff3e0;color:#e65100;}
+  .ct-arrow{color:var(--fg-3);font-size:16px;flex-shrink:0;}
+
+  .rk-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+  .rk-tab{
+    font-size:13.5px;font-weight:800;color:var(--fg);
+    padding:6px 14px;border-radius:8px;background:var(--soft);
+  }
+  .rk-search{margin-left:auto;}
+  .rk-search input{
+    width:212px;box-sizing:border-box;
+    padding:7px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg-sunken);color:var(--fg);
+    font-size:13px;font-family:inherit;outline:none;
+  }
+  .rk-search input:focus{border-color:var(--fg-3);}
+
+  .rk-scroll{
+    border:1px solid var(--line);border-radius:14px;background:var(--card);
+    overflow-x:auto;
+  }
+  .rk-tb{border-collapse:collapse;width:100%;min-width:580px;}
+  .rk-tb th,.rk-tb td{padding:11px 12px;text-align:center;border-bottom:1px solid var(--soft);}
+  .rk-tb thead th{
+    background:var(--bg-sunken);font-size:11.5px;font-weight:700;color:var(--fg-3);
+    white-space:nowrap;border-bottom:1px solid var(--line);
+  }
+  .rk-tb thead .pl{display:block;font-size:14px;font-weight:800;color:var(--fg-2);}
+  .rk-tb thead .ps{display:block;font-size:10.5px;font-weight:600;color:var(--fg-3);margin-top:2px;}
+  .rk-tb tbody tr:last-child td{border-bottom:0;}
+  .rk-tb tbody tr:hover{background:var(--bg-sunken);}
+  .rk-tb tbody tr.me{background:var(--soft);}
+  .rk-tb .c-rank{
+    width:66px;font-size:13px;font-weight:800;color:var(--fg-3);
+    font-variant-numeric:tabular-nums;
+  }
+  .rk-tb tbody .c-rank{color:var(--fg-2);}
+  .rk-tb .c-who{
+    text-align:left;min-width:124px;font-size:13.5px;font-weight:700;color:var(--fg);
+    white-space:nowrap;
+  }
+  .rk-tb .c-who .no{display:block;font-size:11px;font-weight:400;color:var(--fg-3);margin-top:1px;}
+  .rk-tb .c-total{width:98px;}
+  .rk-tb .c-total b{
+    display:block;font-size:15px;font-weight:800;color:var(--fg);
+    font-variant-numeric:tabular-nums;
+  }
+  .rk-tb .c-total i{display:block;font-style:normal;font-size:10.5px;color:var(--fg-3);margin-top:1px;}
+  .rk-tb .c-prob{width:86px;}
+  .rk-tb .c-prob b{
+    display:block;font-size:14px;font-weight:800;color:var(--fg-2);
+    font-variant-numeric:tabular-nums;
+  }
+  .rk-tb .c-prob i{
+    display:block;font-style:normal;font-size:10.5px;color:var(--fg-3);
+    margin-top:1px;white-space:nowrap;
+  }
+  .rk-tb .c-prob.full{background:#e8f5e9;}
+  .rk-tb .c-prob.full b{color:#1b5e20;}
+  .rk-tb .c-prob.full i{color:#4f8f57;}
+  .rk-tb .dash{color:var(--fg-3);}
+
+  .ct-empty{
+    text-align:center;padding:50px 24px;
+    border:1px dashed var(--line);border-radius:14px;background:var(--bg-sunken);
+    font-size:13.5px;color:var(--fg-3);
+  }
+
+  @media (max-width:640px){
+    .ct-wrap{padding:14px 12px 50px;}
+    .ct-head{padding:18px 16px 15px;}
+    .ct-title{font-size:19px;}
+    .ct-tab{padding:9px 13px;font-size:13px;}
+    .ct-desc{padding:16px 15px;}
+    .ct-item{padding:14px 14px;}
+    .ct-idx{width:30px;height:30px;font-size:13px;}
+    .rk-bar{gap:8px;}
+    .rk-search{margin-left:0;width:100%;}
+    .rk-search input{width:100%;}
+    .rk-tb{min-width:520px;}
+    .rk-tb th,.rk-tb td{padding:9px 8px;}
+    .rk-tb .c-who{min-width:96px;font-size:13px;}
+    .rk-tb .c-prob{width:72px;}
+  }
+</style>
+
+<div class="ct-wrap">
+  <div class="ct-crumb">
+    <a href="{{ url_for('oj_contest_list') }}">公开赛</a>
+    <span>/</span>
+    <span>{{ contest.title }}</span>
+  </div>
+
+  <div class="ct-head">
+    <h1 class="ct-title">{{ contest.title }}</h1>
+    {% if me and me.is_admin %}
+    <a href="{{ url_for('oj_contest_problems', cid=contest.id) }}"
+       style="margin-left:12px;padding:6px 14px;background:#f3f4f6;color:#374151;
+              border-radius:7px;font-size:12.5px;text-decoration:none;white-space:nowrap;"
+       onmouseover="this.style.background='#e5e7eb'"
+       onmouseout="this.style.background='#f3f4f6'">管理赛题 →</a>
+    {% endif %}
+    <div class="ct-badges">
+      <span class="ct-state {{ state_class }}">{{ state }}</span>
+      <span class="ct-time">
+        {% if contest.start_at %}{{ contest.start_at|dt_local|replace('T', ' ') }}{% else %}时间待定{% endif %}
+        {% if contest.end_at %} ~ {{ contest.end_at|dt_local|replace('T', ' ') }}{% endif %}
+      </span>
+      <span class="ct-rule">{{ rule_name }}</span>
+    </div>
+  </div>
+
+  <div class="ct-tabs">
+    <button class="ct-tab" type="button" data-tab="desc">比赛说明</button>
+    <button class="ct-tab" type="button" data-tab="problems">题目列表</button>
+    <button class="ct-tab" type="button" data-tab="rank">排行榜</button>
+  </div>
+
+  <div class="ct-panel" data-panel="desc">
+    {% if state == '未开始' %}
+    <div class="ct-warn">比赛还没开始，现在提交不会计入成绩。可以先看看题目列表。</div>
+    {% elif state == '已结束' %}
+    <div class="ct-warn">比赛已经结束，现在提交不会计入成绩，排行榜已经定格。</div>
+    {% endif %}
+    {% if contest.description %}
+    <div class="ct-desc md-content" id="ctDesc"></div>
+    <script>
+    (function(){
+      function go(){
+        if (typeof renderMarkdownInto === 'function'){
+          renderMarkdownInto(document.getElementById('ctDesc'), {{ contest.description|tojson }});
+        } else { setTimeout(go, 120); }
+      }
+      go();
+    })();
+    </script>
+    {% else %}
+    <div class="ct-empty">这场比赛还没有写说明</div>
+    {% endif %}
+  </div>
+
+  <div class="ct-panel" data-panel="problems">
+    {% if hide_problems %}
+    <div style="padding:52px 20px;text-align:center;color:#9aa0a6;
+                border:1px dashed #e0e3e7;border-radius:10px;background:#fcfcfd;margin:16px 0;">
+      <div style="font-size:32px;margin-bottom:10px;">🔒</div>
+      <p style="margin:0 0 5px;font-size:14px;color:#6b7280;">比赛还没开始</p>
+      <span style="font-size:12.5px;">
+        题目在开赛前不可见，开赛后刷新页面即可查看。
+        {% if me and me.is_admin %}<br>（你是管理员，切到「管理赛题」可以预览）{% endif %}
+      </span>
+    </div>
+    {% elif problems %}
+    <div class="ct-list">
+      {% for p in problems %}
+      <a class="ct-item" href="{{ url_for('oj_problem', pid=p.id) }}">
+        <div class="ct-idx">{{ loop.index }}</div>
+        <div class="ct-main">
+          <span class="ct-name">{{ p.title }}</span>
+          <div class="ct-meta">
+            {% set got = mine.get(p.id, 0) %}
+            {% set full = full_map.get(p.id) or 0 %}
+            {% if got > 0 and full > 0 and got >= full %}
+            <span class="ct-tag done">已通过</span>
+            {% elif got > 0 %}
+            <span class="ct-tag tried">已得 {{ got }} 分</span>
+            {% endif %}
+            {% if p.difficulty %}
+            <span class="ct-tag diff">{{ p.difficulty }}</span>
+            {% endif %}
+            {% if p.tags %}
+              {% for t in p.tags.split() %}
+              <span class="ct-tag">{{ t }}</span>
+              {% endfor %}
+            {% endif %}
+            <span class="ct-tag">{{ limits[p.id].time_text }}</span>
+            <span class="ct-tag">{{ limits[p.id].mem_text }}</span>
+          </div>
+        </div>
+        <span class="ct-arrow">→</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="ct-empty">这场比赛还没有题目</div>
+    {% endif %}
+  </div>
+
+  <div class="ct-panel" data-panel="rank">
+    <div class="rk-bar">
+      <span class="rk-tab">全部榜单</span>
+      <label class="rk-search">
+        <input id="rkSearch" type="text" placeholder="搜索 UID / 用户名" autocomplete="off">
+      </label>
+    </div>
+    <p class="ct-note">
+      赛制 {{ rule_name }}：每道题取该用户的最高得分，各题相加得到总分；总分相同时，较早提交出最后一份有效成绩的排在前面。
+      <b>排行榜只统计比赛时间段内提交的成绩</b>，括号里是拿到该成绩时距开赛过了多久。
+      每列标题下面的数字是「拿到满分的人数 / 交过这题的人数」。
+    </p>
+    {% if board %}
+    <div class="rk-scroll">
+      <table class="rk-tb">
+        <thead>
+          <tr>
+            <th class="c-rank">名次</th>
+            <th class="c-who">参赛者</th>
+            <th class="c-total">总分</th>
+            {% for p in board_probs %}
+            <th class="c-prob" title="{{ p.title }}">
+              <span class="pl">{{ p.letter }}</span>
+              <span class="ps">{{ p.ac }} / {{ p.sub }}</span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in board %}
+          <tr class="{{ 'me' if r.is_me }}" data-k="{{ r.username }} {{ r.user_no }}">
+            <td class="c-rank">#{{ r.rank }}</td>
+            <td class="c-who">
+              <span class="nm">{{ r.username }}{% if r.is_me %}（我）{% endif %}</span>
+              {% if r.user_no %}<span class="no">{{ r.user_no }}</span>{% endif %}
+            </td>
+            <td class="c-total">
+              <b>{{ r.total }}</b>
+              {% if r.total_time %}<i>({{ r.total_time }})</i>{% endif %}
+            </td>
+            {% for p in board_probs %}
+            {% set c = r.cells[p.id] %}
+            <td class="c-prob{{ ' full' if c.full }}">
+              {%- if c.tried -%}
+              <b>{{ c.score }}</b>{% if c.time %}<i>({{ c.time }})</i>{% endif %}
+              {%- if c.penalty -%}<i class="pen">{{ c.penalty }}</i>{%- endif -%}
+              {%- else -%}
+              <span class="dash">—</span>
+              {%- endif -%}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="ct-empty">还没有人提交，第一个交卷的就是榜首</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var tabs = document.querySelectorAll('.ct-tab');
+  var panels = document.querySelectorAll('.ct-panel');
+  if (!tabs.length) return;
+  var DEF = '{{ 'desc' if contest.description else 'problems' }}';
+
+  function show(name){
+    var ok = false;
+    for (var i = 0; i < tabs.length; i++){
+      var on = tabs[i].getAttribute('data-tab') === name;
+      if (on) ok = true;
+      tabs[i].classList.toggle('on', on);
+    }
+    for (var j = 0; j < panels.length; j++){
+      panels[j].classList.toggle('on', panels[j].getAttribute('data-panel') === name);
+    }
+    return ok;
+  }
+
+  function fromHash(){
+    var h = (location.hash || '').replace('#', '');
+    return h || DEF;
+  }
+
+  for (var i = 0; i < tabs.length; i++){
+    tabs[i].addEventListener('click', function(){
+      var n = this.getAttribute('data-tab');
+      if (location.hash !== '#' + n) location.hash = n;
+      show(n);
+    });
+  }
+  window.addEventListener('hashchange', function(){ show(fromHash()); });
+  if (!show(fromHash())) show(DEF);
+
+  var search = document.getElementById('rkSearch');
+  if (search){
+    search.addEventListener('input', function(){
+      var q = this.value.trim().toLowerCase();
+      var rows = document.querySelectorAll('.rk-tb tbody tr');
+      for (var i = 0; i < rows.length; i++){
+        var k = (rows[i].getAttribute('data-k') || '').toLowerCase();
+        rows[i].style.display = (!q || k.indexOf(q) >= 0) ? '' : 'none';
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

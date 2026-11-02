@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}连接诊断 · MONO{% endblock %}
+{% block head_extra %}
+<style>
+.diag-wrap{max-width:720px;margin:0 auto;padding:22px 16px 60px}
+.diag-wrap h1{font-size:22px;margin:0 0 6px}
+.diag-sub{font-size:13.5px;color:var(--muted);line-height:1.75;margin:0 0 18px}
+.diag-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px;background:var(--bg-elev)}
+.diag-title{font-size:13px;font-weight:700;margin:0 0 10px;color:var(--fg-2)}
+.diag-row{display:flex;gap:12px;align-items:flex-start;padding:5px 0;font-size:13px;line-height:1.6;border-bottom:1px solid var(--line)}
+.diag-row:last-child{border-bottom:0}
+.diag-row>span{color:var(--muted);flex:0 0 88px}
+.diag-row>b{font-weight:600;word-break:break-all;min-width:0}
+.diag-wrap-text{word-break:break-all}
+.diag-ok{color:#2e7d32}
+.diag-bad{color:#c62828}
+.diag-pre{background:var(--bg-sunken);border:1px solid var(--line);border-radius:10px;
+  padding:12px;font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-all;
+  max-height:50vh;overflow:auto;margin:0 0 12px;
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+.diag-pre .ok{color:#2e7d32;font-weight:700}
+.diag-pre .bad{color:#c62828;font-weight:700}
+.diag-pre .dim{color:var(--fg-3)}
+.diag-btns{display:flex;gap:8px;flex-wrap:wrap}
+.diag-btns button{font:inherit;font-size:13px;font-weight:700;padding:10px 20px;
+  border-radius:10px;border:1px solid var(--fg);background:var(--fg);color:var(--bg);cursor:pointer}
+.diag-btns button+button{background:transparent;color:var(--fg)}
+</style>
+{% endblock %}
+{% block content %}
+<div class="diag-wrap">
+  <h1>连接诊断</h1>
+  <p class="diag-sub">这个页面在服务端渲染，不经过任何缓存。把它显示的内容发给我就能定位问题。</p>
+
+  <div class="diag-card">
+    <div class="diag-row"><span>服务器时间</span><b>{{ diag.now }}</b></div>
+    <div class="diag-row"><span>你的出口 IP</span><b>{{ diag.client_ip }}</b></div>
+    <div class="diag-row"><span>你的浏览器</span><b class="diag-wrap-text">{{ diag.ua }}</b></div>
+    <div class="diag-row"><span>协议</span><b>{{ diag.scheme }} · {{ diag.proto }}</b></div>
+    <div class="diag-row"><span>请求的 Host</span><b>{{ diag.host }}</b></div>
+    <div class="diag-row"><span>代理层数</span><b>{{ diag.depth }}</b></div>
+  </div>
+
+  <div class="diag-card">
+    <div class="diag-title">服务端接口自检</div>
+    {% for it in diag.checks %}
+    <div class="diag-row">
+      <span>{{ it.name }}</span>
+      <b class="{{ 'diag-ok' if it.ok else 'diag-bad' }}">{{ '通过' if it.ok else '失败' }} · {{ it.detail }}</b>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="diag-card">
+    <div class="diag-title">浏览器端实时检测</div>
+    <pre id="diagOut" class="diag-pre">正在检测…</pre>
+    <div class="diag-btns">
+      <button type="button" id="diagAgain">重新检测</button>
+      <button type="button" id="diagClear">清缓存并重载</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var out = [];
+  var el = document.getElementById('diagOut');
+  function put(k, v, cls){
+    out.push('<span class="' + (cls||'dim') + '">' + k + '</span>  ' + v);
+    el.innerHTML = out.join('\n');
+  }
+  function when(t){ return t < 1000 ? Math.round(t) + 'ms' : (t/1000).toFixed(2) + 's'; }
+
+  put('时间', new Date().toString());
+  put('页面', location.href);
+  put('HTTPS', location.protocol === 'https:' ? '是 ✓' : '否 ✗',
+      location.protocol === 'https:' ? 'ok' : 'bad');
+  put('在线判定', navigator.onLine ? '在线' : '离线', navigator.onLine ? 'ok' : 'bad');
+  if (navigator.connection) {
+    put('网络类型', navigator.connection.effectiveType || '未知',
+        /4g|3g/.test(navigator.connection.effectiveType||'') ? 'ok' : 'bad');
+  }
+  put('Service Worker',
+      navigator.serviceWorker && navigator.serviceWorker.controller
+        ? '已接管 ✓' : '未接管（首次访问或已被清）',
+      navigator.serviceWorker && navigator.serviceWorker.controller ? 'ok' : 'dim');
+
+  function probe(){
+    out = []; el.innerHTML = '检测中…';
+    var t0 = performance.now();
+    fetch('/api/mm/me?diag=' + Date.now(), {cache:'no-store', credentials:'same-origin'})
+      .then(function(r){
+        return r.text().then(function(t){
+          put('接口 /api/mm/me', r.status + ' · ' + when(performance.now() - t0),
+              r.status === 200 ? 'ok' : 'bad');
+          put('接口返回', t.slice(0, 100), 'dim');
+        });
+      })
+      .catch(function(e){
+        put('接口 /api/mm/me', '失败 · ' + e + ' · ' + when(performance.now() - t0), 'bad');
+        put('含义', '请求没到服务器层。问题在 DNS / TLS / 防火墙，跟页面代码无关。', 'dim');
+      });
+
+    var t1 = performance.now();
+    fetch('/static/icon.svg?diag=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ put('静态资源', r.status + ' · ' + when(performance.now() - t1), r.ok ? 'ok' : 'bad'); })
+      .catch(function(e){ put('静态资源', '失败 · ' + e, 'bad'); });
+
+    var t2 = performance.now();
+    /* Socket.IO 的握手走 polling（项目里 waitress 不支持 WS upgrade），
+       这里直接拉一次握手包看通不通。
+       ⚠️ 别用原生 new WebSocket() 去连 /socket.io/ —— 那是 Socket.IO 的
+       私有协议，普通 WebSocket 握手会被判 400，看起来像"连不上"是误报。 */
+    fetch('/socket.io/?EIO=4&transport=polling&diag=' + Date.now(), {cache:'no-store'})
+      .then(function(r){
+        put('Socket.IO 握手', r.status + ' · ' + when(performance.now() - t2),
+            r.status === 200 ? 'ok' : 'bad');
+      })
+      .catch(function(e){
+        put('Socket.IO 握手', '失败 · ' + e + ' · ' + when(performance.now() - t2), 'bad');
+      });
+  }
+
+  document.getElementById('diagAgain').addEventListener('click', probe);
+  document.getElementById('diagClear').addEventListener('click', function(){
+    try{
+      caches.keys().then(function(ks){
+        return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+      }).then(function(){
+        if (navigator.serviceWorker){
+          return navigator.serviceWorker.getRegistrations().then(function(rs){
+            return Promise.all(rs.map(function(r){ return r.unregister(); }));
+          });
+        }
+      }).then(function(){ setTimeout(function(){ location.replace('/?_=' + Date.now()); }, 400); });
+    }catch(e){ alert(String(e)); }
+  });
+
+  probe();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,42 @@
+# MONO systemd 单元 · **脱敏快照**
+#
+# ⚠️ 这个文件只做「配置漂移对照」，apply.sh **不会**把它下发到服务器 ——
+#    里面有关键密钥，下发会用占位符覆盖线上真值，直接把站搞挂。
+#    要改服务配置，先在服务器上改 /etc/systemd/system/mono.service，
+#    再跑 infra/snapshot.sh 重新生成这份快照。
+#
+# 生成时间：2026-11-02
+# 用法：diff <(ssh mono-vps cat /etc/systemd/system/mono.service) infra/systemd/mono.service
+
+[Unit]
+Description=MONO Community
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mono/app
+Environment=PORT=8080
+Environment=MONO_BIND=127.0.0.1
+Environment=MONO_ACCEL_MUSIC=1
+Environment=MONO_PROXY_DEPTH=1
+Environment=MONO_SECRET_KEY=<见 /etc/mono/secrets.env 或服务器上的真值>
+Environment=MONO_RESEND_KEY=<见 /etc/mono/secrets.env 或服务器上的真值>
+Environment=MONO_RESEND_FROM=noreply@monocraft.top
+Environment=MONO_PG_SHADOW=1
+Environment=MONO_PG_READ=1
+Environment=MONO_NEON_DSN=<见 /etc/mono/secrets.env 或服务器上的真值>
+Environment=MONO_SNAPSHOT_INTERVAL=1800
+Environment=MONO_SMTP_HOST=<见 /etc/mono/secrets.env 或服务器上的真值>
+Environment=MONO_SMTP_PORT=<见 /etc/mono/secrets.env 或服务器上的真值>
+Environment=MONO_SMTP_USER=<见 /etc/mono/secrets.env 或服务器上的真值>
+Environment=MONO_SMTP_PASS=<见 /etc/mono/secrets.env 或服务器上的真值>
+Environment=MONO_SMTP_FROM=<见 /etc/mono/secrets.env 或服务器上的真值>
+ExecStart=/opt/mono/venv/bin/python wsgi.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/mono/app/server.log
+StandardError=append:/opt/mono/app/server.log
+
+[Install]
+WantedBy=multi-user.target

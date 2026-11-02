@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}创建活动 - MONO 社区{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px;margin:0 auto;">
+  <h2>创建社区活动</h2>
+  <p class="muted" style="font-size:13px;">仅管理员可创建。创建后将全站广播通知，进行中的活动会在首页置顶展示。</p>
+  <form method="post" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:14px;margin-top:16px;">
+    <label>活动名称 *
+      <input type="text" name="name" maxlength="60" required placeholder="例如：夏日代码创作大赛">
+    </label>
+    <label>封面图（可选，png/jpg/gif）
+      <input type="file" name="cover" accept="image/*">
+    </label>
+    <label>活动简介
+      <textarea name="intro" rows="4" maxlength="2000" placeholder="活动规则、参与方式、奖励说明……"></textarea>
+    </label>
+    <div class="row" style="gap:12px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:150px;">活动分类
+        <select name="category">
+          {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        </select>
+      </label>
+      <label style="flex:1;min-width:150px;">活动模式
+        <select name="mode" id="modeSel" onchange="document.getElementById('roomRow').style.display = this.value==='online' ? '' : 'none';">
+          <option value="submission">投稿征集模式（作品投稿+评选）</option>
+          <option value="online">线上集合模式（集合到聊天室）</option>
+        </select>
+      </label>
+    </div>
+    <label id="roomRow" style="display:none;">集合聊天室（线上集合模式）
+      <select name="room_id">
+        {% for r in rooms %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="row" style="gap:12px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:180px;">开始时间 *
+        <input type="datetime-local" name="start_time" required>
+      </label>
+      <label style="flex:1;min-width:180px;">结束时间 *
+        <input type="datetime-local" name="end_time" required>
+      </label>
+    </div>
+    <div class="row" style="gap:12px;">
+      <button type="submit" class="btn">创建活动</button>
+      <a href="{{ url_for('activities_page') }}" class="btn ghost">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

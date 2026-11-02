@@ -1,0 +1,146 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}匹配对手{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-match">
+  <div class="xqm-mbox">
+    <div class="xqm-ring">
+      <div class="r r1"></div><div class="r r2"></div><div class="r r3"></div>
+      <div class="xqm-core">⚔</div>
+    </div>
+    <h2 class="xqm-mtitle" id="xqmMTitle">正在寻找对手…</h2>
+    <p class="xqm-msub" id="xqmMSub">正在按积分匹配 · 搜索范围逐步放宽</p>
+    <div id="xqmMFound"></div>
+    <div class="xqm-mask" id="xqmAsk" style="display:none">
+      <p class="t">暂时没人在线</p>
+      <p class="d">匹配会一直放宽积分范围，等到就自动开局。</p>
+      <div class="acts">
+        <button class="xqm-btn xqm-btn-g xqm-btn-sm" id="xqmAskWait">继续等</button>
+        <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmAskLeave">取消匹配</button>
+      </div>
+    </div>
+    <div class="xqm-mfoot">
+      <button class="xqm-btn xqm-btn-g xqm-btn-sm" id="xqmRetryBtn" style="display:none">重试</button>
+      <button class="xqm-btn xqm-btn-o xqm-btn-sm" id="xqmCancelBtn">取消匹配</button>
+      <a class="xqm-btn xqm-btn-o xqm-btn-sm" href="{{ url_for('xqmaster_page') }}">返回首页</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var timer = null, start = Date.now(), done = false, asked = false;
+  var me = null;
+
+  function setSub(t){ document.getElementById('xqmMSub').textContent = t; }
+
+  function enter(gid){
+    if (done) return;
+    done = true;
+    if (timer) clearInterval(timer);
+    document.getElementById('xqmAsk').style.display = 'none';
+    document.getElementById('xqmMTitle').textContent = '匹配成功';
+    setSub('正在进入对局…');
+    X.sfx.found();
+    var ring = document.querySelector('.xqm-ring');
+    if (ring) ring.classList.add('xqm-ring-done');
+    X.api('/api/xqm/game/' + gid).then(function(p){
+      if (!p || !p.ok) return;
+      var foe = p.my_side === 'red' ? p.black : p.red;
+      showOpp(foe);
+    }).catch(function(){});
+    setTimeout(function(){ location.href = '/game/xqmaster/battle/' + gid; }, 1600);
+  }
+
+  function showOpp(opp){
+    document.getElementById('xqmMFound').innerHTML =
+      '<div class="xqm-mfound"><div class="xqm-vs">'
+      + '<div class="side">' + X.pcHTML({t:'king',s:'red',hp:300,mh:300,id:'mr'},{})
+      + '<div class="nm">' + (me ? me.name : '我') + '</div>'
+      + '<div class="rt">' + (me ? me.rating + ' 分' : '') + '</div></div>'
+      + '<div class="vsw">VS</div>'
+      + '<div class="side">' + X.pcHTML({t:'king',s:'black',hp:300,mh:300,id:'mb'},{})
+      + '<div class="nm">' + opp.name + '</div>'
+      + '<div class="rt">' + opp.rating + ' 分</div></div>'
+      + '</div></div>';
+  }
+
+  var fails = 0;
+  function poll(){
+    var waited = Math.floor((Date.now() - start) / 1000);
+    if (waited >= 20 && !asked){
+      asked = true;
+      document.getElementById('xqmAsk').style.display = '';
+      document.getElementById('xqmMTitle').textContent = '暂时没人在线';
+    }
+    X.api('/api/xqm/queue').then(function(r){
+      fails = 0;
+      if(!r || !r.ok) return;
+      if (r.status === 'matched'){ enter(r.gid); return; }
+      if (r.status === 'idle'){ X.api('/api/xqm/queue', {method:'POST'}); return; }
+      var win = r.window || 0;
+      setSub('已等待 ' + waited + ' 秒 · 搜索范围 '
+        + (win >= 999999 ? '已不限分差' : '±' + win + ' 分'));
+    }).catch(function(){
+      fails++;
+      if (fails >= 3){
+        fail('连接中断', '连续多次连不上服务器，已退出匹配');
+      }
+    });
+  }
+
+  document.getElementById('xqmAskWait').onclick = function(){
+    document.getElementById('xqmAsk').style.display = 'none';
+    document.getElementById('xqmMTitle').textContent = '继续等待中…';
+  };
+  function doCancel(){
+    if (done){ location.href = '/game/xqmaster'; return; }
+    if (timer) clearInterval(timer);
+    X.api('/api/xqm/queue/leave', {method:'POST'}).then(function(r){
+      if (r && r.status === 'matched'){ enter(r.gid); return; }
+      X.toast(__('已取消匹配'));
+      location.href = '/game/xqmaster';
+    }).catch(function(){ location.href = '/game/xqmaster'; });
+  }
+
+  document.getElementById('xqmAskLeave').onclick = doCancel;
+  document.getElementById('xqmCancelBtn').onclick = doCancel;
+
+  function fail(msg, detail){
+    if (timer) clearInterval(timer);
+    document.getElementById('xqmMTitle').textContent = msg;
+    setSub(detail || '可以稍后再试一次');
+    document.getElementById('xqmAsk').style.display = 'none';
+    var box = document.querySelector('.xqm-mbox');
+    if(box) box.classList.add('xqm-mfail');
+    var rt = document.getElementById('xqmRetryBtn');
+    if(rt) rt.style.display = '';
+    var cc = document.getElementById('xqmCancelBtn');
+    if(cc) cc.style.display = 'none';
+    X.toast(msg);
+  }
+
+  document.getElementById('xqmRetryBtn').onclick = function(){
+    this.disabled = true;
+    this.textContent = '重试中…';
+    location.reload();
+  };
+
+  X.api('/api/xqm/me').then(function(r){ if (r.ok) me = r; });
+  X.api('/api/xqm/queue', {method:'POST'}).then(function(r){
+    if (!r || !r.ok){
+      fail('没能开始匹配', r && r.msg ? r.msg : '服务暂时没有响应，请稍后重试');
+      return;
+    }
+    if (r.status === 'matched'){ enter(r.gid); return; }
+    timer = setInterval(poll, 2000);
+    poll();
+  }).catch(function(){
+    fail('网络异常', '连不上服务器，检查网络后重试');
+  });
+})();
+</script>
+{% endblock %}

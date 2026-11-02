@@ -1,0 +1,174 @@
+{% extends "_admin_base.html" %}
+{% block admin_icon %}📋{% endblock %}
+{% block admin_heading %}用户动态{% endblock %}
+{% block admin_desc %}谁在什么时候做了什么 —— 登录、玩游戏、发帖、发动态都记在这里；上面是当前在线的人。{% endblock %}
+
+{% block admin_content %}
+<style>
+  .act-online{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+    gap:10px;margin-bottom:22px;
+  }
+  .act-on{
+    display:flex;align-items:center;gap:10px;padding:11px 13px;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+  }
+  .act-on img{width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;}
+  .act-on .info{flex:1;min-width:0;}
+  .act-on .nm{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .act-on .sub{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .act-on .dot{
+    width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0;
+    box-shadow:0 0 0 3px rgba(16,185,129,.18);
+  }
+
+  .act-filter{
+    display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+    padding:12px 14px;border:1px solid var(--line);border-radius:12px;
+    background:var(--bg-elev);margin-bottom:16px;
+  }
+  .act-filter input,.act-filter select{
+    padding:8px 11px;border:1px solid var(--line);border-radius:9px;
+    background:var(--card);color:var(--fg);font-size:13px;font-family:inherit;
+  }
+  .act-filter input{width:130px;}
+
+  .act-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .act-table th{
+    text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);
+    padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  .act-table td{padding:9px 10px;border-bottom:1px solid var(--soft);vertical-align:top;}
+  .act-table tr:hover td{background:var(--soft);}
+  .act-when{white-space:nowrap;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;}
+  .act-who{font-weight:600;white-space:nowrap;}
+  .act-who small{display:block;font-weight:400;color:var(--fg-3);font-size:11px;}
+  .act-do{
+    display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:20px;
+    background:var(--soft);color:var(--fg-2);white-space:nowrap;
+  }
+  .act-detail{color:var(--fg-2);word-break:break-word;}
+  .act-ip{color:var(--fg-3);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+  .act-pager{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:20px;flex-wrap:wrap;}
+  .act-pager a,.act-pager span{
+    padding:7px 13px;border:1px solid var(--line);border-radius:9px;
+    font-size:13px;text-decoration:none;color:var(--fg);
+  }
+  .act-pager .cur{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600;}
+
+  @media (max-width:640px){
+    .act-online{grid-template-columns:minmax(0, 1fr);}
+    .act-table thead{display:none;}
+    .act-table tr{display:block;border-bottom:1px solid var(--line);padding:10px 0;}
+    .act-table td{display:block;border:0;padding:2px 0;}
+    .act-table td::before{content:attr(data-l);display:inline-block;width:52px;color:var(--fg-3);font-size:11.5px;}
+  }
+</style>
+
+<h3 style="font-size:15px;margin:0 0 10px;">
+  🟢 当前在线（{{ online|length }}）
+  <span style="font-size:12px;font-weight:400;color:var(--muted);">
+    · {{ (online_threshold // 60) }} 分钟内有活动就算在线
+  </span>
+</h3>
+{% if online %}
+<div class="act-online">
+  {% for u in online %}
+  <a class="act-on" href="{{ url_for('user_page', user_id=u.id) }}">
+    <img src="{{ get_avatar_url(u) }}" alt="">
+    <div class="info">
+      <div class="nm">{{ u.username }}</div>
+      <div class="sub">#{{ u.user_no or '——' }} · {{ u.last_active | timeago }}</div>
+    </div>
+    <span class="dot" title="在线"></span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted" style="margin-bottom:22px;">现在没人在线。</p>
+{% endif %}
+
+<details style="margin-bottom:22px;">
+  <summary style="cursor:pointer;font-size:13.5px;color:var(--muted);">
+    看看 24 小时内活跃过的人（{{ recent|length }}）
+  </summary>
+  <div class="act-online" style="margin-top:12px;">
+    {% for u in recent %}
+    <a class="act-on" href="{{ url_for('user_page', user_id=u.id) }}">
+      <img src="{{ get_avatar_url(u) }}" alt="">
+      <div class="info">
+        <div class="nm">{{ u.username }}</div>
+        <div class="sub">#{{ u.user_no or '——' }} · {{ u.last_active | timeago }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</details>
+
+<form class="act-filter" method="get">
+  <input type="text" name="user" value="{{ q_user }}" placeholder="用户名 / 用户号">
+  <select name="action">
+    <option value="">全部行为</option>
+    {% for a in actions %}
+    <option value="{{ a }}" {{ 'selected' if a == q_action else '' }}>{{ a }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="ip" value="{{ q_ip }}" placeholder="IP 片段">
+  <button type="submit" class="btn sm">筛选</button>
+  {% if q_user or q_action or q_ip %}
+  <a href="{{ url_for('admin_activity') }}" class="btn sm ghost">清空</a>
+  {% endif %}
+  <span style="margin-left:auto;font-size:12.5px;color:var(--muted);">
+    共 {{ total }} 条记录
+  </span>
+</form>
+
+{% if rows %}
+<table class="act-table">
+  <thead>
+    <tr>
+      <th>时间</th>
+      <th>用户</th>
+      <th>行为</th>
+      <th>详情</th>
+      <th>IP</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="act-when" data-l="时间">{{ r.created_at | fmttime('%m-%d %H:%M:%S') }}</td>
+      <td class="act-who" data-l="用户">
+        {% if r.user_id %}
+        <a href="{{ url_for('user_page', user_id=r.user_id) }}">{{ r.username }}</a>
+        {% else %}{{ r.username }}{% endif %}
+        <small>#{{ r.user_id or '——' }}</small>
+      </td>
+      <td data-l="行为"><span class="act-do">{{ r.action }}</span></td>
+      <td class="act-detail" data-l="详情">{{ r.detail or '——' }}</td>
+      <td class="act-ip" data-l="IP">{{ r.ip or '——' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if pages > 1 %}
+{% set qs = '&user=' ~ q_user ~ '&action=' ~ q_action ~ '&ip=' ~ q_ip %}
+<div class="act-pager">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}{{ qs }}">← 上一页</a>
+  {% endif %}
+  <span class="cur">{{ page }} / {{ pages }}</span>
+  {% if page < pages %}
+  <a href="?page={{ page + 1 }}{{ qs }}">下一页 →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card center" style="padding:44px;">
+  <p class="muted">没有符合条件的记录</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}评测记录 - MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .rs-wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px;}
+  .rs-crumb{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-size:12.5px;color:var(--fg-3);margin-bottom:14px;
+  }
+  .rs-crumb a{color:var(--fg-3);text-decoration:none;padding:3px 9px;border-radius:6px;border:1px solid var(--line);}
+  .rs-crumb a:hover{background:var(--soft);color:var(--fg);}
+
+  .rs-head{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;
+  }
+  .rs-title{font-size:20px;font-weight:800;margin:0;}
+  .rs-count{font-size:12.5px;color:var(--fg-3);}
+  .rs-seg{
+    margin-left:auto;display:flex;gap:2px;padding:3px;border-radius:9px;
+    background:var(--soft);border:1px solid var(--line);
+  }
+  .rs-seg a{
+    font-size:12.5px;font-weight:700;color:var(--fg-3);text-decoration:none;
+    padding:5px 13px;border-radius:7px;
+  }
+  .rs-seg a.on{background:var(--card);color:var(--fg);box-shadow:var(--shadow);}
+
+  .rs-filter{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:11px 15px;margin-bottom:12px;
+    border:1px solid var(--line);border-radius:11px;background:var(--bg-sunken);
+    font-size:12.5px;color:var(--fg-3);
+  }
+  .rs-filter b{color:var(--fg);font-weight:700;}
+  .rs-filter a{color:var(--fg-3);text-decoration:none;border-bottom:1px solid var(--line);}
+
+  .rs-card{border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;}
+  .rs-row{
+    display:flex;align-items:center;gap:12px;
+    padding:11px 16px;border-top:1px solid var(--soft);
+    text-decoration:none;color:inherit;
+  }
+  .rs-row:first-child{border-top:0;}
+  .rs-row:hover{background:var(--bg-sunken);}
+  .rs-row.hd{
+    font-size:11.5px;font-weight:700;color:var(--fg-3);
+    background:var(--bg-sunken);padding:9px 16px;
+  }
+  .rs-row.hd:hover{background:var(--bg-sunken);}
+  .rs-id{
+    flex:0 0 62px;font-size:12.5px;font-weight:800;color:var(--fg-3);
+    font-variant-numeric:tabular-nums;
+  }
+  .rs-row:nth-child(2) .rs-id,
+  .rs-row:nth-child(3) .rs-id,
+  .rs-row:nth-child(4) .rs-id{color:var(--fg-2);}
+  .rs-prob{flex:1;min-width:0;font-size:13.5px;font-weight:700;color:var(--fg);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rs-who{flex:0 0 96px;font-size:12.5px;color:var(--fg-3);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rs-verdict{flex:0 0 62px;font-size:12.5px;font-weight:800;}
+  .rs-score{flex:0 0 76px;font-size:12.5px;font-weight:700;color:var(--fg);
+    font-variant-numeric:tabular-nums;}
+  .rs-tm{flex:0 0 118px;font-size:12px;color:var(--fg-3);font-variant-numeric:tabular-nums;}
+  .rs-lang{flex:0 0 84px;font-size:11.5px;color:var(--fg-3);}
+  .rs-when{flex:0 0 108px;font-size:11.5px;color:var(--fg-3);text-align:right;
+    font-variant-numeric:tabular-nums;}
+  .v-AC{color:#1b5e20;}
+  .v-WA{color:#c62828;}
+  .v-TLE{color:#e65100;}
+  .v-MLE{color:#6a1b9a;}
+  .v-RE{color:#ad1457;}
+  .v-SE,.v-PD{color:var(--fg-3);}
+  .v-wait{color:var(--fg-3);}
+
+  .rs-empty{
+    text-align:center;padding:50px 24px;font-size:13.5px;color:var(--fg-3);
+    border:1px dashed var(--line);border-radius:14px;background:var(--bg-sunken);
+  }
+  .rs-pager{
+    display:flex;align-items:center;justify-content:center;gap:12px;
+    margin-top:16px;font-size:12.5px;color:var(--fg-3);
+  }
+  .rs-pager a{
+    font-size:12.5px;font-weight:700;color:var(--fg);text-decoration:none;
+    padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);
+  }
+  .rs-pager a:hover{border-color:var(--fg-3);}
+  .rs-pager span.off{opacity:.4;padding:6px 14px;border-radius:8px;border:1px solid var(--line);}
+
+  @media (max-width:820px){
+    .rs-wrap{padding:14px 12px 50px;}
+    .rs-title{font-size:18px;}
+    .rs-seg{margin-left:0;width:100%;}
+    .rs-row{flex-wrap:wrap;gap:8px;padding:11px 13px;}
+    .rs-row.hd{display:none;}
+    .rs-id{flex:0 0 auto;}
+    .rs-prob{flex:1 1 100%;order:-1;white-space:normal;}
+    .rs-who{flex:0 0 auto;}
+    .rs-verdict{flex:0 0 auto;}
+    .rs-score{flex:0 0 auto;}
+    .rs-tm{flex:0 0 auto;}
+    .rs-lang{flex:0 0 auto;}
+    .rs-when{flex:1 1 auto;text-align:right;}
+  }
+</style>
+
+<div class="rs-wrap">
+  <div class="rs-crumb">
+    <a href="{{ url_for('oj_home') }}">公开赛</a>
+    <span>/</span>
+    <span>评测记录</span>
+  </div>
+
+  <div class="rs-head">
+    <h1 class="rs-title">评测记录</h1>
+    <span class="rs-count">共 {{ total }} 条</span>
+    {% if me.is_super_admin %}
+    <div class="rs-seg">
+      <a class="{{ 'on' if scope == 'mine' }}"
+         href="{{ url_for('oj_records') }}{{ '?pid=' ~ pid if pid }}">只看我的</a>
+      <a class="{{ 'on' if scope == 'all' }}"
+         href="{{ url_for('oj_records') }}?scope=all{{ '&pid=' ~ pid if pid }}">全部</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if focus %}
+  <div class="rs-filter">
+    正在筛题目 <b>{{ focus.title }}</b>
+    <a href="{{ url_for('oj_records') }}{{ '?scope=all' if scope == 'all' }}">清除筛选</a>
+  </div>
+  {% endif %}
+  {% if uid_filter %}
+  <div class="rs-filter">
+    正在看 <b>{{ uid_name }}</b> 的全部提交
+    <a href="{{ url_for('oj_records') }}?scope=all{{ '&pid=' ~ pid if pid }}">清除</a>
+  </div>
+  {% endif %}
+
+  {% if items %}
+  <div class="rs-card">
+    <div class="rs-row hd">
+      <span class="rs-id">记录</span>
+      <span class="rs-prob">题目</span>
+      <span class="rs-who">提交者</span>
+      <span class="rs-verdict">状态</span>
+      <span class="rs-score">分数</span>
+      <span class="rs-tm">用时 / 内存</span>
+      <span class="rs-lang">语言</span>
+      <span class="rs-when">提交时间</span>
+    </div>
+    {% for s in items %}
+    <a class="rs-row" href="{{ url_for('oj_record', sid=s.id) }}">
+      <span class="rs-id">R{{ s.id }}</span>
+      <span class="rs-prob">{{ s.ptitle or ('题目 ' ~ s.problem_id) }}</span>
+      <span class="rs-who">{{ s.uname or '已注销' }}</span>
+      <span class="rs-verdict {{ 'v-' ~ s.verdict if s.verdict else 'v-wait' }}">
+        {%- if not s.verdict -%}
+        评测中
+        {%- elif s.verdict == 'AC' -%}
+        AC
+        {%- else -%}
+        {{ s.verdict }}
+        {%- endif -%}
+      </span>
+      <span class="rs-score">{% if s.verdict %}{{ s.score }}/{{ s.full_score }}{% else %}—{% endif %}</span>
+      <span class="rs-tm">{% if s.verdict %}{{ s.time_ms }}ms / {{ (s.memory_kb / 1024)|round(1) }}MB{% else %}—{% endif %}</span>
+      <span class="rs-lang">{{ s.lang_label }}</span>
+      <span class="rs-when">{{ s.created_at|dt_local|replace('T', ' ')|truncate(16, true, '') }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if pages > 1 %}
+  <div class="rs-pager">
+    {% set qs = ('scope=' ~ scope) ~ ('&pid=' ~ pid if pid) ~ ('&uid=' ~ uid_filter if uid_filter) %}
+    {% if has_prev %}
+    <a href="{{ url_for('oj_records') }}?{{ qs }}&page={{ page - 1 }}">上一页</a>
+    {% else %}
+    <span class="off">上一页</span>
+    {% endif %}
+    <span>第 {{ page }} / {{ pages }} 页</span>
+    {% if has_next %}
+    <a href="{{ url_for('oj_records') }}?{{ qs }}&page={{ page + 1 }}">下一页</a>
+    {% else %}
+    <span class="off">下一页</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="rs-empty">
+    {% if scope == 'all' %}还没有任何评测记录{% else %}你还没提交过，去题目页写点代码吧{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

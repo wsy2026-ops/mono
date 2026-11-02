@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+{% block title %}2048 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="games-page">
+<style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        .games-page {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 96px 20px 40px;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .top-bar { position: fixed; top: 76px; left: 30px; font-size: 14px; }
+        .top-bar a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--fg); }
+
+        .user-bar {
+            position: fixed; top: 76px; right: 30px;
+            background: var(--card); border: 1px solid var(--line);
+            padding: 10px 15px; font-size: 14px; color: var(--fg); border-radius: 8px;
+        }
+        .user-bar .high-score { font-weight: bold; margin-left: 8px; }
+
+        .game-container {
+            background: var(--card); border: 2px solid var(--line);
+            padding: 26px; max-width: 500px; width: 100%; border-radius: 10px;
+        }
+
+        .header h1 { font-size: 30px; letter-spacing: 3px; color: var(--fg); margin-bottom: 14px; font-weight: 800; }
+
+        .info-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+        .info-item {
+            flex: 1; border: 1px solid var(--line); border-radius: 8px;
+            padding: 8px 12px; text-align: center;
+        }
+        .info-label { font-size: 11.5px; color: var(--muted); margin-bottom: 3px; }
+        .info-value {
+            font-size: 20px; font-weight: 700; color: var(--fg);
+            font-variant-numeric: tabular-nums; transition: transform .12s ease;
+        }
+        .info-value.bump { transform: scale(1.18); }
+
+        /* 棋盘：只当容器和底格，方块绝对定位在上面滑动 */
+        .board {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: var(--line);
+            border-radius: 10px;
+            user-select: none;
+            touch-action: none;
+            overflow: hidden;
+        }
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-auto-rows: minmax(0, 1fr);
+            gap: 8px;
+            padding: 8px;
+        }
+        .bg-cell { border-radius: 7px; background: rgba(128,128,128,.10); }
+
+        /* 每个方块一个绝对定位元素，位移用 transform + transition 做滑动动画 */
+        .tile {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 7px;
+            font-weight: 800;
+            font-size: 26px;
+            color: #fff;
+            font-variant-numeric: tabular-nums;
+            transition: transform .1s ease;
+            will-change: transform;
+            z-index: 1;
+        }
+        .tile.fresh { animation: tilePop .18s cubic-bezier(.2,.9,.3,1.3); }
+        @keyframes tilePop {
+            0%   { transform: var(--pos) scale(0); }
+            70%  { transform: var(--pos) scale(1.1); }
+            100% { transform: var(--pos) scale(1); }
+        }
+        .tile.merged { animation: tileMerge .2s cubic-bezier(.2,.9,.3,1.4); }
+        @keyframes tileMerge {
+            0%   { transform: var(--pos) scale(1); }
+            45%  { transform: var(--pos) scale(1.18); filter: brightness(1.4); }
+            100% { transform: var(--pos) scale(1); filter: brightness(1); }
+        }
+
+        /* 纯黑白灰阶 */
+        .t2    { background: #f2f2f2; color: #2a2a2a; }
+        .t4    { background: #e6e6e6; color: #2a2a2a; }
+        .t8    { background: #d4d4d4; color: #1f1f1f; }
+        .t16   { background: #bfbfbf; color: #111; }
+        .t32   { background: #a8a8a8; color: #fff; }
+        .t64   { background: #8f8f8f; color: #fff; }
+        .t128  { background: #767676; color: #fff; font-size: 22px; }
+        .t256  { background: #5e5e5e; color: #fff; font-size: 22px; }
+        .t512  { background: #474747; color: #fff; font-size: 22px; }
+        .t1024 { background: #2f2f2f; color: #fff; font-size: 19px; }
+        .t2048 { background: #151515; color: #fff; font-size: 19px; }
+        .t4096 { background: #0d0d0d; color: #fff; font-size: 18px;
+                 box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+        .t8192 { background: #050505; color: #fff; font-size: 17px;
+                 box-shadow: inset 0 0 0 2px rgba(255,255,255,.45); }
+        .t16384 { background: #000; color: #fff; font-size: 16px;
+                  box-shadow: inset 0 0 0 2px rgba(255,255,255,.6), inset 0 0 18px rgba(255,255,255,.12); }
+        .t32768 { background: #000; color: #fff; font-size: 15px;
+                  box-shadow: inset 0 0 0 2px rgba(255,255,255,.75), inset 0 0 22px rgba(255,255,255,.2); }
+        .t65536 { background: #000; color: #fff; font-size: 14px;
+                  box-shadow: inset 0 0 0 3px #fff, inset 0 0 26px rgba(255,255,255,.28); }
+        .tbig  { background: #000;    color: #fff; font-size: 13px;
+                 box-shadow: inset 0 0 0 3px #fff, inset 0 0 30px rgba(255,255,255,.35); }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 16px; }
+        .reset-btn {
+            flex: 1; padding: 11px;
+            border: 1px solid var(--line); background: var(--card); color: var(--fg);
+            border-radius: 8px; font-size: 14px; cursor: pointer;
+            transition: background .15s, transform .1s;
+        }
+        .reset-btn:hover { background: rgba(128,128,128,.1); }
+        .reset-btn:active { transform: scale(.98); }
+        .reset-btn.primary { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 700; }
+        .reset-btn.primary:hover { opacity: .85; }
+
+        .result-msg { margin-top: 12px; font-size: 13px; color: var(--muted); text-align: center; min-height: 18px; }
+
+        .rank-container { width: 100%; max-width: 320px; }
+        .rank-title { font-size: 16px; color: var(--fg); margin-bottom: 12px; }
+        .rank-list { list-style: none; }
+        .rank-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px;
+            margin-bottom: 8px; background: var(--card); font-size: 14px; color: var(--fg);
+        }
+        .rank-item.self { border-color: var(--fg); background: rgba(128,128,128,.1); }
+        .rank-num { width: 22px; color: var(--muted); font-weight: 700; }
+        .rank-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rank-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+        .modal-mask {
+            position: fixed; inset: 0; background: rgba(0,0,0,.5);
+            display: none; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .modal-mask.show { display: flex; }
+        .modal-card {
+            background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+            padding: 26px 30px; text-align: center; min-width: 280px;
+            box-shadow: 0 24px 60px rgba(0,0,0,.3);
+            animation: cardIn .2s cubic-bezier(.2,.9,.3,1.3);
+        }
+        @keyframes cardIn { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-card h3 { font-size: 20px; color: var(--fg); margin-bottom: 10px; }
+        .modal-card .final { font-size: 36px; font-weight: 800; color: var(--fg); margin: 8px 0 4px; }
+        .modal-card .tip { font-size: 12.5px; color: var(--muted); margin-bottom: 18px; }
+        .modal-card .newrec { color: var(--fg); font-weight: 700; display: none; margin-bottom: 10px; }
+        .modal-btns { display: flex; gap: 10px; }
+        .modal-btns button {
+            flex: 1; padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer;
+            border: 1px solid var(--line); background: var(--card); color: var(--fg);
+            transition: background .15s;
+        }
+        .modal-btns button:hover { background: rgba(128,128,128,.1); }
+        .modal-btns button.primary { background: var(--fg); border-color: var(--fg); color: var(--bg); font-weight: 700; }
+
+        @media (max-width: 860px) {
+            .games-page { padding-top: 84px; }
+            .rank-container { max-width: 500px; }
+        }
+        @media (max-width: 560px) {
+            .tile { font-size: 20px; }
+            .t128, .t256, .t512 { font-size: 17px; }
+            .t1024, .t2048 { font-size: 15px; }
+            .user-bar { position: static; margin-bottom: 10px; }
+            .top-bar { position: static; margin-bottom: 10px; }
+            .games-page { padding-top: 20px; }
+        }
+</style>
+
+    <div class="top-bar">
+        <a href="{{ url_for('games_center') }}">← 返回大厅</a>
+    </div>
+
+    <div class="user-bar">
+        {{ user.username }}
+        <span>最高分：<span class="high-score" id="userHighScore">{{ user.high_score_2048 or 0 }}</span></span>
+    </div>
+
+    <div class="game-container">
+        <div class="header"><h1>2048</h1></div>
+
+        <div class="info-bar">
+            <div class="info-item">
+                <div class="info-label">当前分数</div>
+                <div class="info-value" id="scoreDisplay">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">最高分</div>
+                <div class="info-value" id="bestDisplay">{{ user.high_score_2048 or 0 }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">最大方块</div>
+                <div class="info-value" id="maxDisplay">0</div>
+            </div>
+        </div>
+
+        <div class="board" id="board">
+            <div class="bg-grid" id="bgGrid"></div>
+        </div>
+
+        <div class="btn-group">
+            <button class="reset-btn primary" onclick="newGame()">重新开始</button>
+            <button class="reset-btn" onclick="undoMove()">撤销一步</button>
+        </div>
+
+        <div class="result-msg" id="resultMsg">方向键 / WASD 移动，手机可滑动屏幕</div>
+    </div>
+
+    <div class="rank-container">
+        <h3 class="rank-title">排行榜</h3>
+        <ul class="rank-list" id="rankList">
+            {% for item in rank_list %}
+            <li class="rank-item {% if item.username == user.username %}self{% endif %}">
+                <span class="rank-num">{{ loop.index }}</span>
+                <span class="rank-name">{{ item.username }}</span>
+                <span class="rank-score">{{ item.score }}</span>
+            </li>
+            {% endfor %}
+            {% if user_rank > 10 %}
+            <li class="rank-item self">
+                <span class="rank-num">{{ user_rank }}</span>
+                <span class="rank-name">{{ user.username }}</span>
+                <span class="rank-score">{{ user.high_score_2048 or 0 }}</span>
+            </li>
+            {% endif %}
+            {% if not rank_list %}
+            <li class="rank-item"><span class="rank-name" style="color:var(--muted)">还没有人上榜，来抢第一</span></li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+
+<div class="modal-mask" id="gameOverModal">
+    <div class="modal-card">
+        <h3>游戏结束</h3>
+        <div class="newrec" id="newRecordTip">新纪录</div>
+        <div class="final" id="finalScore">0</div>
+        <div class="tip">最大方块：<span id="finalMax">0</span></div>
+        <div class="modal-btns">
+            <button onclick="closeModal()">再看看</button>
+            <button class="primary" onclick="closeModal();newGame()">再来一局</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+  var SIZE = 4;
+  var GAP = 8;
+  var ANIM = 100;            // 滑动动画时长（与 CSS transition 对齐）
+
+  var boardEl = document.getElementById('board');
+  var bgGrid = document.getElementById('bgGrid');
+  var scoreEl = document.getElementById('scoreDisplay');
+  var bestEl = document.getElementById('bestDisplay');
+  var maxEl = document.getElementById('maxDisplay');
+  var msgEl = document.getElementById('resultMsg');
+
+  var tiles = [];            // {id, v, r, c, el}
+  var nextId = 1;
+  var score = 0;
+  var best = {{ (user.high_score_2048 or 0) | int }};
+  var over = false;
+  var submitted = false;
+  var history = [];
+  // 服务端复算用的输入序列（2048 有随机生成，必须把生成结果也报上去）
+  var seqStart = [];      // 开局方块 [[r,c,v], ...]
+  var seqMoves = [];      // 每步 {d: 方向, s: [r,c,v] 本步生成的新方块}
+  var seqDir = null;      // 当前这步的方向，等 addRandom 回来配对
+  var seqReady = false;   // 开局方块记录完才为 true
+  var cell = 0, step = 0;    // 像素尺寸（随窗口重算）
+  var busy = false;          // 动画期间锁输入
+
+  /* ---------- 布局 ---------- */
+  function layout(){
+    var w = boardEl.clientWidth;
+    if (!w) return;
+    var inner = w - GAP * 2;                 // 去掉 padding
+    cell = (inner - GAP * (SIZE - 1)) / SIZE;
+    step = cell + GAP;
+    tiles.forEach(function(t){ place(t, false); });
+  }
+
+  function place(t, animate){
+    var x = GAP + t.c * step;
+    var y = GAP + t.r * step;
+    t.el.style.width = cell + 'px';
+    t.el.style.height = cell + 'px';
+    t.el.style.fontSize = (t.v >= 1024 ? cell * 0.34 : (t.v >= 128 ? cell * 0.4 : cell * 0.5)) + 'px';
+    var pos = 'translate(' + x + 'px,' + y + 'px)';
+    if (!animate) t.el.style.transition = 'none';
+    t.el.className = clsOf(t.v);         // 值变了颜色也要跟着变
+    t.el.textContent = t.v;              // ← 之前漏了，方块全是空色块
+    t.el.style.setProperty('--pos', pos);
+    t.el.style.transform = pos;
+    if (!animate) {
+      // 强制回流后恢复过渡
+      void t.el.offsetWidth;
+      t.el.style.transition = '';
+    }
+  }
+
+  function clsOf(v){
+    // 4096 及以上各有独立档位，超出 65536 才走 tbig
+    if (v > 65536) return 'tile tbig';
+    return 'tile t' + v;
+  }
+
+  /* ---------- 方块增删 ---------- */
+  function spawn(r, c, v, fresh){
+    var el = document.createElement('div');
+    el.className = clsOf(v);
+    var t = {id: nextId++, v: v, r: r, c: c, el: el};
+    el.dataset.id = t.id;
+    boardEl.appendChild(el);
+    tiles.push(t);
+    place(t, false);
+    if (fresh) {
+      requestAnimationFrame(function(){
+        el.classList.add('fresh');
+        setTimeout(function(){ el.classList.remove('fresh'); }, 200);
+      });
+    }
+    return t;
+  }
+
+  function addRandom(){
+    var occ = {};
+    tiles.forEach(function(t){ occ[t.r + ',' + t.c] = 1; });
+    var free = [];
+    for (var r = 0; r < SIZE; r++) for (var c = 0; c < SIZE; c++) {
+      if (!occ[r + ',' + c]) free.push([r, c]);
+    }
+    if (!free.length) return null;
+    var p = free[Math.floor(Math.random() * free.length)];
+    var t = spawn(p[0], p[1], Math.random() < 0.9 ? 2 : 4, true);
+    // 复算序列：开局两个方块进 start，之后每次移动的生成方块进 moves
+    if (t) {
+      if (!seqReady) {
+        seqStart.push([t.r, t.c, t.v]);
+      } else if (seqDir !== null) {
+        seqMoves.push({d: seqDir, s: [t.r, t.c, t.v]});
+        seqDir = null;
+      }
+    }
+    return t;
+  }
+
+  function grid(){
+    var g = [];
+    for (var r = 0; r < SIZE; r++) { g.push([]); for (var c = 0; c < SIZE; c++) g[r].push(null); }
+    tiles.forEach(function(t){ g[t.r][t.c] = t; });
+    return g;
+  }
+
+  /* ---------- 移动 ---------- */
+  // 返回每行/列的坐标序列（按移动方向从远到近）
+  function linesFor(dir){
+    var lines = [];
+    for (var a = 0; a < SIZE; a++) {
+      var line = [];
+      for (var b = 0; b < SIZE; b++) {
+        var r, c;
+        if (dir === 3) { r = a; c = b; }                 // 左
+        else if (dir === 1) { r = a; c = SIZE - 1 - b; } // 右
+        else if (dir === 0) { r = b; c = a; }            // 上
+        else { r = SIZE - 1 - b; c = a; }                // 下
+        line.push({r: r, c: c});
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  function move(dir){
+    if (over || busy) return;
+    var g = grid();
+    var moved = false;
+    var gained = 0;
+    var mergedTiles = [];
+
+    linesFor(dir).forEach(function(line){
+      // 取出这条线上非空方块（按从远到近的顺序）
+      var seq = [];
+      line.forEach(function(p){
+        var t = g[p.r][p.c];
+        if (t) seq.push(t);
+      });
+      // 压缩 + 合并
+      var out = [];
+      for (var i = 0; i < seq.length; i++) {
+        if (i + 1 < seq.length && seq[i].v === seq[i + 1].v && !seq[i].justMerged) {
+          seq[i].v *= 2;
+          seq[i].justMerged = true;
+          gained += seq[i].v;
+          mergedTiles.push(seq[i]);
+          // 被吞并的那个方块先滑到同一格，动画结束后删除
+          seq[i + 1].dead = true;
+          seq[i + 1].r = line[out.length].r;
+          seq[i + 1].c = line[out.length].c;
+          out.push(seq[i]);
+          i++;
+        } else {
+          out.push(seq[i]);
+        }
+      }
+      // 分配新位置
+      out.forEach(function(t, idx){
+        var p = line[idx];
+        if (t.r !== p.r || t.c !== p.c) moved = true;
+        t.r = p.r;
+        t.c = p.c;
+      });
+    });
+
+    // ⚠️ 合并时「留下的那个」位置可能没变，但被吞的方块移过去了 —— 也算动了
+    if (mergedTiles.length) moved = true;
+
+    if (!moved) {
+      tiles.forEach(function(t){ t.justMerged = false; t.dead = false; });
+      return;
+    }
+
+    busy = true;
+    seqDir = dir;   // 记录本步方向，addRandom 时与生成方块配对
+    // 1) 先让所有方块滑到新位置（transform 过渡）
+    tiles.forEach(function(t){ place(t, true); });
+    score += gained;
+    scoreEl.textContent = score;
+    bump(scoreEl);
+
+    setTimeout(function(){
+      // 2) 动画结束：删掉被吞并的、给合并的加弹跳、更新颜色
+      tiles = tiles.filter(function(t){
+        if (t.dead) {
+          if (t.el.parentNode) t.el.parentNode.removeChild(t.el);
+          return false;
+        }
+        return true;
+      });
+      mergedTiles.forEach(function(t){
+        t.el.className = clsOf(t.v);
+        place(t, false);
+        requestAnimationFrame(function(){
+          t.el.classList.add('merged');
+          setTimeout(function(){ t.el.classList.remove('merged'); }, 220);
+        });
+      });
+      // 3) 补一个新方块
+      addRandom();
+      // 4) 清理标记
+      tiles.forEach(function(t){ t.justMerged = false; t.dead = false; });
+      // 5) 更新最大方块 & 结束判定
+      var maxV = 0;
+      tiles.forEach(function(t){ if (t.v > maxV) maxV = t.v; });
+      maxEl.textContent = maxV;
+      if (score > best) { best = score; bestEl.textContent = best; bump(bestEl); }
+      busy = false;
+      if (isOver()) gameOver();
+    }, ANIM);
+  }
+
+  function bump(el){
+    if (!el) return;
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+    setTimeout(function(){ el.classList.remove('bump'); }, 130);
+  }
+
+  function isOver(){
+    if (tiles.length < SIZE * SIZE) return false;
+    var g = grid();
+    for (var r = 0; r < SIZE; r++) {
+      for (var c = 0; c < SIZE; c++) {
+        var v = g[r][c] ? g[r][c].v : 0;
+        if (c + 1 < SIZE && g[r][c + 1] && g[r][c + 1].v === v) return false;
+        if (r + 1 < SIZE && g[r + 1][c] && g[r + 1][c].v === v) return false;
+      }
+    }
+    return true;
+  }
+
+  /* ---------- 局面快照（撤销用） ---------- */
+  function snapshot(){
+    return {
+      score: score,
+      tiles: tiles.map(function(t){ return {v: t.v, r: t.r, c: t.c}; })
+    };
+  }
+
+  function restore(snap){
+    tiles.forEach(function(t){ if (t.el.parentNode) t.el.parentNode.removeChild(t.el); });
+    tiles = [];
+    score = snap.score;
+    scoreEl.textContent = score;
+    snap.tiles.forEach(function(x){ spawn(x.r, x.c, x.v, false); });
+    var maxV = 0;
+    tiles.forEach(function(t){ if (t.v > maxV) maxV = t.v; });
+    maxEl.textContent = maxV;
+    over = false;
+  }
+
+  function undoMove(){
+    if (busy) return;
+    if (!history.length) { msgEl.textContent = '没有可撤销的步数'; return; }
+    restore(history.pop());
+    msgEl.textContent = '已撤销一步';
+  }
+
+  function newGame(){
+    layout();   // 先算好 cell 尺寸，否则首帧方块宽高为 0
+    tiles.forEach(function(t){ if (t.el.parentNode) t.el.parentNode.removeChild(t.el); });
+    tiles = [];
+    score = 0;
+    over = false;
+    submitted = false;
+    busy = false;
+    history = [];
+    scoreEl.textContent = 0;
+    maxEl.textContent = 0;
+    seqStart = []; seqMoves = []; seqDir = null; seqReady = false;
+    addRandom(); addRandom();
+    seqReady = true;   // 开局两个方块已记录
+    msgEl.textContent = '方向键 / WASD 移动，手机可滑动屏幕';
+  }
+
+  function gameOver(){
+    over = true;
+    if (submitted) return;
+    submitted = true;
+    var maxV = 0;
+    tiles.forEach(function(t){ if (t.v > maxV) maxV = t.v; });
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('finalMax').textContent = maxV;
+    document.getElementById('gameOverModal').classList.add('show');
+    if (window.MONO_REC) { try { window.MONO_REC.finish(score); } catch (e) {} }
+
+    fetch('/api/game/submit/2048', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({score: score, max_tile: maxV,
+                            seq: {start: seqStart, moves: seqMoves}})
+    }).then(function(r){ return r.json(); }).then(function(data){
+      if (!data || !data.ok) return;
+      if (data.new_best) {
+        document.getElementById('newRecordTip').style.display = 'block';
+        document.getElementById('userHighScore').textContent = score;
+      }
+      var rl = document.getElementById('rankList');
+      if (rl && data.rank_list) {
+        rl.innerHTML = '';
+        data.rank_list.forEach(function(item, idx){
+          var li = document.createElement('li');
+          li.className = 'rank-item' + (item.username === {{ user.username | tojson }} ? ' self' : '');
+          li.innerHTML = '<span class="rank-num">' + (idx + 1) + '</span>' +
+                         '<span class="rank-name"></span>' +
+                         '<span class="rank-score">' + item.score + '</span>';
+          li.querySelector('.rank-name').textContent = item.username;
+          rl.appendChild(li);
+        });
+      }
+    }).catch(function(){});
+  }
+
+  function closeModal(){
+    document.getElementById('gameOverModal').classList.remove('show');
+  }
+
+  /* ---------- 输入 ---------- */
+  var KEYMAP = {
+    ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3,
+    w: 0, d: 1, s: 2, a: 3, W: 0, D: 1, S: 2, A: 3
+  };
+  document.addEventListener('keydown', function(e){
+    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    var dir = KEYMAP[e.key];
+    if (dir === undefined) return;
+    e.preventDefault();
+    if (!busy && !history.length) { /* 首次移动前记快照 */ }
+    if (!busy) history.push(snapshot());
+    if (history.length > 20) history.shift();
+    move(dir);
+  });
+
+  var touchX = 0, touchY = 0;
+  boardEl.addEventListener('touchstart', function(e){
+    if (!e.touches.length) return;
+    touchX = e.touches[0].clientX;
+    touchY = e.touches[0].clientY;
+  }, {passive: true});
+  boardEl.addEventListener('touchend', function(e){
+    if (!e.changedTouches.length) return;
+    var dx = e.changedTouches[0].clientX - touchX;
+    var dy = e.changedTouches[0].clientY - touchY;
+    if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;
+    if (!busy) history.push(snapshot());
+    if (history.length > 20) history.shift();
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : 3);
+    else move(dy > 0 ? 2 : 0);
+  }, {passive: true});
+
+  /* 底格 */
+  for (var i = 0; i < SIZE * SIZE; i++) {
+    var d = document.createElement('div');
+    d.className = 'bg-cell';
+    bgGrid.appendChild(d);
+  }
+
+  window.addEventListener('resize', layout);
+  layout();
+  newGame();
+})();
+</script>
+{% endblock %}

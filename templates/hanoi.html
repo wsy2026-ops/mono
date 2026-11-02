@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block title %}汉诺塔 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="hn-page">
+<style>
+  .hn-page{
+    font-family:"Microsoft YaHei",sans-serif;
+    min-height:100vh;display:flex;justify-content:center;align-items:flex-start;
+    padding:86px 20px 40px;user-select:none;
+  }
+  .hn-topbar{position:fixed;top:76px;left:30px;font-size:14px;z-index:5;}
+  .hn-topbar a{color:#222;text-decoration:none;border-bottom:1px solid #000;}
+  .hn-userbar{position:fixed;top:76px;right:30px;background:#fff;border:1.5px solid #000;
+    padding:10px 15px;font-size:14px;z-index:5;}
+  .hn-userbar .hs{font-weight:700;margin-left:8px;}
+
+  .hn-wrap{display:flex;align-items:flex-start;gap:26px;flex-wrap:nowrap;}
+  @media (max-width:1040px){
+    .hn-wrap{flex-direction:column;align-items:center;}
+    .hn-rank{width:min(560px,94vw) !important;flex:none !important;}
+  }
+
+  .hn-container{background:#fff;border:2px solid #000;padding:22px 26px;width:fit-content;
+    box-shadow:6px 6px 0 rgba(0,0,0,.08);}
+  .hn-title{font-size:24px;font-weight:900;letter-spacing:6px;text-align:center;margin-bottom:4px;}
+  .hn-sub{font-size:12px;color:#999;text-align:center;margin-bottom:14px;letter-spacing:2px;}
+
+  .hn-levels{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
+  .hn-levels button{width:38px;height:38px;border:1.5px solid #000;background:#fff;color:#111;
+    font-size:15px;font-weight:800;cursor:pointer;padding:0;}
+  .hn-levels button:hover{background:#f2f2f2;}
+  .hn-levels button.on{background:#111;color:#fff;}
+
+  .hn-hud{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13.5px;margin-bottom:12px;
+    border:1.5px solid #000;padding:9px 14px;background:#fafafa;justify-content:center;}
+  .hn-hud b{font-weight:800;}
+  .hn-hud .warn{color:#c22b22;}
+  .hn-hud .time{font-variant-numeric:tabular-nums;}
+  #hnMsg{min-height:22px;font-size:13px;font-weight:700;color:#c22b22;margin:4px 2px 10px;text-align:center;}
+
+  .hn-board{display:flex;justify-content:center;align-items:flex-end;gap:4%;
+    width:min(560px,92vw);height:230px;position:relative;}
+  .hn-peg{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;
+    height:100%;justify-content:flex-end;}
+  .hn-peg:hover .hn-base{background:#333;}
+  .hn-area{position:relative;width:100%;height:196px;display:flex;align-items:flex-end;
+    justify-content:center;}
+  .hn-rod{position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+    width:8px;height:164px;background:#111;}
+  .hn-stack{position:relative;z-index:1;display:flex;flex-direction:column-reverse;
+    align-items:center;gap:3px;width:100%;}
+  .hn-base{width:100%;height:12px;background:#111;}
+  .hn-tag{font-size:13px;font-weight:800;margin-top:6px;letter-spacing:1px;}
+  .hn-disk{height:19px;border:1.5px solid #111;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:800;color:#111;transition:transform .12s ease;}
+  .hn-disk.sel{transform:translateY(-12px);box-shadow:0 0 0 2px #fff,0 0 0 3.5px #111;}
+  .hn-peg.pick .hn-tag{color:#c22b22;}
+
+  .hn-ops{display:flex;gap:10px;margin-top:14px;}
+  .hn-btn{flex:1;padding:9px;border:2px solid #000;background:#111;color:#fff;
+    font-size:14px;font-weight:800;cursor:pointer;letter-spacing:2px;}
+  .hn-btn:hover{background:#333;}
+  .hn-btn.ghost{background:#fff;color:#111;}
+  .hn-btn.ghost:hover{background:#f2f2f2;}
+
+  .hn-overlay{position:absolute;inset:0;background:rgba(255,255,255,.94);z-index:8;
+    display:none;align-items:center;justify-content:center;padding:16px;}
+  .hn-overlay.on{display:flex;}
+  .hn-overlay .box{border:2px solid #000;background:#fff;padding:22px 26px;min-width:280px;
+    text-align:center;box-shadow:6px 6px 0 rgba(0,0,0,.1);}
+  .hn-overlay h2{margin:0 0 10px;font-size:22px;font-weight:900;letter-spacing:4px;}
+  .hn-fin{font-size:34px;font-weight:900;margin:6px 0 4px;font-variant-numeric:tabular-nums;}
+  .hn-line{font-size:13.5px;color:#555;margin:2px 0;}
+  .hn-newrec{color:#c22b22;font-weight:800;font-size:14px;margin:8px 0;}
+
+  .hn-rank{background:#fff;border:2px solid #000;padding:22px;width:270px;height:fit-content;
+    box-shadow:6px 6px 0 rgba(0,0,0,.08);flex:0 0 270px;}
+  .hn-rank h3{margin:0 0 12px;font-size:18px;font-weight:800;text-align:center;
+    letter-spacing:3px;border-bottom:1px solid #000;padding-bottom:10px;}
+  .hn-rank ol{margin:0;padding:0 0 0 4px;list-style:none;}
+  .hn-rank li{display:flex;align-items:center;padding:8px 6px;border-bottom:1px solid #eee;font-size:13.5px;}
+  .hn-rank li:last-child{border-bottom:none;}
+  .hn-rank li.self{background:#f0f0f0;font-weight:700;}
+  .hn-rank .n{width:24px;text-align:center;font-weight:800;}
+  .hn-rank .u{flex:1;padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hn-rank .s{font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .hn-rank .empty{color:#999;font-size:13px;text-align:center;padding:14px 0;}
+
+  @media (max-width:1040px){
+    .hn-container{width:100%;max-width:560px;box-sizing:border-box;}
+    .hn-board{width:100%;}
+  }
+</style>
+
+  <div class="hn-topbar"><a href="{{ url_for('games_center') }}">← 返回游戏中心</a></div>
+  <div class="hn-userbar">👤 {{ user.username }}
+    <span class="hs">最高阶数：<span id="userHigh">{{ user.high_score_hanoi|default(0) }}</span></span>
+  </div>
+
+  <div class="hn-wrap">
+    <div class="hn-container">
+      <div class="hn-title">汉 诺 塔</div>
+      <div class="hn-sub">LUQI STUDIO · 单机版</div>
+
+      <div class="hn-levels" id="lvBox"></div>
+
+      <div class="hn-hud">
+        <span>阶数：<b id="hudLv">3</b></span>
+        <span>步数：<b id="hudMoves">0</b></span>
+        <span>最少：<b id="hudMin">7</b></span>
+        <span>用时：<b class="time" id="hudTime">00:00.0</b></span>
+        <span>本阶最佳：<b class="time" id="hudBest">--</b></span>
+      </div>
+      <div id="hnMsg"></div>
+
+      <div style="position:relative;">
+        <div class="hn-board" id="board"></div>
+        <div class="hn-overlay" id="winOverlay">
+          <div class="box">
+            <h2>通 关</h2>
+            <div class="hn-fin" id="winTime">--</div>
+            <div class="hn-line" id="winLine"></div>
+            <div class="hn-newrec" id="winNew" style="display:none;">🎉 新纪录！</div>
+            <button class="hn-btn" onclick="resetGame()">再来一局</button>
+            <button class="hn-btn ghost" onclick="closeWin()">看看棋盘</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hn-ops">
+        <button class="hn-btn ghost" onclick="undoMove()">撤销一步</button>
+        <button class="hn-btn" onclick="resetGame()">重新开始</button>
+      </div>
+    </div>
+
+    <div class="hn-rank">
+      <h3>排 行 榜</h3>
+      <ol id="rankList">
+        {% for item in rank_list %}
+        <li class="{% if item.username == user.username %}self{% endif %}">
+          <span class="n">{{ loop.index }}</span>
+          <span class="u">{{ item.username }}</span>
+          <span class="s">{{ item.level }} 阶 / {{ item.time_str }}</span>
+        </li>
+        {% endfor %}
+        {% if user_rank > 10 and (user.high_score_hanoi|default(0)) > 0 %}
+        <li class="self">
+          <span class="n">{{ user_rank }}</span>
+          <span class="u">{{ user.username }}</span>
+          <span class="s">{{ user.high_score_hanoi }} 阶 / {{ user.time_str }}</span>
+        </li>
+        {% endif %}
+        {% if not rank_list %}
+        <div class="empty">还没有人通关，快来抢占第一！</div>
+        {% endif %}
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+var N_MIN = 2, N_MAX = 9;
+var pegs = [[], [], []];      // 每根柱子自底向上的盘子（数字越小越小）
+var level = 3, moves = 0, sel = -1, over = false;
+var mvHist = [];
+var startTs = 0, elapsedMs = 0, timerId = null;
+var meName = {{ user.username|tojson }};
+
+window.MONO_GAME = { game: 'hanoi', sub: '3', kind: 'time' };
+window.MONO_GAME_RENDER = function(s, el){
+  var sp = pegs, ss = sel, sl = level, sm = moves;
+  window.__monoReplay = true;
+  pegs = s.p; sel = -1; level = s.l; moves = s.m;
+  render();
+  var bd = document.getElementById('board');
+  var c = bd.cloneNode(true);
+  var kill = c.querySelectorAll('[onclick]');
+  for (var i = 0; i < kill.length; i++) kill[i].removeAttribute('onclick');
+  c.style.pointerEvents = 'none';
+  el.innerHTML = '';
+  el.appendChild(c);
+  pegs = sp; sel = ss; level = sl; moves = sm;
+  render();
+  window.__monoReplay = false;
+};
+
+function bestKey(lv){ return 'mono_hanoi_bestms_' + lv; }
+function getBest(lv){
+  try { var v = localStorage.getItem(bestKey(lv)); return v ? parseInt(v, 10) : 0; }
+  catch(e){ return 0; }
+}
+function setBest(lv, ms){
+  try { localStorage.setItem(bestKey(lv), String(ms)); } catch(e){}
+}
+
+function fmtMs(ms){
+  if(!ms || ms < 0) return '--';
+  var t = Math.floor(ms / 100), d = t % 10;          // 0.1 秒
+  var s = Math.floor(ms / 1000), h = Math.floor(s / 3600);
+  var m = Math.floor((s % 3600) / 60), sec = s % 60;
+  function p2(n){ return (n < 10 ? '0' : '') + n; }
+  return (h ? h + ':' + p2(m) : p2(m)) + ':' + p2(sec) + '.' + d;
+}
+
+function buildLevels(){
+  var box = document.getElementById('lvBox');
+  var h = '';
+  for(var i=N_MIN; i<=N_MAX; i++)
+    h += '<button id="lv'+i+'" onclick="setLevel('+i+')">'+i+'</button>';
+  box.innerHTML = h;
+}
+
+function setLevel(lv){
+  level = lv;
+  resetGame();
+}
+
+function startTimer(){
+  if(timerId) return;
+  startTs = Date.now() - elapsedMs;
+  timerId = setInterval(function(){
+    elapsedMs = Date.now() - startTs;
+    document.getElementById('hudTime').textContent = fmtMs(elapsedMs);
+  }, 100);
+}
+function stopTimer(){
+  if(timerId){ clearInterval(timerId); timerId = null; }
+  elapsedMs = Date.now() - startTs;
+  document.getElementById('hudTime').textContent = fmtMs(elapsedMs);
+}
+
+function resetGame(){
+  pegs = [[], [], []];
+  for(var i=level; i>=1; i--) pegs[0].push(i);
+  moves = 0; sel = -1; over = false; mvHist = [];
+  if (window.MONO_GAME) window.MONO_GAME.sub = String(level);
+  if (window.MONO_REC) window.MONO_REC.start();
+  stopTimer(); startTs = 0; elapsedMs = 0;
+  document.getElementById('hudTime').textContent = '00:00.0';
+  document.getElementById('winOverlay').classList.remove('on');
+  for(var k=N_MIN; k<=N_MAX; k++){
+    var el = document.getElementById('lv'+k);
+    if(el) el.className = (k===level ? 'on' : '');
+  }
+  msg('');
+  render();
+}
+
+function undoMove(){
+  if(over || !mvHist.length) return;
+  var last = mvHist.pop();
+  pegs[last.to].pop();
+  pegs[last.from].push(last.disk);
+  moves = Math.max(0, moves - 1);
+  sel = -1;
+  render();
+}
+
+function tap(idx){
+  if(over) return;
+  if(sel === -1){
+    if(!pegs[idx].length){ msg('这根柱子是空的', true); return; }
+    sel = idx;
+    msg('已拿起 ' + pegs[idx][pegs[idx].length-1] + ' 号盘，点目标柱子放下');
+    render();
+    return;
+  }
+  if(sel === idx){ sel = -1; msg(''); render(); return; }
+  var d = pegs[sel][pegs[sel].length-1];
+  var top = pegs[idx].length ? pegs[idx][pegs[idx].length-1] : 999;
+  if(d > top){ msg('不能把大盘放到小盘上', true); return; }
+  pegs[sel].pop();
+  pegs[idx].push(d);
+  mvHist.push({from: sel, to: idx, disk: d});
+  moves++;
+  sel = -1;
+  msg('');
+  if(moves === 1) startTimer();      // 走出第一步才开始计时
+  render();
+  if(pegs[2].length === level) win();
+}
+
+function win(){
+  over = true;
+  stopTimer();
+  var ms = elapsedMs;
+  var min = Math.pow(2, level) - 1;
+  var best = getBest(level);
+  var isBest = (!best || ms < best);
+  if(isBest) setBest(level, ms);
+  document.getElementById('winTime').textContent = fmtMs(ms);
+  var extra = moves - min;
+  document.getElementById('winLine').innerHTML =
+    level + ' 阶 · ' + moves + ' 步（理论最少 ' + min + ' 步' +
+    (extra === 0 ? '，完美！' : extra > 0 ? '，多 ' + extra + ' 步' : '') + '）';
+  document.getElementById('winNew').style.display = isBest ? 'block' : 'none';
+  document.getElementById('winOverlay').classList.add('on');
+  fetch('/api/game/submit/hanoi', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({level: level, moves: moves, ms: ms, seq: mvHist})
+  }).then(function(r){ return r.json(); }).then(function(j){
+    if(j && j.ok){
+      if(j.new_best){
+        document.getElementById('userHigh').textContent = level;
+        document.getElementById('winNew').style.display = 'block';
+      }
+      if(j.rank_list) renderRank(j.rank_list);
+    }
+  }).catch(function(){});
+  if (window.MONO_REC) window.MONO_REC.finish(ms);
+}
+
+function closeWin(){
+  document.getElementById('winOverlay').classList.remove('on');
+}
+
+function msg(text, isWarn){
+  var el = document.getElementById('hnMsg');
+  el.textContent = isWarn ? '⚠️ ' + text : text;
+  el.style.color = isWarn ? '#c22b22' : '#222';
+}
+
+function diskStyle(d){
+  var span = level > 1 ? (d - 1) / (level - 1) : 0;
+  var w = 30 + span * 66;                       // 30% ~ 96%
+  var light = 93 - span * 62;                   // 浅灰 → 深灰
+  return 'width:' + w.toFixed(1) + '%;background:hsl(0,0%,' + light.toFixed(0) + '%);' +
+         'color:' + (light < 55 ? '#fff' : '#111') + ';';
+}
+
+function render(){
+  if (window.MONO_REC && window.MONO_REC.active){
+    window.MONO_REC.snap({p: pegs.map(function(a){ return a.slice(); }), l: level, m: moves});
+  }
+  var bd = document.getElementById('board');
+  var tags = ['A', 'B', 'C'];
+  var h = '';
+  for(var p=0; p<3; p++){
+    h += '<div class="hn-peg' + (sel===p ? ' pick' : '') + '" onclick="tap(' + p + ')">';
+    h += '<div class="hn-area"><div class="hn-rod"></div><div class="hn-stack">';
+    for(var k=0; k<pegs[p].length; k++){
+      var d = pegs[p][k];
+      var isSel = (sel === p && k === pegs[p].length - 1);
+      h += '<div class="hn-disk' + (isSel ? ' sel' : '') + '" style="' + diskStyle(d) + '">' + d + '</div>';
+    }
+    h += '</div></div>';
+    h += '<div class="hn-base"></div>';
+    h += '<div class="hn-tag">' + tags[p] + '</div>';
+    h += '</div>';
+  }
+  bd.innerHTML = h;
+
+  var min = Math.pow(2, level) - 1;
+  var best = getBest(level);
+  document.getElementById('hudLv').textContent = level;
+  document.getElementById('hudMoves').textContent = moves;
+  document.getElementById('hudMoves').className = (min > 0 && moves > min) ? 'warn' : '';
+  document.getElementById('hudMin').textContent = min;
+  document.getElementById('hudBest').textContent = best ? fmtMs(best) : '--';
+}
+
+function renderRank(list){
+  var el = document.getElementById('rankList');
+  if(!list || !list.length) return;
+  el.innerHTML = list.map(function(it, idx){
+    return '<li class="' + (it.username === meName ? 'self' : '') + '">' +
+      '<span class="n">' + (idx+1) + '</span>' +
+      '<span class="u">' + it.username + '</span>' +
+      '<span class="s">' + it.level + ' 阶 / ' + fmtMs(it.ms) + '</span></li>';
+  }).join('');
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.key === '1' || e.key === '2' || e.key === '3') tap(parseInt(e.key, 10) - 1);
+});
+
+buildLevels();
+resetGame();
+</script>
+{% endblock %}

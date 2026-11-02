@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ a.name }} - 社区活动{% endblock %}
+{% block content %}
+<div class="card" style="max-width:860px;margin:0 auto;">
+  {% if a.cover %}
+    <img src="{{ a.cover }}" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-bottom:16px;" loading="lazy" decoding="async">
+  {% endif %}
+  <div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+    <div>
+      <h2 style="margin:0 0 6px;">{{ a.name }}
+        {% if a.status == 'ongoing' %}
+          <span style="background:#111;color:#fff;font-size:13px;padding:2px 10px;border-radius:12px;vertical-align:middle;">进行中</span>
+        {% elif a.status == 'upcoming' %}
+          <span style="border:1px solid #111;font-size:13px;padding:2px 10px;border-radius:12px;vertical-align:middle;">未开始</span>
+        {% else %}
+          <span class="muted" style="border:1px solid #ccc;font-size:13px;padding:2px 10px;border-radius:12px;vertical-align:middle;">已结束</span>
+        {% endif %}
+      </h2>
+      <div class="muted" style="font-size:13px;">
+        {{ a.category }} · {{ '投稿征集模式' if a.mode == 'submission' else '线上集合模式' }} ·
+        {{ a.start_time|fmttime('%Y-%m-%d %H:%M') }} ~ {{ a.end_time|fmttime('%Y-%m-%d %H:%M') }} ·
+        {{ parts|length }} 人参与
+      </div>
+    </div>
+    {% if current_user and current_user.is_admin %}
+    <div class="row" style="gap:6px;flex-wrap:wrap;">
+      {% if a.status != 'ongoing' %}
+      <form method="post" action="{{ url_for('activity_set_status', aid=a.id, new_status='ongoing') }}"><button class="btn ghost" style="font-size:12px;">▶ 开始</button></form>
+      {% endif %}
+      {% if a.status != 'ended' %}
+      <form method="post" action="{{ url_for('activity_set_status', aid=a.id, new_status='ended') }}"><button class="btn ghost" style="font-size:12px;">■ 结束</button></form>
+      {% endif %}
+      {% if current_user.is_super_admin %}
+      <form method="post" action="{{ url_for('activity_delete', aid=a.id) }}" onsubmit="return confirm(__('确定删除该活动？所有参与记录将一并删除'));"><button class="btn ghost" style="font-size:12px;color:#c00;">删除</button></form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if a.intro %}
+  <div style="margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:8px;white-space:pre-wrap;font-size:14px;">{{ a.intro }}</div>
+  {% endif %}
+
+  <div style="margin-top:18px;">
+    {% if not current_user %}
+      <p class="muted">请<a href="{{ url_for('login') }}">登录</a>后参与活动</p>
+    {% elif a.status == 'upcoming' %}
+      <p class="muted">活动尚未开始，开始后即可参与</p>
+    {% elif a.status == 'ended' %}
+      <p class="muted">活动已结束，感谢参与</p>
+    {% elif a.mode == 'online' %}
+      {% if mine %}
+        <p>✅ 你已报名参与{% if room %}，前往集合地点：<a href="{{ url_for('chat') }}?room={{ room.id }}" class="btn" style="margin-left:8px;">进入「{{ room.name }}」</a>{% endif %}</p>
+      {% else %}
+        <form method="post" action="{{ url_for('activity_join', aid=a.id) }}" class="row" style="gap:10px;align-items:center;">
+          <button class="btn">🙋 报名参与（经验 +5）</button>
+          {% if room %}<span class="muted" style="font-size:13px;">集合地点：{{ room.name }}</span>{% endif %}
+        </form>
+      {% endif %}
+    {% else %}
+      <details {% if not mine %}open{% endif %} style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;">
+        <summary style="cursor:pointer;font-weight:bold;">📮 {{ '更新我的投稿' if mine else '提交投稿（首次投稿经验 +5）' }}</summary>
+        <form method="post" action="{{ url_for('activity_submit', aid=a.id) }}" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+          <textarea name="submission" rows="3" maxlength="1000" placeholder="作品说明 / 投稿文字内容">{{ mine.submission if mine else '' }}</textarea>
+          <input type="text" name="submission_url" maxlength="300" placeholder="作品链接（可填站内帖子链接，如 /post/12）" value="{{ mine.submission_url if mine else '' }}">
+          <div><button class="btn">提交投稿</button>
+          {% if mine %}<span class="muted" style="font-size:12px;margin-left:8px;">当前状态：{{ {'pending':'待审核','approved':'已通过','rejected':'未通过','awarded':'🏆 已获奖'}[mine.status] }}{% if mine.status=='awarded' %}（经验 +{{ mine.award_exp }}）{% endif %}</span>{% endif %}
+          </div>
+        </form>
+      </details>
+    {% endif %}
+  </div>
+
+  <h3 style="margin-top:24px;">{{ '投稿列表' if a.mode == 'submission' else '参与者' }}（{{ parts|length }}）</h3>
+  {% if not parts %}
+    <p class="muted">还没有人参与，快来做第一个吧！</p>
+  {% endif %}
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    {% for p in parts %}
+    <div style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;">
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <div class="row" style="gap:8px;align-items:center;">
+          <a href="{{ url_for('user_page', user_id=p.user_id) }}" style="font-weight:bold;text-decoration:none;color:inherit;">{{ p.username }}</a>
+          <span class="muted" style="font-size:12px;">Lv.{{ p.level }}</span>
+          {% if p.status == 'awarded' %}<span style="background:#111;color:#fff;font-size:12px;padding:2px 8px;border-radius:10px;">🏆 获奖 +{{ p.award_exp }}</span>
+          {% elif p.status == 'approved' %}<span style="border:1px solid #111;font-size:12px;padding:2px 8px;border-radius:10px;">已通过</span>
+          {% elif p.status == 'rejected' %}<span class="muted" style="border:1px solid #ccc;font-size:12px;padding:2px 8px;border-radius:10px;">未通过</span>
+          {% else %}<span class="muted" style="border:1px solid #ccc;font-size:12px;padding:2px 8px;border-radius:10px;">待审核</span>{% endif %}
+          <span class="muted" style="font-size:12px;">{{ p.created_at|timeago }}</span>
+        </div>
+        {% if current_user and current_user.is_admin and a.mode == 'submission' %}
+        <div class="row" style="gap:6px;align-items:center;flex-wrap:wrap;">
+          {% if p.status == 'pending' %}
+          <form method="post" action="{{ url_for('activity_participant_action', aid=a.id, pid=p.id, action='approve') }}"><button class="btn ghost" style="font-size:12px;">通过</button></form>
+          <form method="post" action="{{ url_for('activity_participant_action', aid=a.id, pid=p.id, action='reject') }}"><button class="btn ghost" style="font-size:12px;">拒绝</button></form>
+          {% endif %}
+          {% if p.status in ('approved', 'pending') %}
+          <form method="post" action="{{ url_for('activity_participant_action', aid=a.id, pid=p.id, action='award') }}" class="row" style="gap:4px;align-items:center;">
+            <input type="number" name="bonus" value="20" min="1" max="200" style="width:64px;font-size:12px;padding:4px;">
+            <button class="btn ghost" style="font-size:12px;">🏆 颁奖</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% if p.submission %}<div style="margin-top:8px;font-size:14px;white-space:pre-wrap;">{{ p.submission }}</div>{% endif %}
+      {% if p.submission_url %}<div style="margin-top:6px;font-size:13px;">🔗 <a href="{{ p.submission_url }}">{{ p.submission_url }}</a></div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="margin-top:20px;"><a href="{{ url_for('activities_page') }}" class="muted" style="font-size:13px;">« 返回活动列表</a></div>
+</div>
+{% endblock %}

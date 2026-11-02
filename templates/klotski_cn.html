@@ -1,0 +1,851 @@
+{% extends "base.html" %}
+{% block title %}经典华容道 - MONO 社区</div>
+{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="games-page">
+<style>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+.games-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    font-family: "Microsoft YaHei", sans-serif;
+    color: #111;
+    user-select: none;
+    padding: 20px;
+    gap: 30px;
+}
+
+.top-bar {
+    position: fixed;
+    top: 76px;
+    left: 30px;
+    font-size: 14px;
+    z-index: 100;
+}
+.top-bar a {
+    color: #222;
+    text-decoration: none;
+    border-bottom: 1px solid #000;
+}
+
+.user-bar {
+    position: fixed;
+    top: 76px;
+    right: 30px;
+    background: #fff;
+    border: 1px solid #000;
+    padding: 10px 15px;
+    font-size: 14px;
+    z-index: 100;
+}
+.user-bar .best-time {
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+#homePage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    border: 2px solid #000;
+    padding: 50px 40px;
+}
+#homePage h1 {
+    font-size: 36px;
+    letter-spacing: 8px;
+    font-weight: 300;
+    margin-bottom: 40px;
+}
+.layout-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 240px;
+}
+.layout-btn {
+    padding: 14px 0;
+    background: #fff;
+    border: 1px solid #000;
+    color: #000;
+    font-size: 16px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+.layout-btn:hover {
+    background: #000;
+    color: #fff;
+}
+
+#gamePage {
+    display: none;
+    gap: 56px;
+    align-items: flex-start;
+}
+.game-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    border: 2px solid #000;
+    padding: 30px;
+}
+.game-left h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    letter-spacing: 4px;
+    font-weight: 300;
+}
+.info-bar {
+    width: 400px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    font-size: 14px;
+    border-top: 1px solid #000;
+    border-bottom: 1px solid #000;
+    padding: 10px 0;
+}
+.info-item {
+    text-align: center;
+    flex: 1;
+}
+.info-item span {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 2px;
+}
+
+.board {
+    position: relative;
+    width: 400px;
+    height: 500px;
+    background: #000;
+    padding: 4px;
+    cursor: default;
+}
+.cell {
+    position: absolute;
+    background: #999;
+}
+.piece {
+    position: absolute;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    cursor: grab;
+    z-index: 1;
+    transition: opacity 0.1s ease;
+}
+.piece:active {
+    cursor: grabbing;
+    opacity: 0.9;
+}
+.piece-cao { font-size: 28px; }
+.piece-general { font-size: 20px; }
+.piece-soldier { font-size: 16px; }
+
+.win-tip {
+    margin-top: 16px;
+    height: 24px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #27ae60;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.win-tip.show { opacity: 1; }
+
+.controls {
+    margin-top: 76px;
+    display: flex;
+    gap: 10px;
+}
+.controls button {
+    padding: 8px 20px;
+    background: #fff;
+    border: 1px solid #000;
+    color: #000;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.controls button:hover {
+    background: #000;
+    color: #fff;
+}
+
+.rank-container {
+    background: #fff;
+    border: 2px solid #000;
+    padding: 25px;
+    width: 280px;
+    height: fit-content;
+}
+.rank-title {
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 2px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #000;
+    margin-bottom: 15px;
+}
+.rank-list {
+    list-style: none;
+}
+.rank-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 16px;
+}
+.rank-item:last-child { border-bottom: none; }
+.rank-item.self {
+    background: #f0f0f0;
+    font-weight: bold;
+}
+.rank-num {
+    width: 30px;
+    text-align: center;
+    font-weight: bold;
+}
+.rank-name {
+    flex: 1;
+    padding: 0 10px;
+}
+.rank-time {
+    font-weight: bold;
+    min-width: 60px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.modal {
+    background: #fff;
+    border: 2px solid #000;
+    padding: 40px;
+    text-align: center;
+    max-width: 350px;
+    width: 90%;
+}
+.modal h2 {
+    font-size: 24px;
+    margin-bottom: 15px;
+    color: #000;
+    letter-spacing: 2px;
+}
+.modal p {
+    color: #333;
+    margin-bottom: 10px;
+    line-height: 1.6;
+}
+.new-record {
+    color: #e74c3c;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+.final-time {
+    font-size: 36px;
+    font-weight: bold;
+    color: #000;
+    margin: 20px 0;
+    font-variant-numeric: tabular-nums;
+}
+.modal-btns {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+.modal-btn {
+    padding: 12px 24px;
+    font-size: 15px;
+    border: 2px solid #000;
+    background: #fff;
+    color: #000;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+.modal-btn:hover {
+    background: #000;
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .games-page {
+        flex-direction: column;
+        gap: 20px;
+        padding-top: 70px;
+    }
+    .rank-container {
+        width: 100%;
+        max-width: 460px;
+    }
+    .user-bar { top: 10px; right: 10px; }
+    .top-bar { top: 10px; left: 10px; }
+}
+</style>
+
+    <div class="top-bar">
+        <a href="{{ url_for('games_center') }}">← 返回大厅</a>
+    </div>
+
+    <div class="user-bar">
+        {{ user.username }}
+        <span>最佳用时：<span class="best-time" id="userBestTime">--:--</span></span>
+    </div>
+
+    <div id="homePage">
+        <h1>华容道</h1>
+        <div class="layout-group">
+            <button class="layout-btn" data-id="1">横刀立马</button>
+            <button class="layout-btn" data-id="2">指挥若定</button>
+            <button class="layout-btn" data-id="3">兵分三路</button>
+            <button class="layout-btn" data-id="4">齐头并进</button>
+        </div>
+    </div>
+
+    <div id="gamePage">
+        <div class="game-left">
+            <h1 id="gameTitle">横刀立马</h1>
+            <div class="info-bar">
+                <div class="info-item">
+                    用时
+                    <span id="time">00:00</span>
+                </div>
+                <div class="info-item">
+                    步数
+                    <span id="steps">0</span>
+                </div>
+            </div>
+            <div class="board" id="board"></div>
+            <div class="win-tip" id="winTip">恭喜通关！曹操成功突围</div>
+            <div class="controls">
+                <button id="restartBtn">重新开始</button>
+                <button id="backBtn">返回选关</button>
+            </div>
+        </div>
+
+        <div class="rank-container">
+            <h3 class="rank-title">排行榜</h3>
+            <ul class="rank-list" id="rankList">
+                {% for item in rank_list %}
+                <li class="rank-item {% if item.username == user.username %}self{% endif %}">
+                    <span class="rank-num">{{ loop.index }}</span>
+                    <span class="rank-name">{{ item.username }}</span>
+                    <span class="rank-time" data-seconds="{{ item.best_time }}">--:--</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="gameOverModal">
+        <div class="modal">
+            <h2>通关成功</h2>
+            <p id="gameInfo"></p>
+            <div class="new-record" id="newRecordTip" style="display:none;">🎉 新纪录！</div>
+            <div class="final-time" id="finalTime">00:00</div>
+            <div class="modal-btns">
+                <button class="modal-btn" onclick="backToHome()">返回选关</button>
+                <button class="modal-btn" onclick="restartGame()">再来一局</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+const COLS = 4;
+const ROWS = 5;
+const CELL_SIZE = 95;
+const GAP = 4;
+const PADDING = 4;
+
+const LAYOUTS = [
+    {
+        id: 1,
+        name: '横刀立马',
+        pieces: [
+            { id: 'caocao', name: '曹操', type: 'cao', w: 2, h: 2, x: 1, y: 0 },
+            { id: 'zhangfei', name: '张飞', type: 'general', w: 1, h: 2, x: 0, y: 0 },
+            { id: 'zhaoyun', name: '赵云', type: 'general', w: 1, h: 2, x: 3, y: 0 },
+            { id: 'guanyu', name: '关羽', type: 'general', w: 2, h: 1, x: 1, y: 2 },
+            { id: 'machao', name: '马超', type: 'general', w: 1, h: 2, x: 0, y: 2 },
+            { id: 'huangzhong', name: '黄忠', type: 'general', w: 1, h: 2, x: 3, y: 2 },
+            { id: 'zu1', name: '卒', type: 'soldier', w: 1, h: 1, x: 1, y: 3 },
+            { id: 'zu2', name: '卒', type: 'soldier', w: 1, h: 1, x: 2, y: 3 },
+            { id: 'zu3', name: '卒', type: 'soldier', w: 1, h: 1, x: 0, y: 4 },
+            { id: 'zu4', name: '卒', type: 'soldier', w: 1, h: 1, x: 3, y: 4 }
+        ]
+    },
+    {
+        id: 2,
+        name: '指挥若定',
+        pieces: [
+            { id: 'caocao', name: '曹操', type: 'cao', w: 2, h: 2, x: 1, y: 0 },
+            { id: 'huangzhong', name: '黄忠', type: 'general', w: 1, h: 2, x: 0, y: 0 },
+            { id: 'machao', name: '马超', type: 'general', w: 1, h: 2, x: 3, y: 0 },
+            { id: 'zu7', name: '卒', type: 'soldier', w: 1, h: 1, x: 0, y: 2 },
+            { id: 'guanyu', name: '关羽', type: 'general', w: 2, h: 1, x: 1, y: 2 },
+            { id: 'zu8', name: '卒', type: 'soldier', w: 1, h: 1, x: 3, y: 2 },
+            { id: 'zhangfei', name: '张飞', type: 'general', w: 1, h: 2, x: 0, y: 3 },
+            { id: 'zu9', name: '卒', type: 'soldier', w: 1, h: 1, x: 1, y: 3 },
+            { id: 'zu10', name: '卒', type: 'soldier', w: 1, h: 1, x: 2, y: 3 },
+            { id: 'zhaoyun', name: '赵云', type: 'general', w: 1, h: 2, x: 3, y: 3 }
+        ]
+    },
+    {
+        id: 3,
+        name: '兵分三路',
+        pieces: [
+            { id: 'caocao', name: '曹操', type: 'cao', w: 2, h: 2, x: 0, y: 0 },
+            { id: 'zhangfei', name: '张飞', type: 'general', w: 1, h: 2, x: 2, y: 0 },
+            { id: 'zhaoyun', name: '赵云', type: 'general', w: 1, h: 2, x: 3, y: 0 },
+            { id: 'guanyu', name: '关羽', type: 'general', w: 2, h: 1, x: 0, y: 2 },
+            { id: 'machao', name: '马超', type: 'general', w: 1, h: 2, x: 2, y: 2 },
+            { id: 'huangzhong', name: '黄忠', type: 'general', w: 1, h: 2, x: 3, y: 2 },
+            { id: 'zu1', name: '卒', type: 'soldier', w: 1, h: 1, x: 0, y: 3 },
+            { id: 'zu2', name: '卒', type: 'soldier', w: 1, h: 1, x: 1, y: 3 },
+            { id: 'zu3', name: '卒', type: 'soldier', w: 1, h: 1, x: 0, y: 4 },
+            { id: 'zu4', name: '卒', type: 'soldier', w: 1, h: 1, x: 1, y: 4 }
+        ]
+    },
+    {
+        id: 4,
+        name: '齐头并进',
+        pieces: [
+            { id: 'caocao', name: '曹操', type: 'cao', w: 2, h: 2, x: 1, y: 0 },
+            { id: 'huangzhong', name: '黄忠', type: 'general', w: 1, h: 2, x: 0, y: 0 },
+            { id: 'machao', name: '马超', type: 'general', w: 1, h: 2, x: 3, y: 0 },
+            { id: 'zu1', name: '卒', type: 'soldier', w: 1, h: 1, x: 0, y: 2 },
+            { id: 'zu2', name: '卒', type: 'soldier', w: 1, h: 1, x: 1, y: 2 },
+            { id: 'zu3', name: '卒', type: 'soldier', w: 1, h: 1, x: 2, y: 2 },
+            { id: 'zu4', name: '卒', type: 'soldier', w: 1, h: 1, x: 3, y: 2 },
+            { id: 'zhangfei', name: '张飞', type: 'general', w: 1, h: 2, x: 0, y: 3 },
+            { id: 'guanyu', name: '关羽', type: 'general', w: 2, h: 1, x: 1, y: 3 },
+            { id: 'zhaoyun', name: '赵云', type: 'general', w: 1, h: 2, x: 3, y: 3 }
+        ]
+    }
+];
+
+let currentLayoutId = 1;
+let pieces = [];
+
+window.MONO_GAME = { game: 'klotski_cn', sub: '1', kind: 'time' };
+window.MONO_GAME_RENDER = function(s, el){
+  const sp = pieces, st = steps, sc = seconds, sw = isWon, sb = submitted, sl = currentLayoutId;
+  window.__monoReplay = true;
+  pieces = JSON.parse(JSON.stringify(s.p));
+  steps = s.s; seconds = s.c; isWon = false; submitted = true;
+  const bd = document.getElementById('board');
+  renderBoard();
+  const c = bd.cloneNode(true);
+  c.style.pointerEvents = 'none';
+  el.innerHTML = '';
+  el.appendChild(c);
+  pieces = sp; steps = st; seconds = sc; isWon = sw; submitted = sb; currentLayoutId = sl;
+  renderBoard();
+  window.__monoReplay = false;
+};
+let steps = 0;
+let seconds = 0;
+let timer = null;
+let started = false;
+let isWon = false;
+let submitted = false;
+let rankLoading = false; // 排行榜加载锁，防止竞态
+/* 服务端复算用：合法落子序列 */
+let moveLog = [];
+let isSubmitting = false; // 提交接口防抖锁
+
+let draggingPiece = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let dragStartX = 0;
+let dragStartY = 0;
+
+const userBestTimes = {
+    1: {{ user.best_time_klotski_cn_1 if user.best_time_klotski_cn_1 is not none else 'null' }},
+    2: {{ user.best_time_klotski_cn_2 if user.best_time_klotski_cn_2 is not none else 'null' }},
+    3: {{ user.best_time_klotski_cn_3 if user.best_time_klotski_cn_3 is not none else 'null' }},
+    4: {{ user.best_time_klotski_cn_4 if user.best_time_klotski_cn_4 is not none else 'null' }}
+};
+const currentUsername = {{ user.username|tojson }};
+
+const homePage = document.getElementById('homePage');
+const gamePage = document.getElementById('gamePage');
+const gameTitle = document.getElementById('gameTitle');
+const board = document.getElementById('board');
+const timeEl = document.getElementById('time');
+const stepsEl = document.getElementById('steps');
+const winTip = document.getElementById('winTip');
+const restartBtn = document.getElementById('restartBtn');
+const backBtn = document.getElementById('backBtn');
+const userBestTimeEl = document.getElementById('userBestTime');
+const gameOverModal = document.getElementById('gameOverModal');
+const newRecordTip = document.getElementById('newRecordTip');
+const gameInfoText = document.getElementById('gameInfo');
+const finalTimeText = document.getElementById('finalTime');
+
+function formatTime(sec) {
+    if (sec === null || sec === undefined || isNaN(sec)) return '--:--';
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+}
+
+function initRankTimeFormat() {
+    document.querySelectorAll('.rank-time').forEach(el => {
+        const sec = parseInt(el.dataset.seconds);
+        el.textContent = formatTime(sec);
+    });
+}
+
+function loadRank(layoutId) {
+    if (rankLoading) return;
+    rankLoading = true;
+    fetch(`/api/klotski_cn_rank/${layoutId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) renderRankList(data.rank_list);
+        })
+        .finally(() => {
+            rankLoading = false;
+        });
+}
+
+function renderRankList(list) {
+    const rankListEl = document.getElementById('rankList');
+    rankListEl.innerHTML = '';
+    list.forEach((item, idx) => {
+        const li = document.createElement('li');
+        li.className = 'rank-item' + (item.username === currentUsername ? ' self' : '');
+        li.innerHTML = `
+            <span class="rank-num">${idx + 1}</span>
+            <span class="rank-name">${item.username}</span>
+            <span class="rank-time">${formatTime(item.best_time)}</span>
+        `;
+        rankListEl.appendChild(li);
+    });
+}
+
+function updateUserBestDisplay(layoutId) {
+    userBestTimeEl.textContent = formatTime(userBestTimes[layoutId]);
+}
+
+document.querySelectorAll('.layout-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentLayoutId = parseInt(btn.dataset.id);
+        const layout = LAYOUTS.find(l => l.id === currentLayoutId);
+        gameTitle.textContent = layout.name;
+
+        updateUserBestDisplay(currentLayoutId);
+        loadRank(currentLayoutId);
+
+        homePage.style.display = 'none';
+        gamePage.style.display = 'flex';
+        initGame();
+    });
+});
+
+function backToHome() {
+    clearInterval(timer);
+    gameOverModal.style.display = 'none';
+    homePage.style.display = 'flex';
+    gamePage.style.display = 'none';
+}
+backBtn.addEventListener('click', backToHome);
+
+function initGame() {
+    const layout = LAYOUTS.find(l => l.id === currentLayoutId);
+    pieces = JSON.parse(JSON.stringify(layout.pieces));
+    if (window.MONO_GAME) window.MONO_GAME.sub = String(currentLayoutId);
+    if (window.MONO_REC) window.MONO_REC.start();
+
+    steps = 0;
+    seconds = 0;
+    started = false;
+    isWon = false;
+    moveLog = [];   // 服务端复算：合法落子序列清零
+    submitted = false;
+    isSubmitting = false;
+    clearInterval(timer);
+    timer = null;
+
+    winTip.classList.remove('show');
+    newRecordTip.style.display = 'none';
+    updateUI();
+    renderBoard();
+}
+restartBtn.addEventListener('click', initGame);
+
+function renderBoard() {
+    if (window.MONO_REC && window.MONO_REC.active){
+        window.MONO_REC.snap({p: JSON.parse(JSON.stringify(pieces)), s: steps, c: seconds});
+    }
+    board.innerHTML = '';
+
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.style.left = PADDING + x * (CELL_SIZE + GAP) + 'px';
+            cell.style.top = PADDING + y * (CELL_SIZE + GAP) + 'px';
+            cell.style.width = CELL_SIZE + 'px';
+            cell.style.height = CELL_SIZE + 'px';
+            board.appendChild(cell);
+        }
+    }
+
+    pieces.forEach(piece => {
+        const el = createPieceDom(piece);
+        board.appendChild(el);
+    });
+}
+
+function createPieceDom(piece) {
+    const el = document.createElement('div');
+    el.className = `piece piece-${piece.type}`;
+    el.dataset.id = piece.id;
+    el.textContent = piece.name;
+    el.style.left = PADDING + piece.x * (CELL_SIZE + GAP) + 'px';
+    el.style.top = PADDING + piece.y * (CELL_SIZE + GAP) + 'px';
+    el.style.width = piece.w * CELL_SIZE + (piece.w - 1) * GAP + 'px';
+    el.style.height = piece.h * CELL_SIZE + (piece.h - 1) * GAP + 'px';
+
+    el.addEventListener('mousedown', (e) => startDrag(e, piece));
+    return el;
+}
+
+function startDrag(e, piece) {
+    if (isWon) return;
+    e.preventDefault();
+
+    draggingPiece = piece;
+    dragStartX = piece.x;
+    dragStartY = piece.y;
+
+    const rect = e.target.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+}
+
+function onDrag(e) {
+    if (!draggingPiece) return;
+
+    const boardRect = board.getBoundingClientRect();
+    let newLeft = e.clientX - boardRect.left - dragOffsetX;
+    let newTop = e.clientY - boardRect.top - dragOffsetY;
+
+    const baseLeft = PADDING + dragStartX * (CELL_SIZE + GAP);
+    const baseTop = PADDING + dragStartY * (CELL_SIZE + GAP);
+    const dx = newLeft - baseLeft;
+    const dy = newTop - baseTop;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        newTop = baseTop;
+    } else {
+        newLeft = baseLeft;
+    }
+
+    const maxLeft = PADDING + (COLS - draggingPiece.w) * (CELL_SIZE + GAP);
+    const maxTop = PADDING + (ROWS - draggingPiece.h) * (CELL_SIZE + GAP);
+    newLeft = Math.max(PADDING, Math.min(newLeft, maxLeft));
+    newTop = Math.max(PADDING, Math.min(newTop, maxTop));
+
+    const el = document.querySelector(`.piece[data-id="${draggingPiece.id}"]`);
+    if (el) {
+        el.style.left = newLeft + 'px';
+        el.style.top = newTop + 'px';
+    }
+}
+
+function endDrag() {
+    if (!draggingPiece) return;
+
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', endDrag);
+
+    const el = document.querySelector(`.piece[data-id="${draggingPiece.id}"]`);
+    if (!el) {
+        draggingPiece = null;
+        return;
+    }
+
+    const cellStep = CELL_SIZE + GAP;
+    let targetX = Math.round((parseFloat(el.style.left) - PADDING) / cellStep);
+    let targetY = Math.round((parseFloat(el.style.top) - PADDING) / cellStep);
+
+    targetX = Math.max(0, Math.min(targetX, COLS - draggingPiece.w));
+    targetY = Math.max(0, Math.min(targetY, ROWS - draggingPiece.h));
+
+    if (targetX === dragStartX && targetY === dragStartY) {
+        renderBoard();
+        draggingPiece = null;
+        return;
+    }
+
+    let moveValid = false;
+    if (targetX !== dragStartX) {
+        const stepX = targetX > dragStartX ? 1 : -1;
+        let canMove = true;
+        for (let x = dragStartX + stepX; x !== targetX + stepX; x += stepX) {
+            if (!isPositionValid(draggingPiece, x, dragStartY)) {
+                canMove = false;
+                break;
+            }
+        }
+        if (canMove) {
+            moveValid = true;
+            targetY = dragStartY;
+        }
+    } else if (targetY !== dragStartY) {
+        const stepY = targetY > dragStartY ? 1 : -1;
+        let canMove = true;
+        for (let y = dragStartY + stepY; y !== targetY + stepY; y += stepY) {
+            if (!isPositionValid(draggingPiece, dragStartX, y)) {
+                canMove = false;
+                break;
+            }
+        }
+        if (canMove) {
+            moveValid = true;
+            targetX = dragStartX;
+        }
+    }
+
+    if (moveValid) {
+        if (!started) {
+            started = true;
+            startTimer();
+        }
+        draggingPiece.x = targetX;
+        draggingPiece.y = targetY;
+        steps++;
+        moveLog.push({id: draggingPiece.id, x: targetX, y: targetY});  // 服务端复算
+        updateUI();
+        checkWin();
+    }
+
+    renderBoard();
+    draggingPiece = null;
+}
+
+function isPositionValid(piece, x, y) {
+    if (x < 0 || x + piece.w > COLS) return false;
+    if (y < 0 || y + piece.h > ROWS) return false;
+
+    for (const p of pieces) {
+        if (p.id === piece.id) continue;
+        if (x < p.x + p.w && x + piece.w > p.x &&
+            y < p.y + p.h && y + piece.h > p.y) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function startTimer() {
+    if (timer) return;
+    timer = setInterval(() => {
+        seconds++;
+        timeEl.textContent = formatTime(seconds);
+    }, 1000);
+}
+
+function updateUI() {
+    stepsEl.textContent = steps;
+    timeEl.textContent = formatTime(seconds);
+}
+
+function checkWin() {
+    const caocao = pieces.find(p => p.id === 'caocao');
+    if (caocao && caocao.x === 1 && caocao.y === 3) {
+        isWon = true;
+        clearInterval(timer);
+        winTip.classList.add('show');
+
+        if (!submitted) {
+            submitted = true;
+            gameInfoText.textContent = `步数 ${steps}`;
+            finalTimeText.textContent = formatTime(seconds);
+
+            setTimeout(() => {
+                gameOverModal.style.display = 'flex';
+                submitTime(seconds);
+            }, 800);
+        }
+    }
+}
+
+function submitTime(time) {
+    if (window.MONO_REC) window.MONO_REC.finish(time * 1000);
+    if (isSubmitting) return;
+    isSubmitting = true;
+    fetch('/api/game/submit/klotski_cn', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            layout_id: currentLayoutId, time: time,
+            seq: {layout_id: currentLayoutId, moves: moveLog}
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            if (data.new_best) {
+                newRecordTip.style.display = 'block';
+                userBestTimes[currentLayoutId] = time;
+                updateUserBestDisplay(currentLayoutId);
+            }
+            renderRankList(data.rank_list);
+        }
+    })
+    .catch(err => {
+        console.error('提交用时失败', err);
+    })
+    .finally(() => {
+        isSubmitting = false;
+    });
+}
+
+function restartGame() {
+    gameOverModal.style.display = 'none';
+    initGame();
+}
+
+updateUserBestDisplay(1);
+initRankTimeFormat();
+</script>
+{% endblock %}

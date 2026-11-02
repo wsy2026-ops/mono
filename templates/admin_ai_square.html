@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}AI 广场设置{% endblock %}
+{% block content %}
+<style>
+  .asq{max-width:760px;margin:0 auto;padding:20px 16px 40px;}
+  .asq h1{font-size:20px;margin:0 0 6px;}
+  .asq .sub{color:var(--muted);font-size:13px;margin-bottom:18px;}
+  .asq-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px;}
+  .asq-card h2{font-size:14.5px;margin:0 0 12px;}
+  .asq-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);}
+  .asq-grip{cursor:grab;color:var(--muted);font-size:14px;user-select:none;flex:none;letter-spacing:-1px;}
+  .asq-grip:active{cursor:grabbing;}
+  .asq-drag.dragging{opacity:.4;}
+  .asq-drag.over{background:rgba(91,140,255,.08);border-radius:8px;}
+  .asq-row:last-child{border-bottom:none;}
+  .asq-row label{flex:1;font-size:13.5px;cursor:pointer;}
+  .asq-row .tag{font-size:11.5px;color:var(--muted);}
+  .asq-row input[type=radio]{accent-color:#5b8cff;}
+  .asq-btn{padding:9px 20px;border-radius:10px;border:none;cursor:pointer;font-size:14px;
+    background:linear-gradient(135deg,#5b8cff,#8b5cf6);color:#fff;font-weight:600;}
+  .asq-tip{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.6;}
+  .asq-mblock{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;
+    background:rgba(128,128,128,.03);}
+  .asq-mblock:last-child{margin-bottom:0;}
+  .asq-mname{font-size:13.5px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:7px;}
+  .asq-mname .dot{width:6px;height:6px;border-radius:50%;background:#5b8cff;}
+  .asq-lb{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .asq-nameinp{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;
+    padding:8px 11px;font-size:13px;background:var(--bg);color:var(--fg);outline:none;}
+  .asq-nameinp:focus{border-color:rgba(91,140,255,.5);}
+  .asq-mblock textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:64px;
+    border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;
+    font-family:inherit;line-height:1.6;background:var(--bg);color:var(--fg);outline:none;}
+  .asq-mblock textarea:focus{border-color:rgba(91,140,255,.5);}
+  .asq-2col{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px;}
+  .asq-2col label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);}
+  .asq-2col input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px;
+    background:var(--bg);color:var(--fg);outline:none;width:100%;box-sizing:border-box;}
+  .asq-2col input:focus{border-color:rgba(91,140,255,.5);}
+  @media(max-width:600px){.asq-2col{grid-template-columns:1fr;}}
+</style>
+<div class="asq">
+  <h1>AI 广场 · 模型设置</h1>
+  <div class="sub">控制可选的模型、默认模型，以及悬停卡片里的描述与价格（当前默认：<b>{{ cfg.default }}</b>）</div>
+  <form method="post">
+
+    <div class="asq-card">
+      <h2>可用模型（勾选后在 AI 广场出现）· 可拖拽排序</h2>
+      <input type="hidden" name="model_order" id="modelOrder"
+             value="{{ all_models_sorted | join(',') }}">
+      <div id="modelSortList">
+      {% for m in all_models_sorted %}
+      <div class="asq-row asq-drag" draggable="true" data-model="{{ m }}">
+        <span class="asq-grip" title="拖动排序">⠿</span>
+        <input type="checkbox" name="models" value="{{ m }}" id="m_{{ loop.index }}"
+               {{ 'checked' if m in cfg.models else '' }}>
+        <label for="m_{{ loop.index }}">{{ m }}</label>
+        {% if m == cfg.default %}<span class="tag">默认</span>{% endif %}
+      </div>
+      {% endfor %}
+      </div>
+      <div class="asq-tip">
+        勾选要开放的模型，<b>按住 ⠿ 拖动可调整顺序</b>（这个顺序就是 AI 广场模型菜单里的显示顺序）。
+      </div>
+    </div>
+
+    <div class="asq-card">
+      <h2>默认模型（新用户默认选中）</h2>
+      {% for m in all_models %}
+      <div class="asq-row">
+        <input type="radio" name="default" value="{{ m }}" id="d_{{ loop.index }}"
+               {{ 'checked' if m == cfg.default else '' }}>
+        <label for="d_{{ loop.index }}">{{ m }}</label>
+      </div>
+      {% endfor %}
+      <div class="asq-tip">默认模型必须在「可用模型」里勾选，否则自动回落到第一个可用项。</div>
+    </div>
+
+    <div class="asq-card">
+      <h2>模型描述与价格（显示在 AI 广场的悬停卡片里）</h2>
+      {% for m in cfg.models %}
+      <div class="asq-mblock">
+        <div class="asq-mname"><span class="dot"></span>{{ m }}</div>
+        <label class="asq-lb">显示名（AI 广场里展示的名字，留空用模型 ID）</label>
+        <input class="asq-nameinp" name="name_{{ m }}" maxlength="40"
+               value="{{ info[m].name if info[m].name != m else '' }}" placeholder="{{ m }}">
+        <label class="asq-lb" style="margin-top:10px;">描述</label>
+        <textarea name="desc_{{ m }}" rows="3"
+          placeholder="这个模型的定位，一两句话说清">{{ info[m].desc }}</textarea>
+        <div class="asq-2col">
+          <label>输入价格（元 / 百万 tokens）
+            <input name="price_in_{{ m }}" type="number" step="0.01" min="0"
+                   value="{{ info[m].price_in }}" placeholder="0">
+          </label>
+          <label>输出价格（元 / 百万 tokens）
+            <input name="price_out_{{ m }}" type="number" step="0.01" min="0"
+                   value="{{ info[m].price_out }}" placeholder="0">
+          </label>
+          <label>超长输入价（≥32K，留空同上）
+            <input name="price_in_hi_{{ m }}" type="number" step="0.01" min="0"
+                   value="{{ info[m].price_in_hi or '' }}" placeholder="留空 = 与基础价相同">
+          </label>
+          <label>超长输出价（≥32K，留空同上）
+            <input name="price_out_hi_{{ m }}" type="number" step="0.01" min="0"
+                   value="{{ info[m].price_out_hi or '' }}" placeholder="留空 = 与基础价相同">
+          </label>
+          <label>高峰输入价（分时计价，留空不分时）
+            <input name="peak_in_{{ m }}" type="number" step="0.01" min="0"
+                   value="{{ info[m].peak_in or '' }}" placeholder="留空 = 不分时">
+          </label>
+          <label>高峰输出价（分时计价，留空不分时）
+            <input name="peak_out_{{ m }}" type="number" step="0.01" min="0"
+                   value="{{ info[m].peak_out or '' }}" placeholder="留空 = 不分时">
+          </label>
+        </div>
+      </div>
+      {% endfor %}
+      <div class="asq-tip">
+        价格单位是 <b>元 / 百万 tokens</b>，按实际 token 用量扣用户余额。
+        输入和输出价格都为 0 → 该模型在列表里显示「限时免费」，且不扣费。
+      </div>
+    </div>
+
+    <button type="submit" class="asq-btn">保存设置</button>
+  </form>
+</div>
+
+<script>
+(function(){
+  var list = document.getElementById('modelSortList');
+  var orderInput = document.getElementById('modelOrder');
+  if (!list || !orderInput) return;
+  var dragEl = null;
+
+  function syncOrder(){
+    var names = [];
+    list.querySelectorAll('.asq-drag').forEach(function(el){
+      names.push(el.dataset.model);
+    });
+    orderInput.value = names.join(',');
+  }
+
+  list.addEventListener('dragstart', function(e){
+    var row = e.target.closest('.asq-drag');
+    if (!row) return;
+    dragEl = row;
+    row.classList.add('dragging');
+    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.dataset.model); } catch (err) {}
+  });
+
+  list.addEventListener('dragend', function(){
+    if (dragEl) dragEl.classList.remove('dragging');
+    list.querySelectorAll('.over').forEach(function(x){ x.classList.remove('over'); });
+    dragEl = null;
+    syncOrder();
+  });
+
+  list.addEventListener('dragover', function(e){
+    e.preventDefault();
+    var row = e.target.closest('.asq-drag');
+    if (!row || !dragEl || row === dragEl) return;
+    list.querySelectorAll('.over').forEach(function(x){ x.classList.remove('over'); });
+    row.classList.add('over');
+    var rect = row.getBoundingClientRect();
+    var after = (e.clientY - rect.top) > rect.height / 2;
+    if (after) row.parentNode.insertBefore(dragEl, row.nextSibling);
+    else row.parentNode.insertBefore(dragEl, row);
+  });
+
+  list.addEventListener('drop', function(e){
+    e.preventDefault();
+    list.querySelectorAll('.over').forEach(function(x){ x.classList.remove('over'); });
+    syncOrder();
+  });
+})();
+</script>
+{% endblock %}

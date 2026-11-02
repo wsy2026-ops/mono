@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}群组 - MONO 社区{% endblock %}
+{% set active = 'groups' %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+  <h2 style="margin:0;">我的群组</h2>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <form method="get" action="{{ url_for('groups') }}" style="display:flex;gap:6px;margin:0;">
+      <input type="text" name="q" value="{{ q or '' }}" placeholder="搜索群号 / 群名" style="width:180px;padding:6px 10px;">
+      <button type="submit" class="btn sm">搜索</button>
+    </form>
+    {% if can_create %}
+    <a href="{{ url_for('create_group') }}" class="btn sm">＋ 创建群组</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if my %}
+<div class="friend-list">
+  {% for g in my %}
+  <a href="{{ url_for('group_page', gid=g.id) }}" class="friend-card" style="text-decoration:none;">
+    <div class="friend-info">
+      <div class="friend-name">{{ g.name }}
+        <span class="tag off">{{ '公开' if g.join_mode=='public' else ('审核' if g.join_mode=='audit' else '私密') }}</span>
+        <span class="tag off">{{ g.category }}</span>
+      </div>
+      <div class="muted" style="font-size:12px;">群号 {{ g.group_no or '—' }} · {{ g.member_count }} 人</div>
+    </div>
+    <span style="color:var(--muted);">›</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card center" style="padding:32px;"><p class="muted">你还没有加入任何群组</p></div>
+{% endif %}
+
+<h2 style="margin:28px 0 12px;">{{ '搜索结果' if q else '发现公开群' }}</h2>
+{% if disc %}
+<div class="friend-list">
+  {% for g in disc %}
+  <div class="friend-card">
+    <div class="friend-info">
+      <div class="friend-name">{{ g.name }}
+        <span class="tag off">{{ g.category }}</span>
+      </div>
+      <div class="muted" style="font-size:12px;">群号 {{ g.group_no or '—' }} · {{ g.member_count }} 人{% if g.intro %} · {{ g.intro[:30] }}{% endif %}</div>
+    </div>
+    <form method="post" action="{{ url_for('group_join', gid=g.id) }}" style="margin:0;">
+      <button type="submit" class="btn sm">加入</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card center" style="padding:24px;"><p class="muted">{{ '未找到匹配的公开群' if q else '暂无更多公开群' }}</p></div>
+{% endif %}
+{% endblock %}

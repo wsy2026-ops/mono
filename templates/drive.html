@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}文件云盘 - MONO 社区{% endblock %}
+{% set active = 'drive' %}
+{% block content %}
+<style>
+  .drv{max-width:820px;margin:0 auto;padding-bottom:24px;}
+
+  .drv-top{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .drv-top h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.3px;}
+  .drv-top .drv-sub{color:var(--muted);font-size:12.5px;}
+
+  .drv-quota{
+    border:1px solid var(--line);border-radius:16px;
+    background:linear-gradient(135deg, var(--card), var(--bg-elev));
+    padding:16px 18px;margin-bottom:14px;
+    box-shadow:0 2px 12px var(--shadow);
+  }
+  .drv-quota .q-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:13px;margin-bottom:10px;gap:10px;
+  }
+  .drv-quota .q-used{font-weight:700;font-variant-numeric:tabular-nums;}
+  .drv-quota .q-pct{
+    font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;
+    background:var(--soft);padding:2px 9px;border-radius:20px;
+  }
+  .drv-bar{height:9px;border-radius:99px;background:var(--soft);overflow:hidden;}
+  .drv-bar i{
+    display:block;height:100%;border-radius:99px;
+    background:linear-gradient(90deg, var(--accent), #6ea8ff);
+    transition:width .4s cubic-bezier(.4,0,.2,1);
+  }
+  .drv-bar i.warn{background:linear-gradient(90deg,#f59e0b,#fbbf24);}
+  .drv-bar i.full{background:linear-gradient(90deg,#dc2626,#f87171);}
+
+  .drv-up{
+    border:2px dashed var(--line);border-radius:16px;
+    background:var(--bg-elev);
+    padding:22px 18px;margin-bottom:20px;text-align:center;
+    transition:border-color .2s, background .2s;
+  }
+  .drv-up:hover,.drv-up.drag{border-color:var(--accent);background:var(--soft);}
+  .drv-up .u-ico{
+    font-size:30px;line-height:1;margin-bottom:10px;
+    display:block;opacity:.85;
+  }
+  .drv-up .u-main{font-size:14px;font-weight:600;margin-bottom:4px;}
+  .drv-up .u-tip{font-size:12px;color:var(--fg-3);margin-bottom:14px;}
+  .drv-up input[type=file]{display:none;}
+  .drv-up .u-pick{
+    display:inline-block;padding:10px 22px;border-radius:11px;
+    background:var(--accent);color:var(--accent-fg);
+    font-size:13.5px;font-weight:700;cursor:pointer;
+    border:0;box-shadow:0 4px 14px var(--shadow);
+  }
+  .drv-up .u-pick:active{transform:translateY(1px);}
+  .drv-up .u-name{
+    margin-top:10px;font-size:12.5px;color:var(--muted);
+    word-break:break-all;min-height:18px;
+  }
+  .drv-up .u-go{
+    margin-top:12px;padding:10px 26px;border-radius:11px;border:0;
+    background:var(--accent);color:var(--accent-fg);
+    font-size:13.5px;font-weight:700;cursor:pointer;display:none;
+  }
+  .drv-up .u-go.on{display:inline-block;}
+
+  .drv-grid{display:grid;gap:10px;}
+  .drv-card{
+    display:flex;align-items:center;gap:13px;
+    border:1px solid var(--line);border-radius:14px;
+    background:var(--card);padding:13px 15px;
+    transition:border-color .18s, transform .18s, box-shadow .18s;
+  }
+  .drv-card:hover{
+    border-color:var(--muted);
+    transform:translateY(-1px);
+    box-shadow:0 4px 16px var(--shadow);
+  }
+  .drv-ico{
+    flex-shrink:0;width:42px;height:42px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;line-height:1;
+    background:var(--soft);
+  }
+  .drv-body{flex:1;min-width:0;}
+  .drv-name{
+    font-size:14px;font-weight:600;line-height:1.4;
+    word-break:break-all;
+  }
+  .drv-meta{
+    font-size:11.5px;color:var(--muted);margin-top:3px;
+    display:flex;gap:9px;flex-wrap:wrap;align-items:center;
+  }
+  .drv-meta .ok{color:#10b981;font-weight:600;}
+  .drv-acts{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+
+  .drv-sform{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .drv-sform select,.drv-sform input[type="text"]{
+    height:30px;padding:0 7px;border-radius:8px;border:1px solid var(--line);
+    background:var(--card);color:var(--fg);font-size:12px;font-family:inherit;}
+  .drv-sform input[type="text"]{width:92px;}
+  @media (max-width:900px){
+    .drv-sform{width:100%;}
+    .drv-sform input[type="text"]{flex:1;width:auto;}
+  }
+  .drv-share{
+    margin-top:9px;display:flex;gap:7px;align-items:center;
+  }
+  .drv-share input{
+    flex:1;min-width:0;font-size:11.5px;padding:7px 10px;
+    border:1px solid var(--line);border-radius:8px;
+    background:var(--bg-sunken);color:var(--fg-2);
+  }
+  .drv-share button{
+    flex-shrink:0;padding:7px 12px;border-radius:8px;cursor:pointer;
+    border:1px solid var(--line);background:var(--bg-elev);
+    color:var(--fg-2);font-size:11.5px;font-weight:600;
+  }
+
+  .drv-empty{
+    border:1px solid var(--line);border-radius:16px;background:var(--card);
+    padding:52px 22px;text-align:center;
+  }
+  .drv-empty .e-ico{font-size:40px;opacity:.5;display:block;margin-bottom:12px;}
+  .drv-empty .e-main{font-size:14.5px;font-weight:600;margin-bottom:6px;}
+  .drv-empty .e-sub{font-size:12.5px;color:var(--muted);line-height:1.7;}
+
+  @media (max-width:640px){
+    .drv-top h2{font-size:18px;}
+    .drv-quota{padding:14px 15px;}
+    .drv-up{padding:18px 14px;}
+    .drv-card{
+      flex-wrap:wrap;
+      padding:12px 13px;
+      gap:11px;
+    }
+    .drv-ico{width:38px;height:38px;font-size:18px;border-radius:10px;}
+    .drv-acts{
+      width:100%;justify-content:flex-start;margin-top:2px;
+      gap:7px;
+    }
+    .drv-acts .btn{flex:1;text-align:center;min-width:0;padding:9px 8px;}
+    .drv-share{flex-wrap:wrap;}
+    .drv-share input{width:100%;flex:1 0 100%;}
+  }
+</style>
+
+<div class="drv">
+  <div class="drv-top">
+    <h2>📁 文件云盘</h2>
+    <span class="drv-sub">你自己的空间 · 可生成分享链接</span>
+  </div>
+
+  {% set pct = (used / quota * 100) if quota else 0 %}
+  <div class="drv-quota">
+    <div class="q-row">
+      <span>已用 <span class="q-used">{{ human_size(used) }}</span> / {{ human_size(quota) }}</span>
+      <span class="q-pct">{{ '%.1f'|format(pct) }}%</span>
+    </div>
+    <div class="drv-bar">
+      <i class="{{ 'full' if pct >= 95 else ('warn' if pct >= 80 else '') }}"
+         style="width:{{ [pct, 100]|min }}%"></i>
+    </div>
+  </div>
+
+  <form class="drv-up" id="drvUp" method="post" action="{{ url_for('drive_upload') }}" enctype="multipart/form-data">
+    <span class="u-ico">☁️</span>
+    <div class="u-main">把文件拖进来，或者点下面选一个</div>
+    <div class="u-tip">单个最大 {{ human_size(max_file) }} · 空间共 {{ human_size(quota) }}</div>
+    <label class="u-pick" for="drvFile">选择文件</label>
+    <input type="file" id="drvFile" name="file" required>
+    <div class="u-name" id="drvName"></div>
+    <button type="submit" class="u-go" id="drvGo">上传</button>
+  </form>
+
+  {% if files %}
+  <div class="drv-grid">
+    {% for f in files %}
+    {% set ext = (f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else '') %}
+    <div class="drv-card">
+      <span class="drv-ico">
+        {%- if ext in ('png','jpg','jpeg','gif','webp','bmp','svg','ico') -%}🖼
+        {%- elif ext in ('mp4','mov','mkv','avi','webm') -%}🎬
+        {%- elif ext in ('mp3','wav','flac','m4a','ogg','aac') -%}🎵
+        {%- elif ext in ('zip','rar','7z','tar','gz','xz') -%}🗜
+        {%- elif ext == 'pdf' -%}📕
+        {%- elif ext in ('doc','docx') -%}📄
+        {%- elif ext in ('xls','xlsx','csv') -%}📊
+        {%- elif ext in ('ppt','pptx') -%}📽
+        {%- elif ext in ('py','js','html','css','java','c','cpp','go','rs','json','txt','md','yml','yaml','sh') -%}📜
+        {%- else -%}📦{%- endif -%}
+      </span>
+      <div class="drv-body">
+        <div class="drv-name">{{ f.filename }}</div>
+        <div class="drv-meta">
+          <span>{{ human_size(f.size) }}</span>
+          <span>{{ f.created_at | fmttime('%m-%d %H:%M') }}</span>
+          <span>下载 {{ f.downloads }}</span>
+          {% if f.share_token %}
+          <span class="ok">● 已分享</span>
+          {% if f.share_expire %}<span>{{ f.share_expire | fmttime('%m-%d %H:%M') }} 到期</span>
+          {% else %}<span>永久有效</span>{% endif %}
+          {% if f.share_pass %}<span>需密码</span>{% endif %}
+          {% endif %}
+        </div>
+        {% if f.share_token %}
+        <div class="drv-share">
+          <input type="text" readonly id="share-{{ f.id }}"
+                 value="{{ url_for('drive_shared', token=f.share_token, _external=True) }}"
+                 onclick="this.select()">
+          <button type="button" onclick="copyShare({{ f.id }})">复制</button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="drv-acts">
+        <a class="btn sm" href="{{ url_for('drive_download', fid=f.id) }}">下载</a>
+        <form method="post" action="{{ url_for('drive_share', fid=f.id) }}"
+              class="drv-sform"{% if f.share_token %} style="display:contents;"{% endif %}>
+          {% if f.share_token %}
+          <button type="submit" class="btn sm ghost">取消分享</button>
+          {% else %}
+          <select name="expire" title="有效期">
+            <option value="0">永久</option>
+            <option value="1">1 小时</option>
+            <option value="24">1 天</option>
+            <option value="168">7 天</option>
+            <option value="720">30 天</option>
+          </select>
+          <input type="text" name="pass" placeholder="密码（可空）" maxlength="16" autocomplete="off">
+          <button type="submit" class="btn sm ghost">分享</button>
+          {% endif %}
+        </form>
+        <form method="post" action="{{ url_for('drive_delete', fid=f.id) }}" style="display:contents;"
+              data-name="{{ f.filename }}" onsubmit="return confirm(__('确定删除「') + this.dataset.name + __('」？删了就找不回来了。'));">
+          <button type="submit" class="btn sm ghost">删除</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="drv-empty">
+    <span class="e-ico">🗂</span>
+    <div class="e-main">还没有文件</div>
+    <div class="e-sub">
+      上面选个文件传上来试试<br>
+      传完可以生成分享链接发给别人，对方不用登录也能下
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function(){
+  var inp = document.getElementById('drvFile');
+  var name = document.getElementById('drvName');
+  var go = document.getElementById('drvGo');
+  var box = document.getElementById('drvUp');
+  if (!inp) return;
+  inp.addEventListener('change', function(){
+    if (inp.files && inp.files.length){
+      name.textContent = '已选择：' + inp.files[0].name;
+      go.classList.add('on');
+    } else {
+      name.textContent = ''; go.classList.remove('on');
+    }
+  });
+  ['dragenter','dragover'].forEach(function(ev){
+    box.addEventListener(ev, function(e){ e.preventDefault(); box.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    box.addEventListener(ev, function(e){ e.preventDefault(); box.classList.remove('drag'); });
+  });
+  box.addEventListener('drop', function(e){
+    if (e.dataTransfer && e.dataTransfer.files.length){
+      inp.files = e.dataTransfer.files;
+      inp.dispatchEvent(new Event('change'));
+    }
+  });
+})();
+
+function copyShare(id){
+  var el = document.getElementById('share-' + id);
+  if (!el) return;
+  el.select();
+  var done = function(){
+    var t = el.nextElementSibling;
+    if (t){ var old = t.textContent; t.textContent = '已复制'; setTimeout(function(){ t.textContent = old; }, 1500); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(el.value).then(done).catch(function(){ try { document.execCommand('copy'); done(); } catch(e){} });
+  } else {
+    try { document.execCommand('copy'); done(); } catch(e){}
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}话题热榜 - MONO 社区{% endblock %}
+{% set active = 'forum' %}
+
+{% block content %}
+<style>
+  .hot-wrap{max-width:760px;margin:0 auto;}
+  .hot-head{border:1px solid var(--line);border-radius:16px;padding:24px 30px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);margin-bottom:22px;}
+  .hot-head h1{font-size:23px;margin:0 0 4px;font-weight:700;}
+  .hot-head p{margin:0;font-size:12.5px;color:var(--muted);}
+  .hot-list{display:flex;flex-direction:column;gap:10px;}
+  .hot-row{display:flex;align-items:center;gap:16px;border:1px solid var(--line);
+    border-radius:12px;padding:14px 18px;background:var(--card);text-decoration:none;color:inherit;}
+  .hot-row:hover{border-color:var(--muted);}
+  .hot-no{width:36px;flex:none;font-weight:800;font-size:17px;text-align:center;
+    font-variant-numeric:tabular-nums;color:var(--muted);}
+  .hot-no.r1{color:#d4a017;}.hot-no.r2{color:#9aa0a6;}.hot-no.r3{color:#b08d57;}
+  .hot-name{font-weight:700;font-size:15px;text-decoration:none;color:inherit;}
+  .hot-stats{margin-left:auto;font-size:12px;color:var(--muted);text-align:right;flex:none;}
+  .hot-stats b{color:var(--fg);font-variant-numeric:tabular-nums;}
+  .hot-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;
+    border:1px dashed var(--line);border-radius:14px;}
+</style>
+
+<div class="hot-wrap">
+  <div class="hot-head">
+    <h1>🔥 话题热榜</h1>
+    <p>{% if day %}统计周期截至 {{ day }}（每日聚合近 7 天：帖子量 × 10 + 互动量）{% else %}等待每日聚合任务首次运行{% endif %}</p>
+  </div>
+
+  {% if rows %}
+  <div class="hot-list">
+    {% for r in rows %}
+    <a class="hot-row" href="{{ url_for('tag_page', name=r.name) }}">
+      <div class="hot-no {% if loop.index <= 3 %}r{{ loop.index }}{% endif %}">
+        {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+      </div>
+      <div>
+        <span class="hot-name">#{{ r.name }}</span>
+      </div>
+      <div class="hot-stats">
+        <b>{{ r.post_cnt }}</b> 帖 · <b>{{ r.interact_cnt }}</b> 互动<br>
+        热度 <b>{{ '%.0f'|format(r.score) }}</b>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="hot-empty">还没有足够的数据生成热榜，先去给帖子打几个标签</div>
+  {% endif %}
+</div>
+{% endblock %}

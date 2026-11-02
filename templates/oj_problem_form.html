@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}{{ '出题' if is_new else '编辑题目' }} · MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .ojf-wrap{max-width:860px;margin:0 auto;padding:22px 16px 60px;font-size:14px;color:#1a1a1a;}
+  .ojf-head{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .ojf-head h1{margin:0;font-size:20px;font-weight:700;}
+  .ojf-head a{margin-left:auto;font-size:13px;color:#2563eb;text-decoration:none;}
+  .ojf-head a:hover{text-decoration:underline;}
+
+  .ojf-err{padding:11px 14px;background:#fee2e2;color:#b91c1c;border-radius:8px;
+           font-size:13px;margin-bottom:16px;}
+
+  .ojf-card{background:#fff;border:1px solid #e6e8eb;border-radius:10px;padding:20px;margin-bottom:16px;}
+  .ojf-card h2{margin:0 0 14px;font-size:14px;font-weight:600;color:#374151;}
+
+  .ojf-field{margin-bottom:16px;}
+  .ojf-field:last-child{margin-bottom:0;}
+  .ojf-label{display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px;}
+  .ojf-label .req{color:#dc2626;margin-left:2px;}
+  .ojf-hint{font-size:12px;color:#9aa0a6;margin-top:4px;}
+
+  .ojf-input,.ojf-textarea,.ojf-select{
+    width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #d8dce1;border-radius:7px;
+    font-size:13.5px;font-family:inherit;background:#fff;color:#1a1a1a;
+    transition:border-color .12s,box-shadow .12s;
+  }
+  .ojf-input:focus,.ojf-textarea:focus,.ojf-select:focus{
+    outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1);
+  }
+  .ojf-textarea{resize:vertical;min-height:96px;line-height:1.6;}
+  .ojf-textarea.code{font-family:ui-monospace,Consolas,monospace;font-size:13px;}
+
+  .ojf-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .ojf-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+  .ojf-sample{border:1px solid #eef0f2;border-radius:8px;padding:12px;margin-bottom:10px;background:#fcfcfd;}
+  .ojf-sample-h{font-size:12px;color:#8b9096;font-weight:600;margin-bottom:8px;}
+
+  .ojf-actions{display:flex;gap:10px;align-items:center;margin-top:20px;}
+  .ojf-btn{padding:9px 22px;border:none;border-radius:7px;font-size:13.5px;font-weight:500;
+           cursor:pointer;background:#2563eb;color:#fff;transition:background .12s;}
+  .ojf-btn:hover{background:#1d4ed8;}
+  .ojf-btn.ghost{background:#f3f4f6;color:#374151;}
+  .ojf-btn.ghost:hover{background:#e5e7eb;}
+  .ojf-btn.danger{background:#fee2e2;color:#b91c1c;}
+  .ojf-btn.danger:hover{background:#fecaca;}
+
+  .ojf-status{padding:11px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;}
+  .ojf-status.pending{background:#eef2ff;color:#4338ca;}
+  .ojf-status.rejected{background:#fee2e2;color:#b91c1c;}
+  .ojf-status.approved{background:#e8f7ee;color:#177245;}
+
+  .ojf-cases{font-size:13px;}
+  .ojf-cases table{width:100%;border-collapse:collapse;}
+  .ojf-cases th,.ojf-cases td{padding:8px 10px;text-align:left;border-bottom:1px solid #f3f4f6;}
+  .ojf-cases th{font-size:12px;color:#8b9096;font-weight:600;background:#f8fafc;}
+  .ojf-cases pre{margin:0;font-family:ui-monospace,Consolas,monospace;font-size:12px;
+                 max-height:70px;overflow:auto;white-space:pre-wrap;word-break:break-all;}
+
+  @media (max-width:640px){
+    .ojf-row,.ojf-row3{grid-template-columns:1fr;}
+  }
+</style>
+
+<div class="ojf-wrap">
+  <div class="ojf-head">
+    <h1>{{ '出题' if is_new else '编辑题目' }}</h1>
+    <a href="{{ url_for('oj_home') }}">← 返回题库</a>
+  </div>
+
+  {% if error %}
+  <div class="ojf-err">{{ error }}</div>
+  {% endif %}
+
+  {% if not is_new and problem %}
+    {% if problem.status == 'pending' %}
+    <div class="ojf-status pending">⏳ 正在等待超管审核，审核通过后会出现在题库里。</div>
+    {% elif problem.status == 'rejected' %}
+    <div class="ojf-status rejected">
+      ✗ 已被驳回{% if problem.reject_reason %}：{{ problem.reject_reason }}{% endif %}
+      <br><span style="font-size:12px;opacity:.8;">改完重新保存会再次进入审核队列。</span>
+    </div>
+    {% elif problem.status == 'approved' %}
+    <div class="ojf-status approved">✅ 已通过审核{% if problem.visibility == 'contest' %}（比赛专用题，题库里不显示）{% endif %}</div>
+    {% endif %}
+  {% endif %}
+
+  <form method="post" action="{{ url_for('oj_problem_create') if is_new else url_for('oj_problem_update', pid=problem.id) }}">
+    <div class="ojf-card">
+      <h2>基本信息</h2>
+
+      <div class="ojf-field">
+        <label class="ojf-label">题目标题<span class="req">*</span></label>
+        <input class="ojf-input" name="title" maxlength="120" required
+               value="{{ problem.get('title','') if problem else '' }}" placeholder="例如：A+B Problem">
+      </div>
+
+      <div class="ojf-row">
+        <div class="ojf-field">
+          <label class="ojf-label">难度</label>
+          <select class="ojf-select" name="difficulty">
+            {% set d = (problem.get('difficulty','') if problem else '') %}
+            <option value="" {% if not d %}selected{% endif %}>未标注</option>
+            <option value="入门" {% if d == '入门' %}selected{% endif %}>入门</option>
+            <option value="普及-" {% if d == '普及-' %}selected{% endif %}>普及-</option>
+            <option value="普及/提高-" {% if d == '普及/提高-' %}selected{% endif %}>普及/提高-</option>
+            <option value="普及+/提高" {% if d == '普及+/提高' %}selected{% endif %}>普及+/提高</option>
+            <option value="提高+/省选-" {% if d == '提高+/省选-' %}selected{% endif %}>提高+/省选-</option>
+            <option value="省选/NOI-" {% if d == '省选/NOI-' %}selected{% endif %}>省选/NOI-</option>
+            <option value="NOI/NOI+/CTSC" {% if d == 'NOI/NOI+/CTSC' %}selected{% endif %}>NOI/NOI+/CTSC</option>
+          </select>
+        </div>
+
+        <div class="ojf-field">
+          <label class="ojf-label">题目类型</label>
+          <select class="ojf-select" name="visibility">
+            {% set v = (problem.get('visibility','public') if problem else 'public') %}
+            <option value="public" {% if v == 'public' %}selected{% endif %}>公开题库（所有人可见）</option>
+            <option value="contest" {% if v == 'contest' %}selected{% endif %}>比赛赛题（题库不可见，只能加进比赛）</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ojf-row">
+        <div class="ojf-field">
+          <label class="ojf-label">时间限制（毫秒）</label>
+          <input class="ojf-input" name="time_limit_ms" type="number" min="100" max="20000"
+                 value="{{ problem.get('time_limit_ms', 1000) if problem else 1000 }}">
+        </div>
+        <div class="ojf-field">
+          <label class="ojf-label">内存限制（MB）</label>
+          <input class="ojf-input" name="memory_limit_mb" type="number" min="16" max="1024"
+                 value="{{ problem.get('memory_limit_mb', 256) if problem else 256 }}">
+        </div>
+      </div>
+
+      <div class="ojf-field">
+        <label class="ojf-label">标签（逗号分隔，可选）</label>
+        <input class="ojf-input" name="tags" maxlength="120"
+               value="{{ problem.get('tags','') if problem else '' }}"
+               placeholder="例如：模拟, 贪心, 二分">
+      </div>
+    </div>
+
+    <div class="ojf-card">
+      <h2>题面</h2>
+
+      <div class="ojf-field">
+        <label class="ojf-label">题目描述<span class="req">*</span></label>
+        <textarea class="ojf-textarea" name="description" required
+                  placeholder="讲清楚要做什么，不要一上来就讲算法。">{{ problem.get('description','') if problem else '' }}</textarea>
+      </div>
+
+      <div class="ojf-field">
+        <label class="ojf-label">输入格式</label>
+        <textarea class="ojf-textarea" name="input_format"
+                  placeholder="例如：第一行一个整数 n（1 ≤ n ≤ 10^5）">{{ problem.get('input_format','') if problem else '' }}</textarea>
+      </div>
+
+      <div class="ojf-field">
+        <label class="ojf-label">输出格式</label>
+        <textarea class="ojf-textarea" name="output_format"
+                  placeholder="例如：输出一个整数，表示答案。">{{ problem.get('output_format','') if problem else '' }}</textarea>
+      </div>
+
+      <div class="ojf-field">
+        <label class="ojf-label">提示 / 说明（可选）</label>
+        <textarea class="ojf-textarea" name="hint"
+                  placeholder="数据范围、注意事项、样例解释……">{{ problem.get('hint','') if problem else '' }}</textarea>
+      </div>
+    </div>
+
+    <div class="ojf-card">
+      <h2>样例（最多 3 组）</h2>
+      {% set samples = (problem.get('samples_list', []) if problem else []) %}
+      {% for i in range(1, 4) %}
+        {% set s = samples[i-1] if samples|length >= i else {} %}
+        <div class="ojf-sample">
+          <div class="ojf-sample-h">样例 #{{ i }}</div>
+          <div class="ojf-row">
+            <div>
+              <label class="ojf-label">输入</label>
+              <textarea class="ojf-textarea code" name="sample_in_{{ i }}" rows="3"
+                        placeholder="1 2">{{ s.get('in','') if s else '' }}</textarea>
+            </div>
+            <div>
+              <label class="ojf-label">输出</label>
+              <textarea class="ojf-textarea code" name="sample_out_{{ i }}" rows="3"
+                        placeholder="3">{{ s.get('out','') if s else '' }}</textarea>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="ojf-actions">
+      <button class="ojf-btn" type="submit">{{ '提交审核' if is_new else '保存' }}</button>
+      <a class="ojf-btn ghost" href="{{ url_for('oj_home') }}">取消</a>
+    </div>
+  </form>
+
+  {% if not is_new and problem %}
+  <div class="ojf-card">
+    <h2>测试数据（{{ cases|length }} 个点）</h2>
+    <div class="ojf-hint" style="margin-bottom:12px;">
+      打包成 ZIP 上传，里面放 <code>1.in</code> / <code>1.out</code> / <code>2.in</code> / <code>2.out</code> …
+      <br>每次上传会<b>覆盖</b>原有测试点。文件可以放在 ZIP 根目录或任意子目录里。
+    </div>
+
+    <form method="post" enctype="multipart/form-data"
+          action="{{ url_for('oj_problem_upload_own', pid=problem.id) }}">
+      <div class="ojf-field">
+        <input class="ojf-input" type="file" name="zipfile" accept=".zip" required
+               style="padding:7px 9px;">
+      </div>
+      <div class="ojf-actions" style="margin-top:10px;">
+        <button class="ojf-btn" type="submit">上传并替换测试数据</button>
+      </div>
+    </form>
+
+    {% if cases %}
+    <div class="ojf-cases" style="margin-top:16px;">
+      <table>
+        <thead><tr><th>#</th><th>输入</th><th>期望输出</th><th>样例</th></tr></thead>
+        <tbody>
+        {% for c in cases %}
+          <tr>
+            <td>{{ c.idx }}</td>
+            <td><pre>{{ c.input[:200] }}</pre></td>
+            <td><pre>{{ c.expected[:200] }}</pre></td>
+            <td>{{ '是' if c.is_sample else '' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="ojf-hint" style="margin-top:14px;color:#b45309;">
+      ⚠️ 还没有测试点。没有测试数据的题交上去会直接判 WA。
+    </div>
+    {% endif %}
+  </div>
+
+  <form method="post" action="{{ url_for('oj_problem_delete_own', pid=problem.id) }}"
+        onsubmit="return confirm(__('确定删除这道题吗？测试数据也会一起删掉，无法恢复。'));">
+    <div class="ojf-actions">
+      <button class="ojf-btn danger" type="submit">删除这道题</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

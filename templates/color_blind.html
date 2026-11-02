@@ -1,0 +1,869 @@
+﻿{% extends "base.html" %}
+{% block title %}色盲派对 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<div class="games-page">
+<style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+        .games-page {
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            gap: 56px;
+            min-height: 100vh;
+            color: #111;
+            user-select: none;
+        }
+
+        .top-bar {
+            position: fixed;
+            top: 76px;
+            left: 30px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        .top-bar a {
+            color: #222;
+            text-decoration: none;
+            border-bottom: 1px solid #000;
+        }
+
+        .user-bar {
+            position: fixed;
+            top: 76px;
+            right: 30px;
+            background: #fff;
+            border: 1px solid #000;
+            padding: 10px 15px;
+            font-size: 14px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .user-bar .high-score {
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .helper-btn {
+            border: 1px solid #000;
+            padding: 4px 8px;
+            cursor: pointer;
+            background: #fff;
+            font-size: 12px;
+        }
+        .helper-btn.active {
+            background: #000;
+            color: #fff;
+        }
+
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #fff;
+            border: 2px solid #000;
+            padding: 30px;
+            --cell: 50px;
+            --gap: 2px;
+        }
+        @media (max-width: 720px) {
+            .game-area {
+                padding: 12px;
+                --cell: calc((100vw - 78px) / 10);
+                --gap: 1.5px;
+            }
+            .game-area .info h1 { font-size: 20px; }
+        }
+        .info {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .info h1 {
+            font-size: 24px;
+            letter-spacing: 4px;
+            font-weight: 300;
+            margin-bottom: 12px;
+        }
+        .tip {
+            font-size: 16px;
+            margin: 6px 0;
+            color: #222;
+        }
+        .target-color {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 2px solid #222;
+            vertical-align: middle;
+            margin: 0 8px;
+        }
+        .countdown {
+            font-size: 22px;
+            color: #111;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .board-wrap {
+            position: relative;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(10, var(--cell, 50px));
+            gap: var(--gap, 2px);
+            background: #666;
+            padding: 2px;
+        }
+        .cell {
+            width: var(--cell, 50px);
+            height: var(--cell, 50px);
+            transition: all 0.3s ease;
+        }
+        .cell.fade {
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+        }
+
+        .pause-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            z-index: 10;
+            border: 2px solid #000;
+        }
+        .pause-mask.show {
+            display: flex;
+        }
+
+        .player {
+            width: calc(var(--cell, 50px) * 0.6);
+            height: calc(var(--cell, 50px) * 0.6);
+            background: #111;
+            border-radius: 50%;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            transition: left 0.15s, top 0.15s;
+            z-index: 5;
+        }
+
+        .controls {
+            margin-top: 76px;
+            display: flex;
+            gap: 10px;
+        }
+        .controls button {
+            padding: 8px 20px;
+            background: #fff;
+            border: 1px solid #000;
+            color: #000;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .controls button:hover {
+            background: #000;
+            color: #fff;
+        }
+
+        .rank-container {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 25px;
+            width: 280px;
+            height: fit-content;
+        }
+        .rank-title {
+            font-size: 22px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 2px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #000;
+            margin-bottom: 15px;
+        }
+        .rank-list {
+            list-style: none;
+        }
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 16px;
+        }
+        .rank-item:last-child { border-bottom: none; }
+        .rank-item.self {
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+        .rank-num {
+            width: 30px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .rank-name {
+            flex: 1;
+            padding: 0 10px;
+        }
+        .rank-score {
+            font-weight: bold;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 30px;
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+        }
+        .modal h3 {
+            margin-bottom: 15px;
+        }
+        .modal input {
+            padding: 8px 12px;
+            width: 220px;
+            border: 1px solid #000;
+            margin-bottom: 15px;
+        }
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .modal-btns button {
+            padding: 6px 16px;
+            border: 1px solid #000;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .modal-overlay.game-over {
+            z-index: 1000;
+        }
+        .game-over-modal {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 40px;
+            text-align: center;
+            max-width: 350px;
+            width: 90%;
+        }
+        .game-over-modal h2 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #000;
+            letter-spacing: 2px;
+        }
+        .new-record {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .final-score {
+            font-size: 36px;
+            font-weight: bold;
+            color: #000;
+            margin: 20px 0;
+        }
+        .modal-btns-game {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .modal-btn-game {
+            padding: 12px 24px;
+            font-size: 15px;
+            border: 2px solid #000;
+            background: #fff;
+            color: #000;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .modal-btn-game:hover {
+            background: #000;
+            color: #fff;
+        }
+
+        .touch-pad {
+            display: none;
+            margin-top: 16px;
+            width: 100%;
+            max-width: 300px;
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+            touch-action: none;
+        }
+        .touch-pad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-rows: repeat(3, 1fr);
+            gap: 8px;
+            aspect-ratio: 1 / 1;
+            max-width: 230px;
+            margin: 0 auto;
+        }
+        .touch-btn {
+            display: flex; align-items: center; justify-content: center;
+            background: #fff; border: 2px solid #000; border-radius: 12px;
+            font-size: 22px; font-weight: 700; color: #000; cursor: pointer;
+            min-height: 44px;                       /* 触摸目标不小于 44px */
+            transition: background .08s, transform .08s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .touch-btn:active, .touch-btn.held { background: #000; color: #fff; transform: scale(.94); }
+        .touch-btn.empty { border: none; background: transparent; pointer-events: none; }
+        .touch-pause {
+            width: 100%; margin-top: 10px; padding: 13px;
+            background: #fff; border: 2px solid #000; border-radius: 12px;
+            font-size: 15px; font-weight: 700; color: #000; cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .touch-pause:active { background: #000; color: #fff; }
+        .operate-tip .touch-only { display: none; }
+        @media (pointer: coarse) {
+            .touch-pad { display: block; }
+            .operate-tip .kbd-only { display: none; }
+            .operate-tip .touch-only { display: inline; }
+        }
+
+        .operate-tip {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+
+        .helper-tip {
+            color: #c00;
+            font-weight: bold;
+            margin-top: 5px;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .games-page {
+                flex-direction: column;
+                gap: 20px;
+                padding-top: 70px;
+            }
+            .rank-container {
+                width: 100%;
+                max-width: 520px;
+            }
+            .user-bar { top: 10px; right: 10px; }
+            .top-bar { top: 10px; left: 10px; }
+        }
+    </style>
+
+    <div class="top-bar">
+        <a href="{{ url_for('games_center') }}">← 返回大厅</a>
+    </div>
+
+    <div class="user-bar">
+        {{ user.username }}
+        <span>最高分：<span class="high-score" id="userHighScore">{{ user.high_score_color_blind }}</span></span>
+    </div>
+
+    <div class="modal-overlay game-over" id="gameOverModal">
+        <div class="game-over-modal">
+            <h2>游戏结束</h2>
+            <div class="new-record" id="newRecordTip" style="display:none;">🎉 新纪录！</div>
+            <div class="final-score" id="finalScore">0</div>
+            <p>坚持了 <span id="finalRound">0</span> 轮</p>
+            <div class="modal-btns-game">
+                <button class="modal-btn-game" onclick="location.href='{{ url_for('games_center') }}'">返回大厅</button>
+                <button class="modal-btn-game" onclick="restartGame()">再来一局</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="info">
+            <h1>色盲派对 · 色块生存</h1>
+            <div class="tip">当前轮数：<span id="round">0</span></div>
+            <div class="tip">
+                目标颜色：
+                <span class="target-color" id="targetBox"></span>
+            </div>
+            <div class="countdown" id="countText">页面加载中...</div>
+            <div class="operate-tip"><span class="kbd-only">WASD / 方向键移动 · 空格键暂停</span><span class="touch-only">用下方方向键移动 · 点「暂停」按钮暂停</span></div>
+<div class="touch-pad" id="touchPad">
+            <div class="touch-pad-grid">
+                <div class="touch-btn empty"></div>
+                <button type="button" class="touch-btn" data-dir="up" aria-label="上">▲</button>
+                <div class="touch-btn empty"></div>
+                <button type="button" class="touch-btn" data-dir="left" aria-label="左">◀</button>
+                <div class="touch-btn empty"></div>
+                <button type="button" class="touch-btn" data-dir="right" aria-label="右">▶</button>
+                <div class="touch-btn empty"></div>
+                <button type="button" class="touch-btn" data-dir="down" aria-label="下">▼</button>
+                <div class="touch-btn empty"></div>
+            </div>
+            <button type="button" class="touch-pause" id="touchPause">❙❙ 暂停 / 继续</button>
+        </div>
+        </div>
+
+        <div class="board-wrap">
+            <div class="board" id="board"></div>
+            <div class="player" id="player"></div>
+            <div class="pause-mask" id="pauseMask">游戏暂停</div>
+        </div>
+
+        <div class="controls">
+            <button id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <div class="rank-container">
+        <h3 class="rank-title">排行榜</h3>
+        <ul class="rank-list" id="rankList">
+            {% for item in rank_list %}
+            <li class="rank-item {% if item.username == user.username %}self{% endif %}">
+                <span class="rank-num">{{ loop.index }}</span>
+                <span class="rank-name">{{ item.username }}</span>
+                <span class="rank-score">{{ item.score }}</span>
+            </li>
+            {% endfor %}
+            {% if user_rank > 10 %}
+            <li class="rank-item self">
+                <span class="rank-num">{{ user_rank }}</span>
+                <span class="rank-name">{{ user.username }}</span>
+                <span class="rank-score">{{ user.high_score_color_blind }}</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <script>
+        const ROW = 10;
+        const COL = 10;
+        let cells = [];
+        let cellColor = [];
+        let targetColor = "";
+        let round = 0;
+        let timer = null;
+        let remainTime = 5;
+        /* 服务端复算用：每轮存活记录（alive + 理论时长） */
+        let roundsLog = [];
+        function roundLimitSec(r) {   // 与 nextRound 分档一致
+            if (r <= 3) return 5;
+            if (r <= 6) return 4;
+            if (r <= 9) return 3;
+            return 2;
+        }
+        let currentTimeLeft = 0;
+        let gameRunning = false;
+        let isPaused = false;
+        let submitted = false;
+
+        window.MONO_GAME = { game: 'color_blind', sub: '', kind: 'score' };
+        window.MONO_GAME_RENDER = function(s, el){
+            const w = Math.max(160, Math.min(280, el.clientWidth || 280));
+            const cs = Math.floor(w / ROW);
+            let h = '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--muted)">'
+                  + '<span>第 ' + (s.r + 1) + ' 关</span>'
+                  + '<span style="display:inline-block;width:22px;height:14px;border-radius:3px;border:1px solid var(--line);'
+                  + 'background:' + (s.tc || '#fff') + '"></span>'
+                  + '<span>目标色</span></div>'
+                  + '<div style="display:grid;grid-template-columns:repeat(' + ROW + ',' + cs + 'px);gap:1px">';
+            for (let i = 0; i < ROW * COL; i++){
+                h += '<div style="width:' + cs + 'px;height:' + cs + 'px;background:' + (s.cc[i] || '#fff') + '"></div>';
+            }
+            el.innerHTML = h + '</div>';
+        };
+
+        const colorList = [
+            "#ff0000", "#e6194b", "#f032e6", "#911eb4",
+            "#f58231", "#ffd8b1", "#ffe119", "#fffac8",
+            "#3cb44b", "#aaffc3", "#46f0f0", "#008080",
+            "#4363d8", "#9a6324", "#800000", "#808000",
+            "#e6beff", "#ffc8dd", "#bcf60c", "#000075",
+            "#dc143c", "#ff7f50", "#ffd700", "#7cfc00",
+            "#00ced1", "#1e90ff", "#9370db", "#ff69b4",
+            "#cd853f", "#708090", "#2f4f4f", "#556b2f",
+            "#8b4513", "#483d8b", "#2e8b57", "#b8860b",
+            "#cd5c5c", "#daa520", "#7fff00", "#00fa9a",
+            "#00bfff", "#4169e1", "#8a2be2", "#ee82ee",
+            "#f0e68c", "#d2b48c", "#bc8f8f", "#8fbc8f",
+            "#6495ed", "#fa8072", "#00ffff", "#ff00ff",
+            "#7b68ee", "#20b2aa", "#87ceeb", "#98fb98",
+            "#e9967a", "#dda0dd", "#90ee90", "#ffb6c1"
+        ];
+        const similarColor = [
+            "#ff4d4d", "#ff6666", "#ff8080", "#ff9999", "#ffb3b3", "#ffcccc",
+            "#3399ff", "#66b3ff", "#80bfff", "#99ccff", "#b3d9ff", "#cce6ff",
+            "#33ff33", "#66ff66", "#80ff80", "#99ff99", "#b3ffb3", "#ccffcc",
+            "#ffff33", "#ffff66", "#ffff80", "#ffff99", "#ffffb3", "#ffffcc",
+            "#b366ff", "#c280ff", "#d199ff", "#e0b3ff", "#ecccff", "#f7e6ff",
+            "#ff9933", "#ffa64d", "#ffb366", "#ffbf80", "#ffcc99", "#ffd9b3",
+            "#33ffff", "#66ffff", "#80ffff", "#99ffff", "#b3ffff", "#ccffff",
+            "#ff66cc", "#ff80d5", "#ff99de", "#ffb3e6", "#ffccef", "#ffe6f7",
+            "#a67c52", "#b38960", "#bf966e", "#cca37c", "#d9b08a", "#e6bd98",
+            "#666666", "#737373", "#808080", "#8c8c8c", "#999999", "#a6a6a6"
+        ];
+
+        const board = document.getElementById("board");
+        const player = document.getElementById("player");
+        const targetBox = document.getElementById("targetBox");
+        const countText = document.getElementById("countText");
+        const roundDom = document.getElementById("round");
+        const pauseMask = document.getElementById("pauseMask");
+        const restartBtn = document.getElementById("restartBtn");
+        const currentUsername = {{ user.username|tojson }};
+
+        function initBoard() {
+            if (window.MONO_REC) window.MONO_REC.start();
+            board.innerHTML = "";
+            cells = [];
+            cellColor = [];
+            for (let i = 0; i < ROW * COL; i++) {
+                const div = document.createElement("div");
+                div.className = "cell";
+                board.appendChild(div);
+                cells.push(div);
+                cellColor.push("");
+            }
+            placePlayerAtStart();;
+            player.style.top = "10px";
+        }
+
+        function fillColor() {
+            let pool = [...colorList];
+            if (round >= 4) pool = pool.concat(similarColor.slice(0, 2));
+            if (round >= 7) pool = pool.concat(similarColor);
+
+            let targetCount;
+            if (round <= 3) targetCount = 12;
+            else if (round <= 5) targetCount = 9;
+            else if (round <= 7) targetCount = 6;
+            else targetCount = 3;
+
+            targetColor = pool[Math.floor(Math.random() * pool.length)];
+            const otherColors = pool.filter(c => c !== targetColor);
+
+            const indexes = Array.from({length: cells.length}, (_, i) => i);
+            for (let i = indexes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+            }
+
+            for (let i = 0; i < targetCount; i++) {
+                const idx = indexes[i];
+                cellColor[idx] = targetColor;
+                cells[idx].style.backgroundColor = targetColor;
+                cells[idx].classList.remove("fade");
+            }
+
+            for (let i = targetCount; i < indexes.length; i++) {
+                const idx = indexes[i];
+                const c = otherColors[Math.floor(Math.random() * otherColors.length)];
+                cellColor[idx] = c;
+                cells[idx].style.backgroundColor = c;
+                cells[idx].classList.remove("fade");
+            }
+        }
+
+        function pickTarget() {
+            targetBox.style.backgroundColor = targetColor;
+            if (window.MONO_REC && window.MONO_REC.active){
+                window.MONO_REC.snap({cc: cellColor.slice(), tc: targetColor, r: round});
+            }
+        }
+
+        // ⚠️ 必须和 movePlayer() 用的 cellMetrics() 口径一致 ✗
+        //    否则「玩家移动一格」和「索引算一格」错位，又会出现无故判负 ✓
+        function getPlayerCellIndex() {
+            const boardRect = board.getBoundingClientRect();
+            const playerRect = player.getBoundingClientRect();
+            const x = playerRect.left - boardRect.left;
+            const y = playerRect.top - boardRect.top;
+            const m = cellMetrics();
+            // 原始版本写死 52 ✗ PC 端 --cell 是 50px、手机端约 30px
+            // → 索引指到别的格子 → 站在目标格上也判负（反馈 #48）✗
+            const colIdx = Math.max(0, Math.min(COL - 1, Math.floor(x / m.step)));
+            const rowIdx = Math.max(0, Math.min(ROW - 1, Math.floor(y / m.step)));
+            const idx = rowIdx * COL + colIdx;
+            if (idx < 0) idx = 0;
+            if (idx >= ROW * COL) idx = ROW * COL - 1;
+            return idx;
+        }
+
+        function checkLose() {
+            const idx = getPlayerCellIndex();
+            return cellColor[idx] !== targetColor;
+        }
+
+        function nextRound() {
+            round++;
+            /* 服务端复算：上一轮活过（首轮从开局倒计时进来，不算活过一轮） */
+            if (round > 1) roundsLog.push({alive: true, ms: roundLimitSec(round - 1) * 1000});
+            roundDom.innerText = round;
+
+            if (round <= 3) remainTime = 5;
+            else if (round <= 6) remainTime = 4;
+            else if (round <= 9) remainTime = 3;
+            else remainTime = 2;
+
+            currentTimeLeft = remainTime;
+            fillColor();
+            pickTarget();
+            countText.innerText = `剩余时间：${remainTime} s`;
+
+            startCountdown();
+        }
+
+        function startCountdown() {
+            clearInterval(timer);
+            timer = setInterval(() => {
+                currentTimeLeft--;
+                countText.innerText = `剩余时间：${currentTimeLeft} s`;
+                if (currentTimeLeft <= 0) {
+                    clearInterval(timer);
+                    for (let i = 0; i < cells.length; i++) {
+                        if (cellColor[i] !== targetColor) {
+                            cells[i].classList.add("fade");
+                        }
+                    }
+                    setTimeout(() => {
+                        if (checkLose()) {
+                            gameOver();
+                        } else {
+                            setTimeout(nextRound, 800);
+                        }
+                    }, 400);
+                }
+            }, 1000);
+        }
+
+        function togglePause() {
+            if (!gameRunning) return;
+
+            isPaused = !isPaused;
+            if (isPaused) {
+                clearInterval(timer);
+                pauseMask.classList.add('show');
+                countText.innerText = "游戏暂停";
+            } else {
+                pauseMask.classList.remove('show');
+                countText.innerText = `剩余时间：${currentTimeLeft} s`;
+                startCountdown();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(timer);
+            pauseMask.classList.remove('show');
+
+            if (!submitted) {
+                submitted = true;
+                roundsLog.push({alive: false, ms: roundLimitSec(round) * 1000});  // 服务端复算：失败轮
+                document.getElementById('finalScore').textContent = round;
+                document.getElementById('finalRound').textContent = round;
+                document.getElementById('gameOverModal').style.display = 'flex';
+                submitScore(round);
+            }
+        }
+
+        function submitScore(score) {
+            if (window.MONO_REC) window.MONO_REC.finish(score);
+            fetch('/api/game/submit/colorblind', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({score: score, seq: {rounds: roundsLog}})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.new_best) {
+                        document.getElementById('newRecordTip').style.display = 'block';
+                        document.getElementById('userHighScore').textContent = score;
+                    }
+                    const rankList = document.getElementById('rankList');
+                    rankList.innerHTML = '';
+                    data.rank_list.forEach((item, idx) => {
+                        const li = document.createElement('li');
+                        li.className = 'rank-item' + (item.username === currentUsername ? ' self' : '');
+                        li.innerHTML = `
+                            <span class="rank-num">${idx + 1}</span>
+                            <span class="rank-name">${item.username}</span>
+                            <span class="rank-score">${item.score}</span>
+                        `;
+                        rankList.appendChild(li);
+                    });
+                }
+            });
+        }
+
+        function autoStartCountdown() {
+            let wait = 3;
+            countText.innerText = `即将开始：${wait} s`;
+            const countTimer = setInterval(() => {
+                wait--;
+                if (wait > 0) {
+                    countText.innerText = `即将开始：${wait} s`;
+                } else {
+                    clearInterval(countTimer);
+                    gameRunning = true;
+                    isPaused = false;
+                    round = 0;
+                    submitted = false;
+                    roundsLog = [];   // 服务端复算：开局清空
+                    roundDom.innerText = round;
+                    countText.innerText = "游戏开始！";
+                    setTimeout(nextRound, 600);
+                }
+            }, 1000);
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverModal').style.display = 'none';
+            document.getElementById('newRecordTip').style.display = 'none';   // 修复：新纪录提示残留
+            clearInterval(timer);
+            gameRunning = false;
+            isPaused = false;
+            pauseMask.classList.remove('show');
+            round = 0;
+            roundDom.innerText = 0;
+            roundsLog = [];   // 服务端复算：新局清空回合流水
+            initBoard();
+            targetBox.style.backgroundColor = "#fff";
+            autoStartCountdown();
+        }
+
+        restartBtn.addEventListener('click', restartGame);
+
+        function cellMetrics() {
+            const board = document.querySelector('.board');
+            const cell = document.querySelector('.cell');
+            if (!board || !cell) return { step: 52, pad: 10 };
+            const bcs = getComputedStyle(board);
+            const gap = parseFloat(bcs.columnGap || bcs.gap) || 2;
+            const bpad = parseFloat(bcs.paddingLeft) || 2;
+            const cw = cell.getBoundingClientRect().width || 50;
+            const pw = player.getBoundingClientRect().width || 30;
+            return { step: cw + gap, pad: bpad + (cw - pw) / 2 };
+        }
+
+        function movePlayer(dx, dy) {
+            if (!gameRunning || isPaused) return;
+            const m = cellMetrics();
+            let left = parseFloat(player.style.left);
+            let top = parseFloat(player.style.top);
+            if (isNaN(left)) left = m.pad;
+            if (isNaN(top)) top = m.pad;
+            left += dx * m.step;
+            top += dy * m.step;
+            const maxL = m.pad + (COL - 1) * m.step;
+            const maxT = m.pad + (ROW - 1) * m.step;
+            left = Math.max(m.pad, Math.min(left, maxL));
+            top = Math.max(m.pad, Math.min(top, maxT));
+            player.style.left = left + "px";
+            player.style.top = top + "px";
+        }
+
+        function placePlayerAtStart() {
+            const m = cellMetrics();
+            player.style.left = m.pad + "px";
+            player.style.top = m.pad + "px";
+        }
+
+        document.addEventListener("keydown", (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePause();
+                return;
+            }
+            switch (e.key) {
+                case "w": case "W": case "ArrowUp":    movePlayer(0, -1); break;
+                case "s": case "S": case "ArrowDown":  movePlayer(0,  1); break;
+                case "a": case "A": case "ArrowLeft":  movePlayer(-1, 0); break;
+                case "d": case "D": case "ArrowRight": movePlayer( 1, 0); break;
+            }
+        });
+
+        (function bindTouchPad() {
+            const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+            const buttons = document.querySelectorAll('.touch-btn[data-dir]');
+            let holdTimer = null, repeatTimer = null;
+
+            function start(dir, btn) {
+                const d = DIRS[dir];
+                if (!d) return;
+                btn.classList.add('held');
+                movePlayer(d[0], d[1]);
+                clearTimeout(holdTimer); clearInterval(repeatTimer);
+                holdTimer = setTimeout(function () {
+                    repeatTimer = setInterval(function () { movePlayer(d[0], d[1]); }, 110);
+                }, 260);
+            }
+            function stop(btn) {
+                if (btn) btn.classList.remove('held');
+                clearTimeout(holdTimer); clearInterval(repeatTimer);
+                holdTimer = repeatTimer = null;
+            }
+
+            buttons.forEach(function (btn) {
+                const dir = btn.dataset.dir;
+                btn.addEventListener('pointerdown', function (e) {
+                    e.preventDefault();
+                    if (btn.setPointerCapture) btn.setPointerCapture(e.pointerId);
+                    start(dir, btn);
+                });
+                btn.addEventListener('pointerup',     function () { stop(btn); });
+                btn.addEventListener('pointercancel', function () { stop(btn); });
+                btn.addEventListener('pointerleave',  function () { stop(btn); });
+                btn.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); start(dir, btn); }
+                });
+                btn.addEventListener('keyup', function () { stop(btn); });
+            });
+
+            const pauseBtn = document.getElementById('touchPause');
+            if (pauseBtn) pauseBtn.addEventListener('click', function () { togglePause(); });
+
+            const pad = document.getElementById('touchPad');
+            if (pad) pad.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+        })();
+
+        window.onload = function() {
+            initBoard();
+            autoStartCountdown();
+        }
+    </script>
+{% endblock %}

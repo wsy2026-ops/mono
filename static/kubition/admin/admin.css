@@ -1,0 +1,26 @@
+*{
+    font-family: 'microsoft yahei';
+    font-size:10px;
+}
+.win{
+    width:160px;
+    position: fixed;
+    right: 10px;
+    bottom: 100px;
+    background: #fff;
+    border: solid #ddd 1px;
+    padding: 20px;
+    text-align: center;
+}
+.itemTable{
+    width:860px;
+    margin: 50px;
+}
+.mstTable > thead > tr > td:nth-child(6){
+    width:150px;
+    background: #ddd;
+}
+.badge{
+    background: #fff;
+    color: #000;
+}

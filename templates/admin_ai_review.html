@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}AI 审核队列 - 管理后台{% endblock %}
+{% block content %}
+<div class="wrap" style="max-width:1100px;margin:24px auto;padding:0 16px;">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+    <h1 style="margin:0;font-size:22px;">🛡️ AI 审核队列</h1>
+    <span class="muted" style="font-size:13px;">四层防线：词库 → cold(HK) → Qwen3Guard(LA) → 人工</span>
+    <a href="{{ url_for('admin') }}" class="btn ghost" style="margin-left:auto;">← 返回后台</a>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+    {% set tabs = [('flagged','待复核'),('hidden','已隐藏'),('pending','处理中'),('cleared','已放行'),('reviewed','已处理')] %}
+    {% for key, label in tabs %}
+      <a href="{{ url_for('admin_ai_review', status=key) }}"
+         class="btn {{ 'primary' if status==key else 'ghost' }}" style="padding:6px 14px;font-size:13px;">
+        {{ label }} {{ stats.get(key, 0) }}
+      </a>
+    {% endfor %}
+    <span class="muted" style="font-size:12px;align-self:center;margin-left:8px;">
+      队列：排队 {{ qstats.get('queued', '-') }} · 失败 {{ qstats.get('failed', '-') }}
+    </span>
+  </div>
+
+  {% if rows %}
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    {% for r in rows %}
+    <div class="card" style="padding:16px;border-radius:12px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+        <span style="font-size:12px;padding:2px 8px;border-radius:6px;background:var(--bg,#f4f4f4);">
+          {{ '帖子' if r['target_type']=='post' else '评论' }} #{{ r['target_id'] }}
+        </span>
+        <b>{{ r['username'] or ('uid ' ~ r['user_id']) }}</b>
+        <span class="muted" style="font-size:12px;">
+          cold: <b>{{ r['cold_level'] or '-' }}</b> {{ '%.2f'|format(r['cold_score'] or 0) }}
+          · Qwen3Guard: <b>{{ r['llm_level'] or '处理中' }}</b>
+          {% if r['llm_score'] is not none %}{{ '%.2f'|format(r['llm_score']) }}{% endif %}
+        </span>
+        <span style="margin-left:auto;font-size:12px;color:var(--muted);">
+          {{ r['created_at']|dt_local }}
+        </span>
+      </div>
+      {% if r['title'] %}<div style="font-weight:600;margin-bottom:4px;">{{ r['title'] }}</div>{% endif %}
+      <div style="font-size:14px;line-height:1.6;white-space:pre-wrap;max-height:120px;overflow:auto;color:var(--fg);">{{ r['body'] or '' }}</div>
+      {% if r['llm_why'] %}
+      <div class="muted" style="font-size:12px;margin-top:6px;">AI 判定：{{ r['llm_why'] }}</div>
+      {% endif %}
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <form method="post" action="{{ url_for('admin_ai_review_action', mid=r['id'], action='clear') }}" style="display:inline;">
+          <input type="hidden" name="back" value="{{ status }}">
+          <button class="btn primary" style="padding:6px 14px;font-size:13px;">✓ 通过（恢复显示）</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_ai_review_action', mid=r['id'], action='hide') }}" style="display:inline;">
+          <input type="hidden" name="back" value="{{ status }}">
+          <button class="btn ghost" style="padding:6px 14px;font-size:13px;">隐藏</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_ai_review_action', mid=r['id'], action='delete') }}" style="display:inline;"
+              onsubmit="return confirm(__('确认删除这条内容？'));">
+          <input type="hidden" name="back" value="{{ status }}">
+          <button class="btn ghost" style="padding:6px 14px;font-size:13px;color:#d92d20;">删除</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card" style="padding:40px;text-align:center;border-radius:12px;">
+    <p class="muted">这个队列是空的 —— {% if status=='flagged' %}没有待复核的内容，挺好{% else %}暂无记录{% endif %}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ tr('forum.title') }} - {{ tr('brand') }}{% endblock %}
+{% set active = 'forum' %}
+{% block content %}
+<style>
+.section-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.section-tab{padding:6px 16px;border:1px solid var(--line);border-radius:20px;font-size:13px;color:var(--fg-2);text-decoration:none;transition:all .15s;}
+.section-tab:hover{border-color:#111;color:#111;}
+.section-tab.active{background:#111;color:#fff;border-color:#111;}
+.section-tab.announce{border-style:dashed;}
+.sort-bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;font-size:13px;}
+.sort-link{color:var(--muted);text-decoration:none;padding:2px 10px;border-radius:12px;}
+.sort-link.active{background:#111;color:#fff;}
+.p-tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:10px;background:var(--soft);color:var(--fg-2);margin-right:4px;}
+.tag.essence{background:#fff7e0;color:#b8860b;border-color:#e6c66a;}
+.tag.locked{background:#fbecec;color:#c0392b;border-color:#e0b4b4;}
+.tag.edited{background:var(--soft);color:var(--muted);border-color:#ddd;}
+
+/* 064 编辑精选横条 */
+.essence-strip {
+  margin: 0 0 14px; padding: 12px 14px 13px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(245,158,11,.10), rgba(245,158,11,.03));
+  border: 1px solid rgba(245,158,11,.28);
+}
+.essence-strip-h {
+  font-size: 13px; font-weight: 700; margin-bottom: 9px;
+  color: #b45309; display: flex; align-items: center; gap: 6px;
+}
+.essence-strip-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.essence-chip {
+  flex: 0 0 auto; max-width: 250px; padding: 8px 12px; border-radius: 9px;
+  background: var(--bg-elev); border: 1px solid var(--line);
+  text-decoration: none; display: block;
+  transition: border-color .15s, transform .15s;
+}
+.essence-chip:hover { border-color: rgba(245,158,11,.55); transform: translateY(-1px); }
+.ec-title {
+  display: block; font-size: 13px; font-weight: 600; color: var(--fg-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ec-meta { display: block; font-size: 11px; color: var(--fg-3); margin-top: 3px; }
+</style>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+  <h2 style="margin-bottom:0;">论坛{% if cur_section %} · {{ cur_section.name }}{% endif %}</h2>
+  {% if current_user %}
+  <a href="{{ url_for('create_post') }}" class="btn">{{ tr('forum.new_post') }}</a>
+  {% endif %}
+</div>
+
+<div class="section-tabs">
+  <a href="{{ url_for('forum') }}?sort={{ sort }}" class="section-tab {% if not sec_id %}active{% endif %}">{{ tr('forum.all') }}</a>
+  {% for s in sections %}
+  <a href="{{ url_for('forum') }}?section={{ s.id }}&sort={{ sort }}"
+     class="section-tab {% if sec_id == s.id %}active{% endif %} {% if s.is_announcement %}announce{% endif %}">
+    {{ s.name }}{% if s.is_announcement %} 📢{% endif %}
+  </a>
+  {% endfor %}
+  <a href="{{ url_for('hot_page') }}" class="section-tab" style="margin-left:auto;">{{ tr('forum.hot_topics') }}</a>
+</div>
+{% if board_threads %}
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-6px 0 14px;">
+  <span class="muted" style="font-size:12px;align-self:center;">{{ tr('forum.topic_label') }}</span>
+  {% for t in board_threads %}
+  <a href="{{ url_for('thread_page', thread_id=t.id) }}"
+     style="font-size:12px;padding:3px 11px;border-radius:99px;border:1px solid var(--line);
+            background:var(--bg-elev);color:var(--fg-2);text-decoration:none;">
+    {{ t.name }}<span class="muted" style="margin-left:4px;">{{ t.post_count }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% if cur_section and cur_section.is_announcement %}
+
+{% endif %}
+
+{% if essence_posts %}
+<div class="essence-strip">
+  <div class="essence-strip-h">{{ tr('forum.editors') }}</div>
+  <div class="essence-strip-list">
+    {% for p in essence_posts %}
+    <a class="essence-chip" href="{{ url_for('view_post', post_id=p.id) }}">
+      <span class="ec-title">{{ p.title }}</span>
+      <span class="ec-meta">{{ p.username }} · 💬 {{ p.real_comment_count }} · 👁 {{ p.view_count }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="sort-bar">
+  <span class="muted">{{ tr('forum.sort') }}</span>
+  <a href="{{ url_for('forum') }}?section={{ sec_id }}&sort=new" class="sort-link {% if sort=='new' %}active{% endif %}">{{ tr('forum.sort_new') }}</a>
+  <a href="{{ url_for('forum') }}?section={{ sec_id }}&sort=reply" class="sort-link {% if sort=='reply' %}active{% endif %}">{{ tr('forum.sort_reply') }}</a>
+  <a href="{{ url_for('forum') }}?section={{ sec_id }}&sort=hot" class="sort-link {% if sort=='hot' %}active{% endif %}">{{ tr('forum.sort_hot') }}</a>
+</div>
+
+{% if posts %}
+<div class="post-list">
+  {% for post in posts %}
+  <div class="post-item {% if post.is_pinned %}pinned{% endif %}" data-post-id="{{ post.id }}">
+    {% if get_user_effect(post) %}
+    <div class="post-cover-effect {{ get_user_effect(post) }}"></div>
+    {% endif %}
+    <div class="post-header">
+      <img src="{{ get_avatar_url(post) }}" alt="" class="avatar sm">
+      <div>
+        <div style="font-size:14px;font-weight:600;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+          {{ post.username }}
+          {% if post.is_admin %}<span class="tag admin">{{ tr('forum.sort_admin') }}</span>{% endif %}
+          {{ badges_html(post) }}
+        </div>
+        <div class="muted" style="font-size:12px;">{{ post.created_at|timeago }} · {{ post.section_name or '综合闲聊区' }}</div>
+      </div>
+      <span style="margin-left:auto;display:flex;gap:4px;">
+        {% if post.is_essence %}<span class="tag essence">{{ tr('forum.sort_best') }}</span>{% endif %}
+        {% if post.is_locked %}<span class="tag locked">{{ tr('forum.locked') }}</span>{% endif %}
+      </span>
+    </div>
+    <a href="{{ url_for('view_post', post_id=post.id) }}">
+      <div class="post-title">{{ post.title }}{% if post.edited %} <span class="tag edited">{{ tr('forum.edited') }}</span>{% endif %}</div>
+      <div class="post-excerpt">{{ (post.summary or post.content)|excerpt(150) }}</div>
+    </a>
+    <div class="post-meta">
+      <span>👁 {{ post.view_count }} 浏览</span>
+      <span>💬 {{ post.real_comment_count }} 评论</span>
+      <span class="like-btn {% if post.id in user_likes %}liked{% endif %}" onclick="toggleLike({{ post.id }})">
+        ❤️ <span class="like-count">{{ post.likes }}</span>
+      </span>
+      {% if current_user and current_user.is_admin %}
+      <form method="post" action="{{ url_for('pin_post', post_id=post.id) }}" style="display:inline;">
+        <button type="submit" class="btn sm ghost">{% if post.is_pinned %}取消置顶{% else %}置顶{% endif %}</button>
+      </form>
+      <form method="post" action="{{ url_for('essence_post', post_id=post.id) }}" style="display:inline;">
+        <button type="submit" class="btn sm ghost">{% if post.is_essence %}取消精华{% else %}设为精华{% endif %}</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card center" style="padding:40px;">
+  <p class="muted" style="font-size:15px;margin-bottom:6px;">{{ tr('forum.empty') }}</p>
+  {% if not (cur_section and cur_section.is_announcement and not (current_user and current_user.is_admin)) %}
+  <p class="muted" style="font-size:13px;margin-bottom:16px;">{{ tr('forum.empty_cta') }}</p>
+  <a class="btn" href="{{ url_for('create_post') }}{% if cur_section %}?section={{ cur_section.id }}{% endif %}">{{ tr('forum.empty_btn') }}</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

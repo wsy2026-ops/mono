@@ -1,0 +1,75 @@
+{% extends "_admin_base.html" %}
+{% block title %}AI 兑换码 · 管理后台{% endblock %}
+{% block admin_icon %}🎟️{% endblock %}
+{% block admin_heading %}AI 广场 · 兑换码{% endblock %}
+{% block admin_desc %}生成兑换码发给用户，兑换后给「AI 广场余额」充值。可限定最多几人兑换、每个码的金额、有效期起止{% endblock %}
+
+{% block admin_content %}
+<style>
+  .ac-gen{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;
+    padding:14px;border-bottom:1px solid var(--line);background:var(--soft);}
+  .ac-gen label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+  .ac-gen input{padding:7px 10px;font-size:13px;width:110px;}
+  .ac-gen input.w-note{width:200px;}
+  .ac-gen button{padding:8px 18px;font-size:13px;font-weight:600;}
+  .ac-wrap{padding:14px;overflow-x:auto;}
+  .ac-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+  .ac-tbl th,.ac-tbl td{padding:8px 10px;border-bottom:1px solid var(--line);
+    text-align:left;white-space:nowrap;}
+  .ac-tbl th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft);}
+  .ac-tbl tr:hover td{background:var(--soft);}
+  .ac-tbl .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;
+    letter-spacing:1px;font-size:13.5px;}
+  .ac-pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;border:1px solid var(--line);}
+  .ac-pill.ok{color:#067647;border-color:#a6f4c5;background:#ecfdf3;}
+  .ac-pill.full{color:#b42318;border-color:#fecdca;background:#fef3f2;}
+  .ac-pill.exp{color:#93370d;border-color:#fedf89;background:#fffaeb;}
+  .ac-pill.wait{color:#175cd3;border-color:#b2ddff;background:#eff8ff;}
+  .ac-empty{padding:36px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+
+<form method="post" class="ac-gen">
+  <div><label>生成数量</label><input type="number" name="count" value="1" min="1" max="50"></div>
+  <div><label>最多几人兑换</label><input type="number" name="max_uses" value="1" min="1" max="9999"></div>
+  <div><label>每个码金额（元）</label><input type="number" name="amount" value="1" min="0.01" max="10000" step="0.01"></div>
+  <div><label>生效日（留空不限）</label><input type="date" name="valid_from"></div>
+  <div><label>失效日（留空不限）</label><input type="date" name="valid_until"></div>
+  <div><label>备注</label><input type="text" name="note" class="w-note" placeholder="比如：十一活动" maxlength="120"></div>
+  <button type="submit" class="btn">🎟️ 生成</button>
+</form>
+
+<div class="ac-wrap">
+  {% if rows %}
+  <table class="ac-tbl">
+    <tr><th>兑换码</th><th>状态</th><th>已兑 / 上限</th><th>金额</th><th>有效期</th><th>备注</th><th>创建</th><th></th></tr>
+    {% for r in rows %}
+    <tr>
+      <td class="code">{{ r['code'] }}</td>
+      <td>
+        {% set full = r['used_count'] >= r['max_uses'] %}
+        {% set expired = r['valid_until'] and now_d > r['valid_until'] %}
+        {% set waiting = r['valid_from'] and now_d < r['valid_from'] %}
+        {% if expired %}<span class="ac-pill exp">已过期</span>
+        {% elif waiting %}<span class="ac-pill wait">未生效</span>
+        {% elif full %}<span class="ac-pill full">已领完</span>
+        {% else %}<span class="ac-pill ok">可用</span>{% endif %}
+      </td>
+      <td>{{ r['used_count'] }} / {{ r['max_uses'] }}</td>
+      <td><b>¥{{ '%.2f' % (r['amount'] or 0) }}</b></td>
+      <td>{{ r['valid_from'] or '—' }} ~ {{ r['valid_until'] or '不限' }}</td>
+      <td>{{ r['note'] or '—' }}</td>
+      <td>{{ r['created_by'] or '—' }}<br><span style="font-size:11px;color:var(--muted)">{{ (r['created_at'] | fmttime) if r['created_at'] else '' }}</span></td>
+      <td>
+        <form method="post" action="{{ url_for('admin_ai_code_del', cid=r['id']) }}"
+              onsubmit="return confirm(__('删掉 {code}？已兑换的记录也一并删除', {code: {{ r['code']|tojson }}}))">
+          <button class="btn sm ghost">删除</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="ac-empty">还没有兑换码，用上面表单生成第一批</div>
+  {% endif %}
+</div>
+{% endblock %}

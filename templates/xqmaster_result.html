@@ -1,0 +1,91 @@
+{% extends "_xqmaster_base.html" %}
+{% block xqm_title %}对局结算{% endblock %}
+
+{% block xqm_content %}
+<div class="xqm-rbox">
+  <h1 class="xqm-verdict win" id="xqmVerdict">结算中…</h1>
+  <p class="xqm-why" id="xqmWhy"></p>
+  <div class="xqm-rcard"><div class="xqm-rgrid" id="xqmRGrid"></div></div>
+  <div class="xqm-rloot" id="xqmRLoot" style="display:none"></div>
+  <div class="xqm-ryizhu" id="xqmRYizhu" style="display:none"></div>
+  <div class="xqm-racts">
+    <a class="xqm-btn xqm-btn-p xqm-racts-main" href="{{ url_for('xqmaster_match_page') }}">再来一局</a>
+    <a class="xqm-btn xqm-btn-o" href="/game/xqmaster/replay/{{ gid }}">看复盘</a>
+    <a class="xqm-btn xqm-btn-o" href="{{ url_for('xqmaster_rank_page') }}">看巅峰榜</a>
+    <a class="xqm-btn xqm-btn-o" href="{{ url_for('xqmaster_page') }}">回首页</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block xqm_scripts %}
+<script>
+(function(){
+  var X = window.XQM;
+  var GID = {{ gid }};
+  X.api('/api/xqm/game/'+GID).then(function(p){
+    if(!p.ok){
+      document.getElementById('xqmVerdict').textContent = '加载失败';
+      document.getElementById('xqmWhy').textContent = p.msg || '';
+      return;
+    }
+    var st = p.state, w = st.winner, iAmRed = (p.my_side === 'red');
+    var myWin = (w==='red' && iAmRed) || (w==='black' && !iAmRed);
+    var v = document.getElementById('xqmVerdict');
+    if(w === 'draw'){ v.textContent = '和棋'; v.className = 'xqm-verdict draw'; }
+    else if(myWin){ v.textContent = '你赢了'; v.className = 'xqm-verdict win'; }
+    else { v.textContent = '你输了'; v.className = 'xqm-verdict lose'; }
+    document.getElementById('xqmWhy').textContent = st.reason || '';
+    var mine = iAmRed ? p.red : p.black, foe = iAmRed ? p.black : p.red;
+    var stats = [
+      ['总回合数', st.round],
+      ['你的剩余血量', mine.hp],
+      ['对方剩余血量', foe.hp],
+      ['你的剩余棋子', mine.alive],
+      ['对方剩余棋子', foe.alive],
+      ['你的积分', mine.rating],
+      ['对方积分', foe.rating]
+    ];
+    document.getElementById('xqmRGrid').innerHTML = stats.map(function(s, i){
+      return '<div class="g" style="animation-delay:' + (380 + i*55) + 'ms">'
+        + '<div class="k">' + s[0] + '</div><div class="v">' + s[1] + '</div></div>';
+    }).join('');
+
+    setTimeout(function(){
+      if(w === 'draw') X.sfx.turn();
+      else if(myWin) X.sfx.win();
+      else X.sfx.lose();
+    }, 220);
+
+    var myLoot = p.loot ? (p.loot[p.my_side] || null) : null;
+    if(myLoot && Object.keys(myLoot).length){
+      var items = Object.keys(myLoot).map(function(t, i){
+        var g = X.GLYPH[t][0], nm = X.PD[t].name;
+        var gr = X.PD[t].grade, gd = X.GRADE[gr];
+        return '<div class="li" style="animation-delay:' + (760 + i*95) + 'ms">'
+          + '<span class="g">'+g+'</span><span class="nm2">'+nm+'</span>'
+          + '<span class="cnt">+'+myLoot[t]+'</span>'
+          + '<span class="xqm-grade" style="color:'+gd.c+';border-color:'+gd.c+'55;background:'+gd.c+'14">'+gd.zh+'</span></div>';
+      }).join('');
+      var el = document.getElementById('xqmRLoot');
+      el.innerHTML = '<div class="lt">此役缴获 · 碎片已注入棋子养成</div><div class="ls">'+items+'</div>';
+      el.style.display = '';
+      el.style.animationDelay = '700ms';
+      setTimeout(function(){ X.sfx.hit(); }, 760);
+      setTimeout(function(){ X.sfx.hit(); }, 860);
+    }
+    var myCoin = p.yizhu ? (p.yizhu[p.my_side] || 0) : 0;
+    if(myCoin > 0 || p.yizhu_balance !== undefined){
+      var yz = document.getElementById('xqmRYizhu');
+      if(yz){
+        yz.innerHTML = '<span class="yz-ico">弈铢</span>'
+          + '<span class="yz-gain">+' + myCoin + '</span>'
+          + '<span class="yz-bal">当前 ' + (p.yizhu_balance || 0) + '</span>';
+        yz.style.display = 'flex';
+      }
+    }
+  }).catch(function(){
+    document.getElementById('xqmVerdict').textContent = '网络异常';
+  });
+})();
+</script>
+{% endblock %}

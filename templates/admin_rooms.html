@@ -1,0 +1,127 @@
+{% extends "_admin_base.html" %}
+{% block title %}聊天室管理 · 管理后台{% endblock %}
+{% block admin_icon %}💬{% endblock %}
+{% block admin_heading %}聊天室管理{% endblock %}
+{% block admin_desc %}每个房间的配置独立生效 · 开关即点即生效 · 仅超级管理员可操作{% endblock %}
+
+{% block admin_actions %}
+<a href="{{ url_for('chat') }}" class="btn sm ghost">前往聊天室 →</a>
+{% endblock %}
+
+{% block admin_content %}
+
+<form method="post" class="adm-card">
+  <input type="hidden" name="action" value="add">
+  <div class="adm-sec-title">新增房间</div>
+  <div class="adm-form-row">
+    <input type="text" name="name" placeholder="房间名称" style="flex:1 1 160px;min-width:140px;" required maxlength="30">
+    <input type="text" name="description" placeholder="房间描述（可选）" style="flex:2 1 240px;min-width:180px;" maxlength="80">
+    <button class="btn" type="submit">添加房间</button>
+  </div>
+</form>
+
+<div class="adm-card flush">
+  <div class="adm-card-head">
+    <h3>房间列表</h3>
+    <span class="adm-hint">共 {{ rooms|length }} 个</span>
+  </div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th style="width:60px;">ID</th>
+          <th style="min-width:330px;">名称 / 描述</th>
+          <th style="width:120px;">房间状态</th>
+          <th style="width:110px;">附件上传</th>
+          <th style="width:110px;">全员禁言</th>
+          <th style="width:110px;">访客权限</th>
+          <th style="width:90px;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rooms %}
+        <tr>
+          <td class="adm-id">{{ r.id }}</td>
+
+          <td>
+            <form method="post" class="adm-form-row">
+              <input type="hidden" name="action" value="edit">
+              <input type="hidden" name="room_id" value="{{ r.id }}">
+              <input type="text" name="name" value="{{ r.name }}" style="width:118px;" maxlength="30">
+              <input type="text" name="description" value="{{ r.description or '' }}"
+                     placeholder="描述" style="flex:1;min-width:150px;" maxlength="80">
+              <button class="btn sm ghost" type="submit">保存</button>
+            </form>
+          </td>
+
+          <td>
+            <form method="post">
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="room_id" value="{{ r.id }}">
+              <input type="hidden" name="field" value="is_closed">
+              <button class="btn sm {{ 'ghost' if r.is_closed else '' }}" type="submit"
+                      title="点击切换">{{ '🚫 已关闭' if r.is_closed else '✅ 开放中' }}</button>
+            </form>
+          </td>
+
+          <td>
+            <form method="post">
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="room_id" value="{{ r.id }}">
+              <input type="hidden" name="field" value="file_upload">
+              <button class="btn sm {{ '' if r.file_upload else 'ghost' }}" type="submit"
+                      title="点击切换">{{ '📎 允许' if r.file_upload else '🚫 禁止' }}</button>
+            </form>
+          </td>
+
+          <td>
+            <form method="post">
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="room_id" value="{{ r.id }}">
+              <input type="hidden" name="field" value="all_muted">
+              <button class="btn sm {{ '' if r.all_muted else 'ghost' }}" type="submit"
+                      title="点击切换">{{ '🔇 已开启' if r.all_muted else '🔊 未开启' }}</button>
+            </form>
+          </td>
+
+          <td>
+            <form method="post">
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="room_id" value="{{ r.id }}">
+              <input type="hidden" name="field" value="guest_readonly">
+              <button class="btn sm {{ '' if r.guest_readonly else 'ghost' }}" type="submit"
+                      title="点击切换">{{ '👁 只读' if r.guest_readonly else '✏ 可发言' }}</button>
+            </form>
+          </td>
+
+          <td>
+            <form method="post"
+                  data-name="{{ r.name }}" onsubmit="return confirm(__('仅可删除无任何消息的闲置房间，确定删除「') + this.dataset.name + '」？');">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="room_id" value="{{ r.id }}">
+              <button class="btn sm ghost" type="submit"
+                      style="color:#b42318;border-color:#f2cfcb;">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">
+            <div class="adm-empty">
+              <div class="adm-empty-ico">💬</div>
+              <div class="adm-empty-text">暂无房间</div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="adm-card-head" style="border-top:1px solid var(--line);border-bottom:none;">
+    <span class="adm-hint">
+      官方固定房间（综合大厅 / 技术交流厅 / 游戏交流厅 / 资源分享厅）建议保留；
+      删除仅对「无任何消息」的闲置房间生效。
+    </span>
+  </div>
+</div>
+{% endblock %}

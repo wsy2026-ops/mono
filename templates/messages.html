@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}私信 - MONO 社区{% endblock %}
+{% set active = 'messages' %}
+{% block content %}
+<style>
+  .pcv-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .pcv-head h2{margin:0}
+  .pcv-head .sub{font-size:13px;color:var(--muted)}
+  .pcv-list{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .pcv-row{display:flex;align-items:center;gap:13px;padding:13px 16px;text-decoration:none;
+    color:inherit;border-bottom:1px solid var(--line);transition:background .16s ease}
+  .pcv-row:last-child{border-bottom:none}
+  .pcv-row:hover{background:var(--soft)}
+  .pcv-ava{width:44px;height:44px;border-radius:50%;flex-shrink:0;object-fit:cover;
+    background:var(--soft);border:1px solid var(--line)}
+  .pcv-mid{flex:1;min-width:0}
+  .pcv-name{font-size:14.5px;font-weight:700;color:var(--fg);display:flex;align-items:center;gap:7px}
+  .pcv-prev{font-size:12.5px;color:var(--muted);margin-top:3px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pcv-right{flex-shrink:0;text-align:right;display:flex;flex-direction:column;
+    align-items:flex-end;gap:6px}
+  .pcv-time{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .pcv-dot{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#C0392B;
+    color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;
+    font-variant-numeric:tabular-nums}
+  .pcv-sk{height:70px;margin:0}
+</style>
+
+<div class="pcv-head">
+  <h2>私信</h2>
+  <span class="sub" id="pcvSub">加载中…</span>
+</div>
+<div class="pcv-list" id="pcvList">
+  <div class="pcv-sk" style="border-bottom:1px solid var(--line)"></div>
+  <div class="pcv-sk" style="border-bottom:1px solid var(--line)"></div>
+  <div class="pcv-sk"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var box = document.getElementById('pcvList');
+  var sub = document.getElementById('pcvSub');
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function rel(ts){
+    var d = new Date(ts * 1000), now = new Date();
+    var sameDay = d.toDateString() === now.toDateString();
+    var pad = function(n){ return n < 10 ? '0' + n : '' + n; };
+    if (sameDay) return pad(d.getHours()) + ':' + pad(d.getMinutes());
+    var y = new Date(now.getTime() - 86400000);
+    if (d.toDateString() === y.toDateString()) return '昨天';
+    if (d.getFullYear() === now.getFullYear()) return (d.getMonth()+1) + '月' + d.getDate() + '日';
+    return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate();
+  }
+
+  fetch('/api/private/conversations', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (!r || !r.ok){ box.innerHTML = '<div class="empty" style="padding:24px">加载失败</div>'; sub.textContent = ''; return; }
+      if (!r.list.length){
+        box.innerHTML = '<div class="empty" style="padding:28px">还没有私信。去好友列表找个人聊聊？</div>';
+        sub.textContent = '';
+        return;
+      }
+      sub.textContent = r.unread ? ('未读 ' + r.unread + ' 条') : '全部已读';
+      box.innerHTML = r.list.map(function(c){
+        return '<a class="pcv-row" href="/private-chat/' + c.id + '">'
+          + '<img class="pcv-ava" src="' + esc(c.avatar) + '" alt="">'
+          + '<div class="pcv-mid"><div class="pcv-name">' + esc(c.name) + '</div>'
+          + '<div class="pcv-prev">' + (c.mine ? '我：' : '') + esc(c.preview) + '</div></div>'
+          + '<div class="pcv-right"><span class="pcv-time">' + rel(c.time) + '</span>'
+          + (c.unread ? '<span class="pcv-dot">' + (c.unread > 99 ? '99+' : c.unread) + '</span>' : '')
+          + '</div></a>';
+      }).join('');
+    })
+    .catch(function(){
+      box.innerHTML = '<div class="empty" style="padding:24px">网络异常</div>';
+      sub.textContent = '';
+    });
+})();
+</script>
+{% endblock %}

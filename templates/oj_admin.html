@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}比赛管理 - MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .oa-wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px;}
+  .oa-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .oa-title{font-size:20px;font-weight:800;margin:0;}
+  .oa-back{
+    font-size:13px;color:var(--fg-3);text-decoration:none;
+    padding:4px 10px;border-radius:7px;border:1px solid var(--line);
+  }
+  .oa-back:hover{background:var(--soft);color:var(--fg);}
+  .oa-sub{font-size:12.5px;color:var(--fg-3);margin:0 0 18px;line-height:1.7;}
+
+  .oa-card{
+    border:1px solid var(--line);border-radius:12px;background:var(--card);
+    padding:18px 20px;margin-bottom:14px;
+  }
+  .oa-card h2{margin:0 0 14px;font-size:14.5px;font-weight:700;}
+
+  .oa-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .oa-input,.oa-textarea,.oa-select{
+    width:100%;box-sizing:border-box;
+    padding:9px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--bg-sunken);color:var(--fg);
+    font-size:13.5px;font-family:inherit;outline:none;
+  }
+  .oa-input:focus,.oa-textarea:focus{border-color:var(--fg-3);}
+  .oa-textarea{min-height:80px;resize:vertical;line-height:1.7;}
+  .oa-label{
+    display:block;font-size:12px;font-weight:700;color:var(--fg-2);
+    margin:0 0 6px;
+  }
+  .oa-field{margin-bottom:14px;}
+  .oa-field:last-child{margin-bottom:0;}
+
+  .oa-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:8px 18px;border:0;border-radius:8px;cursor:pointer;
+    font-size:13.5px;font-weight:700;font-family:inherit;
+    background:var(--fg);color:var(--bg);text-decoration:none;
+  }
+  .oa-btn:hover{opacity:.85;}
+  .oa-btn.ghost{background:none;color:var(--fg);border:1px solid var(--line);}
+  .oa-btn.ghost:hover{background:var(--soft);}
+  .oa-btn.danger{background:none;color:#c62828;border:1px solid var(--line);}
+  .oa-btn.danger:hover{background:#fdecea;border-color:#f5b5b0;}
+  .oa-btn.sm{padding:5px 12px;font-size:12.5px;}
+
+  .oa-list{display:flex;flex-direction:column;gap:10px;}
+  .oa-item{
+    display:flex;align-items:center;gap:14px;
+    padding:14px 16px;border:1px solid var(--line);border-radius:11px;
+    background:var(--bg-sunken);text-decoration:none;
+  }
+  .oa-item:hover{border-color:var(--fg-3);}
+  .oa-imain{flex:1;min-width:0;}
+  .oa-iname{display:block;font-size:14.5px;font-weight:700;color:var(--fg);margin-bottom:4px;}
+  .oa-imeta{display:block;font-size:12px;color:var(--fg-3);}
+  .oa-iact{display:flex;gap:8px;flex-shrink:0;}
+
+  .oa-empty{
+    text-align:center;padding:44px 20px;
+    border:1px dashed var(--line);border-radius:12px;background:var(--bg-sunken);
+    font-size:13px;color:var(--fg-3);
+  }
+
+  .oa-flash{
+    padding:11px 15px;border-radius:9px;margin-bottom:14px;font-size:13px;
+  }
+  .oa-flash.ok{background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}
+  .oa-flash.error{background:#fdecea;color:#a32d2d;border:1px solid #f5b5b0;}
+
+  .oa-hint{font-size:11.5px;color:var(--fg-3);margin-top:5px;line-height:1.6;}
+
+  @media (max-width:640px){
+    .oa-wrap{padding:14px 12px 50px;}
+    .oa-card{padding:15px 14px;}
+    .oa-item{flex-wrap:wrap;}
+    .oa-iact{width:100%;}
+  }
+</style>
+
+<div class="oa-wrap">
+  <div class="oa-head">
+    <h1 class="oa-title">比赛管理</h1>
+    <a class="oa-back" href="{{ url_for('oj_home') }}">← 回公开赛</a>
+  </div>
+  <p class="oa-sub">创建比赛 → 添加题目 → 上传测试点。题目规则和洛谷一致。</p>
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}
+    <div class="oa-flash {{ 'error' if cat == 'error' else 'ok' }}">{{ m }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="oa-card">
+    <h2>新建比赛</h2>
+    <form method="post" action="{{ url_for('oj_admin_contest_new') }}">
+      <div class="oa-field">
+        <label class="oa-label">比赛标题</label>
+        <input class="oa-input" name="title" placeholder="例如：MONO 月赛 #1" maxlength="120" required>
+      </div>
+      <button class="oa-btn" type="submit">创建比赛</button>
+    </form>
+  </div>
+
+  <div class="oa-card">
+    <h2>全部比赛（{{ contests|length }}）</h2>
+    {% if contests %}
+    <div class="oa-list">
+      {% for c in contests %}
+      <div class="oa-item">
+        <div class="oa-imain">
+          <span class="oa-iname">{{ c.title }}</span>
+          <span class="oa-imeta">
+            {{ c.pcount }} 道题 ·
+            {{ c.start_label }} ~ {{ c.end_label }} ·
+            {{ '公开' if c.is_public else '隐藏' }}
+          </span>
+        </div>
+        <div class="oa-iact">
+          <a class="oa-btn sm" href="{{ url_for('oj_admin_contest', cid=c.id) }}">编辑</a>
+          <form method="post" action="{{ url_for('oj_admin_contest_delete', cid=c.id) }}"
+                onsubmit="return confirm(__('确定删除这场比赛？题目和测试点都会没。'));">
+            <button class="oa-btn sm danger" type="submit">删除</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="oa-empty">还没有比赛，在上面创建一场</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

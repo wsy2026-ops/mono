@@ -1,0 +1,565 @@
+{% extends "base.html" %}
+{% block title %}{{ pz.title }} - 象棋残局{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .xq-wrap{max-width:980px;margin:0 auto;display:grid;grid-template-columns:minmax(560px, 1fr) 280px;gap:22px;align-items:start;}
+  .xq-main{min-width:0;}
+  .xq-info{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05);}
+  .xq-info h2{margin:0;font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .xq-info .tag{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;}
+  .xq-tag-red{background:#fef0ee;color:#d43b25;}
+  .xq-tag-diff{background:#111;color:#fff;}
+  .xq-tag-sys{background:#e7f9ef;color:#189a5d;}
+  .xq-tag-user{background:#eef2ff;color:#4f46e5;}
+  .xq-info .meta{font-size:12.5px;color:var(--muted,#888);display:flex;flex-wrap:wrap;gap:12px;}
+  .xq-info .meta b{color:#333;font-weight:600;}
+  .xq-status{font-size:13.5px;font-weight:700;margin-left:auto;}
+  .xq-board{position:relative;width:100%;max-width:560px;min-width:480px;aspect-ratio:9/10;margin:0 auto;background:#fff;border:4px solid #111;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);user-select:none;-webkit-user-select:none;flex-shrink:0;}
+  .xq-board svg{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;}
+  .xq-corner-label{position:absolute;font-size:11px;font-weight:700;color:#888;z-index:1;pointer-events:none;font-family:Georgia,'Times New Roman',serif;opacity:.7;}
+  .xq-pt{position:absolute;width:calc(100% / 8 * 0.72);height:calc(100% / 9 * 0.72);transform:translate(-50%,-50%);cursor:pointer;z-index:2;border-radius:50%;}
+  .xq-pt:hover:not(.disabled){background:rgba(0,0,0,.10);}
+  .xq-pt.disabled{cursor:default;}
+  .xq-hint{position:absolute;width:calc(100% / 8 * 0.30);height:auto;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:rgba(20,120,60,.85);z-index:4;pointer-events:none;box-shadow:0 0 0 3px rgba(20,120,60,.25);}
+  .xq-hint.capture{width:calc(100% / 8 * 0.78);height:auto;aspect-ratio:1;background:transparent;border:3.5px solid rgba(210,40,30,.95);box-shadow:0 0 0 4px rgba(210,40,30,.18), inset 0 0 0 2px rgba(210,40,30,.10);border-radius:50%;}
+  .xq-piece{position:absolute;width:calc(100% / 8 * 0.86);height:auto;aspect-ratio:1;flex-shrink:0;border-radius:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-weight:900;z-index:3;pointer-events:none;box-sizing:border-box;font-size:1em;background:#fff;color:#111;border:2px solid #111;box-shadow:0 2px 4px rgba(0,0,0,.25), inset 0 -2px 3px rgba(0,0,0,.06), inset 0 2px 3px rgba(255,255,255,.85);transition:box-shadow .15s;}
+  .xq-piece.red{color:#c22b22;border-color:#111;}
+  .xq-piece.black{color:#111;border-color:#111;}
+  .xq-piece.last::after{content:'';position:absolute;inset:-6px;border:3px solid #2563eb;border-radius:50%;box-sizing:border-box;animation:xqFadeIn .25s;}
+  .xq-piece.selected{outline:3px solid #f5b301;outline-offset:3px;box-shadow:0 0 0 5px rgba(245,179,1,.30), 0 2px 4px rgba(0,0,0,.25);}
+  .xq-piece.check{animation:xqCheckPulse 1s ease-in-out infinite;box-shadow:0 0 0 4px rgba(210,40,30,.55), 0 0 14px 4px rgba(210,40,30,.55);}
+  .xq-piece.ht{outline:3px solid #f5a623;outline-offset:3px;box-shadow:0 0 0 6px rgba(245,166,35,.4);}
+  @keyframes xqCheckPulse{0%,100%{box-shadow:0 0 0 4px rgba(210,40,30,.45), 0 0 10px 3px rgba(210,40,30,.40);}50%{box-shadow:0 0 0 6px rgba(210,40,30,.75), 0 0 18px 6px rgba(210,40,30,.65);}}
+  @keyframes xqFadeIn{from{opacity:0;}to{opacity:1;}}
+  .xq-thinking{position:absolute;inset:0;background:transparent;z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none;border-radius:8px;}
+  .xq-thinking .box{background:rgba(255,255,255,.95);border:1px solid #ccc;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:700;color:#333;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.18);}
+  .xq-thinking .spinner{width:13px;height:13px;border:2.5px solid #e0e0e0;border-top-color:#111;border-radius:50%;animation:xqspin .8s linear infinite;}
+  @keyframes xqspin{to{transform:rotate(360deg);}}
+  .xq-overlay{position:absolute;inset:0;background:rgba(255,255,255,.88);z-index:20;display:none;align-items:center;justify-content:center;border-radius:8px;}
+  .xq-overlay.on{display:flex;}
+  .xq-overlay .box{text-align:center;background:#fff;border:2px solid #111;border-radius:18px;padding:26px 34px;box-shadow:0 10px 34px rgba(0,0,0,.22);max-width:340px;}
+  .xq-overlay .box .big{font-size:44px;margin-bottom:6px;}
+  .xq-overlay .box .tt{font-size:18px;font-weight:800;margin-bottom:6px;}
+  .xq-overlay .box .msg{font-size:13px;color:#555;line-height:1.7;margin-bottom:16px;word-break:break-all;}
+  .xq-overlay .box .act{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .xq-overlay .box button,.xq-overlay .box a{padding:8px 16px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;border:1px solid #111;background:#111;color:#fff;}
+  .xq-overlay .box a.ghost{background:#fff;color:#111;}
+  .xq-side{position:sticky;top:80px;display:flex;flex-direction:column;gap:12px;}
+  .xq-card{border:1px solid var(--line);border-radius:14px;padding:15px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+  .xq-card h4{margin:0 0 9px;font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:6px;}
+  .xq-card p{margin:0 0 8px;font-size:12.5px;color:var(--muted,#888);line-height:1.75;}
+  .xq-card p:last-child{margin-bottom:0;}
+  .xq-card .xq-btn-primary{width:100%;padding:9px;border-radius:9px;background:#111;color:#fff;border:1px solid #111;cursor:pointer;font-size:13px;font-weight:700;margin-top:8px;}
+  .xq-card .xq-btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+  .xq-card .xq-btn-ghost{width:100%;padding:8px;border-radius:9px;background:#fff;color:#333;border:1px solid #ddd;cursor:pointer;font-size:13px;font-weight:600;margin-top:6px;}
+  .xq-card .xq-btn-ghost:hover{border-color:#999;}
+  .xq-card .xq-btn-warn{width:100%;padding:8px;border-radius:9px;background:#fff;color:#dc2626;border:1px solid #f3c0c0;cursor:pointer;font-size:13px;font-weight:600;margin-top:6px;}
+  .xq-ai-badge{display:inline-flex;align-items:center;gap:5px;background:#f4f5f7;border:1px solid #e3e5e8;border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:700;color:#333;}
+  .xq-moves{max-height:200px;overflow-y:auto;margin-top:4px;border:1px solid #ddd;border-radius:10px;padding:8px 10px;font-size:12px;color:#333;line-height:1.8;background:#fff;}
+  .xq-moves .mv{display:inline-block;margin:0 6px 2px 0;}
+  .xq-moves .mv.red{color:#c22b22;font-weight:700;}
+  .xq-moves .mv.black{color:#222;font-weight:700;}
+  .xq-moves .mv-num{color:#999;font-weight:600;margin-right:2px;}
+  .xq-stars{color:#f5a623;letter-spacing:1px;font-size:12.5px;}
+  @media (max-width:820px){.xq-wrap{grid-template-columns:minmax(0, 1fr);}.xq-side{position:static;}.xq-board{min-width:0;}.xq-status{margin-left:0;width:100%;}}
+</style>
+
+<div class="xq-wrap">
+  <div class="xq-main">
+    <div class="xq-info">
+      <h2>
+        💥 {{ pz.title }}
+        <span class="tag xq-tag-sys">{{ '内置残局' if pz.author_id == 0 else '玩家创作' }}</span>
+        {% if pz.author_id != 0 %}<span class="tag xq-tag-user">@{{ pz.author_name }}</span>{% endif %}
+      </h2>
+      <div class="meta">
+        <span>难度 <b><span class="xq-stars">{% for i in range(5) %}{{ '★' if i < pz.diff else '☆' }}{% endfor %}</span></b></span>
+        <span>你执 <b style="color:#c22b22;">红</b> 先手</span>
+        <span>黑方 <b>{{ '内置 AI' if ai_builtin else 'AI' }}</b></span>
+        {% if done %}<span style="color:#189a5d;font-weight:700;">✅ 已破解过</span>{% endif %}
+      </div>
+      <div class="xq-status" id="status"></div>
+    </div>
+
+    <div class="xq-board" id="board">
+      <div class="xq-corner-label" style="left:2.5%;top:1.5%;">黑</div>
+      <div class="xq-corner-label" style="right:2.5%;bottom:1.5%;">红</div>
+      <div class="xq-overlay" id="overlay">
+        <div class="box">
+          <div class="big" id="ovIcon">🏆</div>
+          <div class="tt" id="ovTitle">破解成功！</div>
+          <div class="msg" id="ovMsg"></div>
+          <div class="act">
+            <button onclick="location.reload()">🔄 再试一次</button>
+            <a class="ghost" href="{{ url_for('xq_puzzles_list') }}">残局大厅</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if pz.intro %}
+    <div class="xq-card" style="margin-top:12px;">
+      <h4>📖 残局介绍</h4>
+      <p>{{ pz.intro }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="xq-side">
+    <div class="xq-card">
+      <h4>🎯 残局信息</h4>
+      <p>目标：<b style="color:#111;">红方先行，将死黑将</b>。<br>每走一步黑方都会全力防守，走出正确杀法即可通关。</p>
+      <p>回合杀 <b style="color:#111;">{{ pz.mate_len or '—' }}</b> · 已被挑战 <b style="color:#111;">{{ pz.plays }}</b> 次 · 破解 <b style="color:#111;">{{ pz.solves }}</b> 次</p>
+    </div>
+    <div class="xq-card">
+      <h4>🔧 操作</h4>
+      <button class="xq-btn-primary" id="hintBtn" onclick="askHint()">💡 提示（AI 推荐一手）</button>
+      <button class="xq-btn-ghost" onclick="location.reload()">🔄 重新开始</button>
+      <button class="xq-btn-ghost" onclick="location.href='{{ url_for('xq_puzzles_list') }}'">← 返回残局大厅</button>
+      <button class="xq-btn-warn" onclick="giveUp()">🏳️ 放弃本题</button>
+      <p style="margin-top:10px;color:#999;">点击红方棋子选中，绿色圆点=可走，红圈=可吃。<b style="color:#d97706;">注意：刷新页面会重置本局</b>（走法保存在页面内）。</p>
+    </div>
+    <div class="xq-card">
+      <h4>📜 着法记录</h4>
+      <div class="xq-moves" id="moveList"><span style="color:#aaa;">（暂无）</span></div>
+    </div>
+    <div class="xq-card">
+      <h4>📖 规则</h4>
+      <p>帅仕相马车炮兵按规则走子；蹩马腿、塞象眼、将帅不能照面。<br>把黑方将死即胜；若被黑方将死或三次重复局面则失败。<b style="color:#111;">红方长将属违规，将判负。</b></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const PUZZLE_ID = {{ pz.id }};
+const ME_ID = {{ user.id }};
+const W = 9, H = 10;
+const START_BOARD = "{{ start_board }}";
+const PIECE_NAME = {K:'帅',k:'将',A:'仕',a:'士',B:'相',b:'象',N:'马',n:'马',R:'车',r:'车',C:'炮',c:'炮',P:'兵',p:'卒'};
+const X_FILES = '一二三四五六七八九';
+const X_FILES_BLACK = '123456789';
+
+let board = START_BOARD;
+let status = 'playing';
+let redTurn = true;          // 残局永远红方（你）先行
+let lastMove = null;
+let uciMoves = '';
+let pending = false;
+let pendingSince = 0;                 // pending 置真的时刻（超时兜底用）
+const PENDING_TIMEOUT_MS = 30000;     // 残局走子/提示请求超过此时长视为挂住
+let selected = null;
+let inCheck = false;
+let gameOver = false;
+
+function pctX(x){ return ((x / (W - 1)) * 100) + '%'; }
+function pctY(y){ return ((y / (H - 1)) * 100) + '%'; }
+function at(x, y){ return board[y * W + x]; }
+function setAt(x, y, v){ board = board.slice(0, y*W+x) + v + board.slice(y*W+x+1); }
+function myTurn(){ return status === 'playing' && redTurn && !gameOver; }
+function isMine(p){ return p !== '.' && p === p.toUpperCase(); }
+
+function xqAt(b,x,y){return b[y*9+x];}
+function xqPieceMoves(b,x,y){
+  const p=xqAt(b,x,y); if(p==='.') return [];
+  const red = p === p.toUpperCase();
+  const moves=[];
+  const ok = (tx,ty) => { if(!(0<=tx&&tx<9&&0<=ty&&ty<10)) return false; const t=xqAt(b,tx,ty); return t==='.' || (t===t.toUpperCase())!==red; };
+  const inPalace = (tx,ty) => 3<=tx&&tx<=5 && (red?(7<=ty&&ty<=9):(0<=ty&&ty<=2));
+  if(p==='K'||p==='k'){
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const tx=x+dx,ty=y+dy; if(inPalace(tx,ty)&&ok(tx,ty)) moves.push([tx,ty]); }
+  } else if(p==='A'||p==='a'){
+    for(const [dx,dy] of [[1,1],[1,-1],[-1,1],[-1,-1]]){ const tx=x+dx,ty=y+dy; if(inPalace(tx,ty)&&ok(tx,ty)) moves.push([tx,ty]); }
+  } else if(p==='B'||p==='b'){
+    for(const [dx,dy] of [[2,2],[2,-2],[-2,2],[-2,-2]]){
+      const tx=x+dx,ty=y+dy;
+      if(!(0<=tx&&tx<9&&0<=ty&&ty<10)) continue;
+      if(red&&ty<5) continue; if(!red&&ty>4) continue;
+      if(xqAt(b,x+(dx/2)|0,y+(dy/2)|0)!=='.') continue;
+      if(ok(tx,ty)) moves.push([tx,ty]);
+    }
+  } else if(p==='N'||p==='n'){
+    for(const [dx,dy,lx,ly] of [[1,2,0,1],[-1,2,0,1],[1,-2,0,-1],[-1,-2,0,-1],[2,1,1,0],[-2,1,-1,0],[2,-1,1,0],[-2,-1,-1,0]]){
+      const tx=x+dx,ty=y+dy;
+      if(0<=tx&&tx<9&&0<=ty&&ty<10 && xqAt(b,x+lx,y+ly)==='.' && ok(tx,ty)) moves.push([tx,ty]);
+    }
+  } else if(p==='R'||p==='r'){
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      let tx=x+dx,ty=y+dy;
+      while(0<=tx&&tx<9&&0<=ty&&ty<10){
+        const t=xqAt(b,tx,ty);
+        if(t==='.'){ moves.push([tx,ty]); }
+        else { if((t===t.toUpperCase())!==red) moves.push([tx,ty]); break; }
+        tx+=dx; ty+=dy;
+      }
+    }
+  } else if(p==='C'||p==='c'){
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      let tx=x+dx,ty=y+dy, jumped=false;
+      while(0<=tx&&tx<9&&0<=ty&&ty<10){
+        const t=xqAt(b,tx,ty);
+        if(!jumped){ if(t==='.') moves.push([tx,ty]); else jumped=true; }
+        else { if(t!=='.'){ if((t===t.toUpperCase())!==red) moves.push([tx,ty]); break; } }
+        tx+=dx; ty+=dy;
+      }
+    }
+  } else if(p==='P'){
+    if(y-1>=0 && ok(x,y-1)) moves.push([x,y-1]);
+    if(y<5){ if(x-1>=0 && ok(x-1,y)) moves.push([x-1,y]); if(x+1<9 && ok(x+1,y)) moves.push([x+1,y]); }
+  } else if(p==='p'){
+    if(y+1<10 && ok(x,y+1)) moves.push([x,y+1]);
+    if(y>4){ if(x-1>=0 && ok(x-1,y)) moves.push([x-1,y]); if(x+1<9 && ok(x+1,y)) moves.push([x+1,y]); }
+  }
+  return moves;
+}
+function xqPathClear(b,x1,y1,x2,y2){
+  if(x1!==x2) return false;
+  const step = y2>y1?1:-1;
+  for(let yy=y1+step; yy!==y2; yy+=step) if(xqAt(b,x1,yy)!=='.') return false;
+  return true;
+}
+function xqInCheck(b, red){
+  const target = red?'K':'k';
+  let kx=-1, ky=-1;
+  for(let y=0;y<10;y++) for(let x=0;x<9;x++) if(xqAt(b,x,y)===target){kx=x;ky=y;break;}
+  if(kx<0) return true;
+  for(let y=0;y<10;y++) for(let x=0;x<9;x++){
+    const pp=xqAt(b,x,y);
+    if(pp==='.' || (pp===pp.toUpperCase())===red) continue;
+    const ms=xqPieceMoves(b,x,y);
+    if(ms.some(([tx,ty])=>tx===kx&&ty===ky)) return true;
+    if((pp==='K'||pp==='k')&&x===kx&&xqPathClear(b,x,y,kx,ky)) return true;
+  }
+  return false;
+}
+function xqLegalMoves(b, red){
+  const moves=[];
+  for(let y=0;y<10;y++) for(let x=0;x<9;x++){
+    const p=xqAt(b,x,y);
+    if(p==='.' || (p===p.toUpperCase())!==red) continue;
+    for(const [tx,ty] of xqPieceMoves(b,x,y)){
+      const t=xqAt(b,tx,ty);
+      if(t==='K'||t==='k') continue;
+      const nb = b.slice(0,y*9+x)+'.'+b.slice(y*9+x+1);
+      const nb2 = nb.slice(0,ty*9+tx)+p+nb.slice(ty*9+tx+1);
+      if(!xqInCheck(nb2, red)) moves.push([x,y,tx,ty]);
+    }
+  }
+  return moves;
+}
+
+const ptEls = [];
+const hintEls = [];
+let pieceEls = {};
+let staticBuilt = false;
+let thinkingEl = null;
+
+function boardSvg(){
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 8 9');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const mk = (x1,y1,x2,y2,w) => {
+    const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+    l.setAttribute('stroke','#111'); l.setAttribute('stroke-width',w); l.setAttribute('stroke-linecap','round'); l.setAttribute('vector-effect','non-scaling-stroke');
+    svg.appendChild(l);
+  };
+  for (let x = 0; x < 9; x++) mk(x, 0, x, 9, (x===0||x===8) ? 2.6 : 1.2);
+  for (let y = 0; y <= 4; y++) mk(0, y, 8, y, (y===0) ? 2.6 : 1.2);
+  for (let y = 5; y <= 9; y++) mk(0, y, 8, y, (y===9) ? 2.6 : 1.2);
+  mk(3, 0, 5, 2, 1.2); mk(5, 0, 3, 2, 1.2);
+  mk(3, 7, 5, 9, 1.2); mk(5, 7, 3, 9, 1.2);
+  mk(0, 4, 1.0, 4, 1.0); mk(7.0, 4, 8, 4, 1.0);
+  mk(0, 5, 1.0, 5, 1.0); mk(7.0, 5, 8, 5, 1.0);
+  const mt = (x,txt) => {
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x); t.setAttribute('y',4.95); t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','central');
+    t.setAttribute('fill','#444'); t.setAttribute('font-size','0.72'); t.setAttribute('font-weight','700');
+    t.setAttribute('font-family','KaiTi,STKaiti,"Microsoft YaHei","PingFang SC",serif'); t.setAttribute('letter-spacing','0.1');
+    t.textContent = txt; svg.appendChild(t);
+  };
+  mt(2.0, '楚 河'); mt(6.0, '汉 界');
+  return svg;
+}
+function ensureStatic(){
+  if (staticBuilt) return;
+  const el = document.getElementById('board');
+  el.insertBefore(boardSvg(), el.firstChild);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const pt = document.createElement('div');
+    pt.className = 'xq-pt';
+    pt.dataset.x = x; pt.dataset.y = y;
+    pt.style.left = pctX(x); pt.style.top = pctY(y);
+    pt.addEventListener('click', onPtClick);
+    el.appendChild(pt);
+    ptEls.push(pt);
+  }
+  staticBuilt = true;
+}
+function syncPieces(){
+  const el = document.getElementById('board');
+  for (const key in pieceEls){
+    const k = key.split(','), x = +k[0], y = +k[1];
+    if (at(x, y) === '.'){
+      const node = pieceEls[key];
+      if (node && node.parentNode === el) el.removeChild(node);
+      delete pieceEls[key];
+    }
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const p = at(x, y);
+    if (p === '.') continue;
+    const key = x + ',' + y;
+    let pc = pieceEls[key];
+    const name = PIECE_NAME[p] || p;
+    const isRed = p === p.toUpperCase();
+    if (!pc){
+      pc = document.createElement('div');
+      pc.className = 'xq-piece';
+      el.appendChild(pc);
+      pieceEls[key] = pc;
+    }
+    if (pc.textContent !== name) pc.textContent = name;
+    pc.classList.toggle('red', isRed);
+    pc.classList.toggle('black', !isRed);
+    pc.classList.toggle('check', !!(inCheck && p === (redTurn ? 'K' : 'k')));
+    pc.style.left = pctX(x); pc.style.top = pctY(y);
+    const isLast = lastMove && lastMove[2] === x && lastMove[3] === y;
+    pc.classList.toggle('last', !!isLast);
+    pc.classList.toggle('selected', !!(selected && selected[0] === x && selected[1] === y));
+  }
+}
+function clearHints(){
+  const el = document.getElementById('board');
+  for (const h of hintEls){ if (h.parentNode === el) el.removeChild(h); }
+  hintEls.length = 0;
+}
+function renderHints(){
+  clearHints();
+  if (!selected) return;
+  const el = document.getElementById('board');
+  const sx = selected[0], sy = selected[1];
+  const ms = xqLegalMoves(board, true);
+  for (const m of ms){
+    if (m[0] !== sx || m[1] !== sy) continue;
+    const hint = document.createElement('div');
+    hint.className = 'xq-hint' + (at(m[2], m[3]) !== '.' ? ' capture' : '');
+    hint.style.left = pctX(m[2]); hint.style.top = pctY(m[3]);
+    el.appendChild(hint);
+    hintEls.push(hint);
+  }
+}
+function updateClickLayers(){
+  const on = myTurn();
+  for (const pt of ptEls) pt.classList.toggle('disabled', !on);
+}
+function updateThinking(){
+  const el = document.getElementById('board');
+  const want = pending && status === 'playing';
+  if (want && !thinkingEl){
+    thinkingEl = document.createElement('div');
+    thinkingEl.className = 'xq-thinking';
+    thinkingEl.innerHTML = '<div class="box"><div class="spinner"></div>AI 思考中…</div>';
+    el.appendChild(thinkingEl);
+  } else if (!want && thinkingEl){
+    el.removeChild(thinkingEl);
+    thinkingEl = null;
+  }
+}
+function _uciToXY(s){
+  s = (s || '').toLowerCase();
+  if (s.length < 2) return null;
+  const x = s.charCodeAt(0) - 97;
+  const y = 9 - parseInt(s.slice(1), 10);
+  if (isNaN(y) || x < 0 || x > 8 || y < 0 || y > 9) return null;
+  return {x, y};
+}
+function renderMoveList(){
+  const el = document.getElementById('moveList');
+  const parts = (uciMoves || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length){ if (el) el.innerHTML = '<span style="color:#aaa;">（暂无）</span>'; return; }
+  let lb = START_BOARD;
+  let html = '';
+  for (let i = 0; i < parts.length; i++){
+    const u = parts[i].toLowerCase();
+    if (u.length < 4) continue;
+    const f = _uciToXY(u.slice(0,2)), t = _uciToXY(u.slice(2,4));
+    if (!f || !t) { html += '<span class="mv">' + u + '</span>'; continue; }
+    const p = lb[f.y * W + f.x];
+    if (p === '.') { html += '<span class="mv">' + u + '</span>'; continue; }
+    const red = p === p.toUpperCase();
+    const piece = PIECE_NAME[p.toUpperCase()] || '子';
+    const file = red ? X_FILES[f.x] : X_FILES_BLACK[f.x];
+    const kind = p.toUpperCase();
+    let dir, dist;
+    if (t.y === f.y){ dir = '平'; dist = red ? X_FILES[t.x] : X_FILES_BLACK[t.x]; }
+    else if (t.y < f.y){ dir = '进'; }
+    else { dir = '退'; }
+    if (dir !== '平'){
+      if (kind === 'R' || kind === 'C' || kind === 'P') dist = String(Math.abs(t.y - f.y));
+      else dist = red ? X_FILES[t.x] : X_FILES_BLACK[t.x];
+    }
+    const cls = red ? 'red' : 'black';
+    if (i % 2 === 0) html += '<span class="mv-num">' + (Math.floor(i / 2) + 1) + '.</span>';
+    html += '<span class="mv ' + cls + '">' + piece + file + dir + dist + '</span>';
+    lb = lb.slice(0, f.y*W+f.x) + '.' + lb.slice(f.y*W+f.x+1);
+    lb = lb.slice(0, t.y*W+t.x) + p + lb.slice(t.y*W+t.x+1);
+  }
+  el.innerHTML = html || '<span style="color:#aaa;">（暂无）</span>';
+}
+function statusText(){
+  const el = document.getElementById('status');
+  if (!el) return;
+  if (gameOver) return;
+  if (inCheck){
+    el.innerHTML = myTurn()
+      ? '<span style="color:#b91c1c;font-weight:800;">⚠️ 将军！轮到你应将</span>'
+      : '<span style="color:#b91c1c;font-weight:800;">⚠️ 将军！等待 AI 走棋…</span>';
+    return;
+  }
+  el.innerHTML = myTurn()
+    ? '<span style="color:#b91c1c;font-weight:800;">● 轮到你走棋</span>'
+    : '<span style="color:#888;">○ 黑方思考中…</span>';
+}
+function showOverlay(icon, title, msg){
+  gameOver = true;
+  document.getElementById('ovIcon').textContent = icon;
+  document.getElementById('ovTitle').textContent = title;
+  document.getElementById('ovMsg').textContent = msg || '';
+  document.getElementById('overlay').classList.add('on');
+  renderBoard();
+}
+function uci4(x1,y1,x2,y2){ return String.fromCharCode(97+x1) + (9-y1) + String.fromCharCode(97+x2) + (9-y2); }
+
+async function doMove(x1, y1, x2, y2){
+  pending = true; pendingSince = Date.now();
+  renderBoard();
+  try{
+    const r = await fetch('/api/xq/puzzle/' + PUZZLE_ID + '/move', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'x1=' + x1 + '&y1=' + y1 + '&x2=' + x2 + '&y2=' + y2 + '&hist=' + encodeURIComponent(uciMoves)
+    });
+    const j = await r.json();
+    if (!j.ok){ alert(j.msg || __('走棋失败')); pending = false; location.reload(); return; }
+    pending = false;
+    if (j.result === 'win'){
+      board = j.board; uciMoves = j.uci_moves; lastMove = j.last_move || null;
+      showOverlay('🏆', '破解成功！', j.msg || '将死黑将，红方获胜');
+    } else if (j.result === 'lose'){
+      board = j.board; uciMoves = j.uci_moves; lastMove = j.last_move || null;
+      showOverlay('💀', '挑战失败', j.msg || '你被黑方将死');
+    } else if (j.result === 'draw'){
+      board = j.board; uciMoves = j.uci_moves; lastMove = j.last_move || null;
+      showOverlay('👋', '和棋', j.msg || '三次重复局面');
+    } else {
+      board = j.board;
+      uciMoves = j.uci_moves;
+      redTurn = !!j.red_turn;
+      inCheck = !!j.in_check;
+      lastMove = j.last_move || null;
+      selected = null;
+      clearHints();
+      renderBoard();
+    }
+  }catch(err){
+    alert(__('网络错误，请刷新页面查看最新局面'));
+    pending = false;
+    location.reload();
+  }
+}
+async function onPtClick(e){
+  if (pending || gameOver) return;
+  if (!myTurn()) return;
+  const pt = e.currentTarget;
+  if (pt.classList.contains('disabled')) return;
+  const x = parseInt(pt.dataset.x), y = parseInt(pt.dataset.y);
+  const p = at(x, y);
+  if (selected){
+    const sx = selected[0], sy = selected[1];
+    if (sx === x && sy === y){ selected = null; clearHints(); syncPieces(); return; }
+    if (p !== '.' && isMine(p)){ selected = [x, y]; renderHints(); syncPieces(); return; }
+    const ms = xqLegalMoves(board, true);
+    const ok = ms.some(m => m[0] === sx && m[1] === sy && m[2] === x && m[3] === y);
+    if (!ok){ alert(__('不符合走法规则')); return; }
+    selected = null; clearHints();
+    doMove(sx, sy, x, y);
+  } else {
+    if (p !== '.' && isMine(p)){ selected = [x, y]; renderHints(); syncPieces(); }
+  }
+}
+async function askHint(){
+  if (status !== 'playing' || pending || gameOver || !myTurn()){ alert(__('现在无法获取提示')); return; }
+  pending = true; pendingSince = Date.now();
+  renderBoard();
+  try{
+    const r = await fetch('/api/xq/puzzle/' + PUZZLE_ID + '/hint', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: 'hist=' + encodeURIComponent(uciMoves)
+    });
+    const j = await r.json();
+    pending = false;
+    if (!j.ok){ alert(j.msg || __('暂时无法提示')); renderBoard(); return; }
+    selected = [j.x1, j.y1];
+    renderHints();
+    syncPieces();
+    const el = document.getElementById('board');
+    const mk = document.createElement('div');
+    mk.className = 'xq-hint';
+    mk.style.left = pctX(j.x2); mk.style.top = pctY(j.y2);
+    el.appendChild(mk);
+    hintEls.push(mk);
+    setTimeout(() => { clearHints(); }, 1600);
+  }catch(e){
+    pending = false;
+    alert(__('网络错误，请重试'));
+    renderBoard();
+  }
+}
+async function giveUp(){
+  if (!confirm(__('确定放弃本题吗？本局将结束。'))) return;
+  try{ await fetch('/api/xq/puzzle/' + PUZZLE_ID + '/giveup', {method:'POST'}); }catch(e){}
+  showOverlay('🏳️', '已放弃', '可以去残局大厅选别的题，或刷新重试本题');
+}
+function renderBoard(){
+  ensureStatic();
+  syncPieces();
+  renderHints();
+  updateClickLayers();
+  updateThinking();
+  statusText();
+  renderMoveList();
+}
+renderBoard();
+
+setInterval(function(){
+  if (pending && pendingSince && Date.now() - pendingSince > PENDING_TIMEOUT_MS){
+    pending = false; pendingSince = 0;
+    renderBoard();
+  }
+}, 3000);
+
+</script>
+<script>
+/* 棋子文字自适应棋盘宽度。
+   ⚠️ 原来 CSS 写的是 `font-size: calc(100% / 8 * 0.48)` —— 这是错的：
+   CSS 里 font-size 的百分比是相对**父元素字号**算的，不是相对宽度。
+   父元素 16px 时算出来只有 0.96px，棋子上的字根本看不见。
+   这里改成用棋盘真实宽度算：字号 = 棋盘宽 / 8 * 0.48。 */
+(function(){
+  function fitBoardFont(){
+    var bs = document.querySelectorAll('.xq-board');
+    for (var i = 0; i < bs.length; i++){
+      var w = bs[i].clientWidth;
+      if (w > 0) bs[i].style.fontSize = (w / 8 * 0.48) + 'px';
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fitBoardFont);
+  } else { fitBoardFont(); }
+  window.addEventListener('resize', fitBoardFont, { passive: true });
+  window.addEventListener('orientationchange', function(){ setTimeout(fitBoardFont, 240); });
+})();
+</script>
+{% endblock %}

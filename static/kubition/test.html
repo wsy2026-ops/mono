@@ -1,0 +1,27 @@
+<html>
+<script type="text/javascript" src="http://cdn.bootcss.com/react/0.14.2/react-with-addons.js"></script>
+<script type="text/javascript" src="http://cdn.bootcss.com/react/0.14.2/react-dom.js"></script>
+<script type="text/javascript" src="./build/browser.min.js"></script>
+
+<body>
+</body>
+<script type="text/babel" >
+var InputDemo = React.createClass({
+    getInitialState:function(){
+      return {value:null}
+    },
+    render: function () {
+        return (
+            <input type="number" value={this.state.value} onChange = {this.handleChange}/>
+        );
+    },
+    handleChange: function (event) {
+        this.setState({value: event.target.value});
+    }
+});
+ReactDOM.render(
+    <InputDemo/>,
+    document.body
+);
+</script>
+</html>

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}MONO OJ{% endblock %}
+
+{% block content %}
+<style>
+  .ojh-wrap{max-width:1000px;margin:0 auto;padding:22px 16px 60px;font-size:14px;color:#1a1a1a;}
+  .ojh-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
+  .ojh-title{margin:0;font-size:22px;font-weight:700;letter-spacing:-.3px;}
+  .ojh-nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;}
+  .ojh-nav a{padding:6px 13px;border-radius:7px;text-decoration:none;color:#555;font-size:13px;
+             transition:background .12s,color .12s;}
+  .ojh-nav a:hover{background:#f2f4f7;color:#111;}
+  .ojh-nav a.primary{background:#2563eb;color:#fff;}
+  .ojh-nav a.primary:hover{background:#1d4ed8;}
+  .ojh-nav a.warn{background:#fff4e5;color:#b45309;}
+  .ojh-nav a.warn:hover{background:#ffe8cc;}
+
+  .ojh-sec{margin-bottom:30px;}
+  .ojh-sec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:11px;}
+  .ojh-sec-h h2{margin:0;font-size:16px;font-weight:600;}
+  .ojh-sec-h .cnt{font-size:12px;color:#9aa0a6;}
+  .ojh-sec-h .more{margin-left:auto;font-size:12.5px;color:#2563eb;text-decoration:none;}
+  .ojh-sec-h .more:hover{text-decoration:underline;}
+
+  /* 题库表 */
+  .ojh-table{border:1px solid #e6e8eb;border-radius:10px;overflow:hidden;background:#fff;}
+  .ojh-row{display:grid;grid-template-columns:54px 1fr 86px 74px 104px;align-items:center;
+           gap:8px;padding:12px 16px;border-bottom:1px solid #f3f4f6;
+           text-decoration:none;color:inherit;transition:background .12s;}
+  .ojh-row:last-child{border-bottom:none;}
+  .ojh-row:hover{background:#f8fafc;}
+  .ojh-th{background:#f8fafc;font-size:12px;color:#8b9096;font-weight:600;
+          padding-top:10px;padding-bottom:10px;}
+  .ojh-th:hover{background:#f8fafc;}
+  .ojh-id{font-variant-numeric:tabular-nums;color:#a0a5aa;font-size:13px;}
+  .ojh-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ojh-row:hover .ojh-name{color:#2563eb;}
+  .ojh-diff{font-size:12px;color:#6b7280;}
+  .ojh-ac{font-size:12px;color:#a0a5aa;font-variant-numeric:tabular-nums;}
+  .ojh-tag{display:inline-block;padding:3px 9px;border-radius:5px;font-size:12px;white-space:nowrap;}
+  .ojh-tag.ac{background:#e8f7ee;color:#177245;}
+  .ojh-tag.tried{background:#fff6e5;color:#a25c00;}
+  .ojh-tag.todo{background:#f3f4f6;color:#8b9096;}
+  .ojh-tag.pending{background:#eef2ff;color:#4338ca;}
+  .ojh-tag.rejected{background:#fee2e2;color:#b91c1c;}
+  .ojh-tag.contest{background:#fef3c7;color:#92400e;}
+
+  /* 空状态 */
+  .ojh-empty{padding:38px 20px;text-align:center;color:#9aa0a6;border:1px dashed #e0e3e7;
+             border-radius:10px;background:#fcfcfd;}
+  .ojh-empty .ico{font-size:28px;margin-bottom:8px;}
+  .ojh-empty p{margin:0 0 4px;font-size:14px;color:#6b7280;}
+  .ojh-empty span{font-size:12.5px;}
+
+  /* 比赛卡片 */
+  .ojh-clist{display:flex;flex-direction:column;gap:8px;}
+  .ojh-citem{display:flex;align-items:center;justify-content:space-between;gap:12px;
+             padding:13px 16px;border:1px solid #e6e8eb;border-radius:9px;
+             text-decoration:none;color:inherit;background:#fff;transition:background .12s;}
+  .ojh-citem:hover{background:#f8fafc;}
+  .ojh-cmain{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .ojh-cname{font-weight:600;font-size:14px;}
+  .ojh-cmeta{font-size:12px;color:#9aa0a6;}
+  .ojh-cstate{font-size:12px;padding:3px 10px;border-radius:5px;white-space:nowrap;}
+  .ojh-cstate.running{background:#e8f7ee;color:#177245;}
+  .ojh-cstate.wait{background:#eef2ff;color:#4338ca;}
+  .ojh-cstate.ended{background:#f3f4f6;color:#8b9096;}
+
+  @media (max-width:720px){
+    .ojh-row{grid-template-columns:40px 1fr 100px;padding:11px 13px;}
+    .ojh-diff,.ojh-ac{display:none;}
+    .ojh-title{font-size:19px;}
+    .ojh-nav{width:100%;margin-left:0;}
+  }
+</style>
+
+<div class="ojh-wrap">
+  <div class="ojh-head">
+    <h1 class="ojh-title">MONO OJ</h1>
+    <div class="ojh-nav">
+      <a class="on" href="{{ url_for('oj_home') }}">题库</a>
+      <a href="{{ url_for('oj_contest_list') }}">公开赛</a>
+      {% if me %}
+      <a href="{{ url_for('oj_records') }}">我的记录</a>
+      <a class="primary" href="{{ url_for('oj_problem_new') }}">＋ 我要出题</a>
+      {% else %}
+      <a class="primary" href="{{ url_for('login') }}">登录后提交 / 出题</a>
+      {% endif %}
+      {% if me and me.is_admin %}
+      <a class="warn" href="{{ url_for('oj_admin_review') }}">
+        审核{% if pending_count %} · {{ pending_count }}{% endif %}
+      </a>
+      <a href="{{ url_for('oj_admin') }}">管理</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ══════════ 版块 1：题库 ══════════ #}
+  <section class="ojh-sec">
+    <div class="ojh-sec-h">
+      <h2>题库</h2>
+      <span class="cnt">{{ problems|length }} 道公开题</span>
+    </div>
+
+    {% if problems %}
+    <div class="ojh-table">
+      <div class="ojh-row ojh-th">
+        <span class="ojh-id">#</span>
+        <span class="ojh-name">题目</span>
+        <span class="ojh-diff">难度</span>
+        <span class="ojh-ac">通过</span>
+        <span>状态</span>
+      </div>
+      {% for p in problems %}
+      <a class="ojh-row" href="{{ url_for('oj_problem', pid=p.id) }}">
+        <span class="ojh-id">{{ p.id }}</span>
+        <span class="ojh-name" title="{{ p.title }}">{{ p.title }}</span>
+        <span class="ojh-diff">{{ p.difficulty or '—' }}</span>
+        <span class="ojh-ac">{{ p.ac_users or 0 }} 人</span>
+        <span>
+          {% if p.my_state == 'ac' %}<span class="ojh-tag ac">✅ 已通过</span>
+          {% elif p.my_state == 'tried' %}<span class="ojh-tag tried">⚠️ 尝试过</span>
+          {% else %}<span class="ojh-tag todo">⬜ 未尝试</span>{% endif %}
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="ojh-empty">
+      <div class="ico">📚</div>
+      <p>题库还是空的</p>
+      <span>点右上角「＋ 我要出题」贡献第一道题吧</span>
+    </div>
+    {% endif %}
+  </section>
+
+  {# ══════════ 我出的题（有才显示） ══════════ #}
+  {% if my_problems %}
+  <section class="ojh-sec">
+    <div class="ojh-sec-h">
+      <h2>我出的题</h2>
+      <span class="cnt">{{ my_problems|length }} 道</span>
+    </div>
+    <div class="ojh-table">
+      <div class="ojh-row ojh-th">
+        <span class="ojh-id">#</span>
+        <span class="ojh-name">题目</span>
+        <span class="ojh-diff">难度</span>
+        <span class="ojh-ac">类型</span>
+        <span>状态</span>
+      </div>
+      {% for p in my_problems %}
+      <a class="ojh-row" href="{{ url_for('oj_problem_edit', pid=p.id) }}">
+        <span class="ojh-id">{{ p.id }}</span>
+        <span class="ojh-name" title="{{ p.title }}">{{ p.title }}</span>
+        <span class="ojh-diff">{{ p.difficulty or '—' }}</span>
+        <span class="ojh-ac">
+          {% if p.visibility == 'contest' %}比赛题{% else %}公开{% endif %}
+        </span>
+        <span>
+          {% if p.status == 'approved' %}<span class="ojh-tag ac">已通过</span>
+          {% elif p.status == 'pending' %}<span class="ojh-tag pending">审核中</span>
+          {% else %}<span class="ojh-tag rejected" title="{{ p.reject_reason }}">已驳回</span>{% endif %}
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

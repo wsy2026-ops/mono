@@ -1,0 +1,687 @@
+{% extends "base.html" %}
+{% block title %}AI 助手 - MONO 社区{% endblock %}
+{% set active = 'ai' %}
+{% block content %}
+<style>
+  .ai-wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px;}
+  .ai-header{
+    border:1px solid var(--line);border-radius:14px;padding:16px 20px;background:var(--bg-elev);
+    display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap;
+    box-shadow:0 2px 10px rgba(0,0,0,.04);
+  }
+  .ai-header .ai-logo{
+    width:42px;height:42px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    box-shadow:0 4px 12px rgba(37,99,235,.25);
+  }
+  .ai-header .ai-logo img{width:100%;height:100%;object-fit:cover;}
+  .ai-header h1{margin:0;font-size:18px;font-weight:800;}
+  .ai-header .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .ai-header .actions{margin-left:auto;display:flex;gap:8px;}
+  .ai-header button{padding:7px 14px;border-radius:9px;border:1px solid var(--line);background:var(--bg-elev);cursor:pointer;font-size:12.5px;font-weight:600;color:var(--fg-2);}
+  .ai-header button:hover{border-color:var(--muted);}
+  .ai-think-toggle{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:7px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--bg-elev);cursor:pointer;
+    font-size:12.5px;font-weight:600;color:var(--fg-2);
+    user-select:none;-webkit-user-select:none;
+  }
+  .ai-think-toggle:hover{border-color:var(--muted);}
+  .ai-think-toggle input{margin:0;cursor:pointer;}
+  .ai-think-toggle.on{border-color:var(--accent);color:var(--fg);background:var(--soft);}
+  .ai-header button.primary{background:#111;color:#fff;border-color:#111;}
+
+  .ai-model-select{
+    border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--bg-elev);font-size:12.5px;
+    font-weight:600;color:var(--fg-2);cursor:pointer;outline:none;
+  }
+
+  .ai-chat{
+    border:1px solid var(--line);border-radius:14px;background:var(--bg-elev);
+    box-shadow:0 2px 10px rgba(0,0,0,.04);
+    display:flex;flex-direction:column;height:calc(100vh - 240px);min-height:480px;overflow:hidden;
+  }
+  .ai-messages{
+    flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;
+    scroll-behavior:smooth;
+  }
+  .ai-msg{display:flex;gap:10px;max-width:88%;}
+  .ai-msg.user{align-self:flex-end;flex-direction:row-reverse;}
+  .ai-msg .avatar{
+    width:34px;height:34px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.15);
+  }
+  .ai-msg.user .avatar{background:linear-gradient(135deg,#2563eb,#3b82f6);}
+  .ai-msg.assistant .avatar{background:linear-gradient(135deg,#7c3aed,#a855f7);}
+  .ai-msg .bubble{
+    padding:11px 15px;border-radius:14px;line-height:1.7;font-size:14.5px;word-break:break-word;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);
+  }
+  .ai-msg.user .bubble{background:#2563eb;color:#fff;border-bottom-right-radius:5px;}
+  .ai-msg.assistant .bubble{background:var(--bg-elev);color:#1f2329;border:1px solid #eceef1;border-bottom-left-radius:5px;}
+  .ai-msg .bubble .typing{display:inline-flex;gap:3px;vertical-align:middle;}
+  .ai-msg .bubble .typing span{
+    width:6px;height:6px;border-radius:50%;background:#999;
+    animation:aiDot 1.2s infinite ease-in-out;
+  }
+  .ai-msg .bubble .typing span:nth-child(2){animation-delay:.15s;}
+  .ai-msg .bubble .typing span:nth-child(3){animation-delay:.3s;}
+  @keyframes aiDot{0%,80%,100%{opacity:.3;transform:translateY(0);}40%{opacity:1;transform:translateY(-3px);}}
+
+  .ai-msg .bubble p{margin:6px 0;}
+  .ai-msg .bubble h1,.ai-msg .bubble h2,.ai-msg .bubble h3,.ai-msg .bubble h4,.ai-msg .bubble h5,.ai-msg .bubble h6{
+    margin:14px 0 8px;line-height:1.35;font-weight:800;color:#111;
+  }
+  .ai-msg .bubble h1{font-size:19px;} .ai-msg .bubble h2{font-size:17px;}
+  .ai-msg .bubble h3{font-size:15.5px;} .ai-msg .bubble h4{font-size:14.5px;}
+  .ai-msg .bubble h5,.ai-msg .bubble h6{font-size:13.5px;}
+  .ai-msg .bubble > :first-child{margin-top:0;}
+  .ai-msg .bubble > :last-child{margin-bottom:0;}
+
+  .ai-msg .bubble ul,.ai-msg .bubble ol{margin:7px 0;padding-left:22px;}
+  .ai-msg .bubble li{margin:4px 0;}
+  .ai-msg .bubble ul ul,.ai-msg .bubble ol ol,.ai-msg .bubble ul ol,.ai-msg .bubble ol ul{margin:3px 0;}
+  .ai-msg .bubble li::marker{color:#8a8f99;}
+
+  .ai-msg .bubble blockquote{
+    margin:9px 0;padding:7px 13px;border-left:3px solid #b794f6;
+    background:#f7f4fc;color:#5b5566;border-radius:0 8px 8px 0;
+  }
+  .ai-msg .bubble blockquote p{margin:3px 0;}
+
+  .ai-msg .bubble hr{border:none;border-top:1px solid #eceef1;margin:13px 0;}
+  .ai-msg .bubble a{color:#2563eb;text-decoration:none;word-break:break-all;}
+  .ai-msg .bubble a:hover{text-decoration:underline;}
+  .ai-msg .bubble img{max-width:100%;border-radius:10px;margin:8px 0;}
+
+  .ai-msg .bubble code:not(pre code){
+    background:#f0f1f4;color:#d6336c;padding:1.5px 6px;border-radius:5px;font-size:13px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  .ai-msg.user .bubble code:not(pre code){background:rgba(255,255,255,.22);color:#fff;}
+
+  .ai-msg .bubble pre{
+    display:grid !important;
+    grid-template-areas:"head" "code" !important;
+    grid-template-rows:auto min-content !important;
+    grid-template-columns:minmax(0,1fr) !important;
+    position:relative;background:#f6f8fa;color:#24292e;border-radius:12px;margin:12px 0;
+    overflow:hidden;border:1px solid #e1e4e8;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+  }
+  .ai-msg .bubble pre .code-head{
+    grid-area:head !important;
+    display:flex;flex-direction:row;flex-wrap:nowrap;
+    justify-content:space-between;align-items:center;gap:8px;
+    padding:8px 12px;background:#eef1f4;color:#57606a;font-size:12px;
+    border-bottom:1px solid #e1e4e8;min-width:0;
+  }
+  .ai-msg .bubble pre .code-head .lang{
+    font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    flex-shrink:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  .ai-msg .bubble pre .code-head .code-actions{display:flex;gap:6px;flex-shrink:0;align-items:center;}
+  .ai-msg .bubble pre .code-head .code-btn{
+    background:var(--bg-elev);color:#24292e;border:1px solid #d0d7de;border-radius:6px;
+    padding:3px 10px;font-size:11.5px;font-weight:600;cursor:pointer;
+    display:inline-flex;align-items:center;gap:4px;line-height:1.4;
+    transition:background .15s,border-color .15s;
+  }
+  .ai-msg .bubble pre .code-head .code-btn:hover{background:#f3f4f6;border-color:#afb8c1;}
+  .ai-msg .bubble pre > code.hljs{
+    grid-area:code !important;
+    display:block;padding:14px 16px;background:transparent;color:inherit;
+    font-size:13px;line-height:1.7;overflow-x:auto;margin:0;min-width:0;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    white-space:pre;
+  }
+  .ai-msg.user .bubble pre{background:#eef2fb;border-color:#dbe3f5;}
+  .ai-msg.user .bubble pre .code-head{background:#e3e9f6;color:#3a4a6b;border-bottom-color:#dbe3f5;}
+  .ai-msg.user .bubble pre .code-head .code-btn{background:var(--bg-elev);color:#243b5e;border-color:#c8d4ec;}
+  .ai-msg.user .bubble pre .code-head .code-btn:hover{background:#f0f4fc;border-color:#a8b8d8;}
+
+  .ai-input-wrap{
+    border-top:1px solid var(--line);padding:14px 16px;background:#fafaf8;
+    display:flex;gap:10px;align-items:flex-end;
+  }
+  .ai-input-wrap textarea{
+    flex:1;min-height:46px;max-height:160px;padding:10px 14px;
+    border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;
+    background:var(--bg-elev);resize:none;outline:none;line-height:1.5;
+  }
+  .ai-input-wrap textarea:focus{border-color:#2563eb;}
+  .ai-input-wrap button{
+    padding:10px 18px;border-radius:10px;border:none;background:#2563eb;color:#fff;
+    font-size:13.5px;font-weight:700;cursor:pointer;
+  }
+  .ai-input-wrap button:hover{opacity:.9;}
+  .ai-input-wrap button:disabled{background:#9db8f0;cursor:not-allowed;}
+
+  .ai-input-wrap #imgBtn{
+    flex-shrink:0;background:transparent;color:var(--muted);
+    border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+    cursor:pointer;display:inline-flex;align-items:center;
+  }
+  .ai-input-wrap #imgBtn:hover{color:var(--fg);border-color:var(--muted);}
+  .ai-img-chip{
+    display:none;position:relative;flex-shrink:0;
+    width:44px;height:44px;border-radius:10px;overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .ai-img-chip.on{display:block;}
+  .ai-img-chip img{width:100%;height:100%;object-fit:cover;display:block;}
+  .ai-img-chip button{
+    position:absolute;top:1px;right:1px;width:16px;height:16px;
+    border:0;border-radius:50%;background:rgba(0,0,0,.62);color:#fff;
+    font-size:10px;line-height:1;cursor:pointer;padding:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .ai-msg-img{max-width:260px;max-height:260px;border-radius:10px;display:block;margin-bottom:6px;border:1px solid var(--line);}
+
+  .ai-status{font-size:12px;color:var(--muted);margin-left:10px;}
+  .ai-err{
+    background:#fef0ee;color:#c5392a;border:1px solid #f3c6bd;border-radius:8px;
+    padding:8px 12px;margin:8px 0;font-size:13px;
+  }
+  /* 推理模型的思考过程：默认折叠，想看再点开 */
+  .ai-think{
+    margin:0 0 10px;border:1px dashed var(--line);border-radius:9px;
+    background:var(--bg);font-size:12.5px;color:var(--muted);
+  }
+  .ai-think summary{
+    cursor:pointer;padding:7px 12px;font-weight:600;font-size:12px;
+    color:var(--muted);user-select:none;list-style:none;
+  }
+  .ai-think summary::-webkit-details-marker{display:none;}
+  .ai-think summary::before{content:'▸ ';}
+  .ai-think[open] summary::before{content:'▾ ';}
+  .ai-think .tk{
+    padding:8px 12px 10px;white-space:pre-wrap;line-height:1.65;
+    max-height:220px;overflow:auto;border-top:1px solid var(--line);
+  }
+/* ── 页签 / 模式 / 代码调试 ── */
+.ai-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.ai-tab{padding:9px 22px;border-radius:10px;border:1px solid var(--line);background:var(--bg-elev);
+  font:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--muted);}
+.ai-tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg);}
+.ai-pane{display:none;}
+.ai-pane.on{display:block;}
+.ai-modes{display:flex;gap:6px;flex-wrap:wrap;}
+.ai-mode{padding:7px 13px;border-radius:9px;border:1px solid var(--line);background:var(--bg-elev);
+  font:inherit;font-size:12.5px;cursor:pointer;color:var(--muted);}
+.ai-mode.on{border-color:var(--accent);background:var(--soft);color:var(--fg);font-weight:700;}
+.ai-dbg .field{margin-bottom:14px;}
+.ai-dbg label{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:700;margin-bottom:7px;}
+.ai-dbg label .req{color:#c0392b;font-size:12px;font-weight:400;}
+.ai-dbg label .opt{color:var(--muted);font-size:12px;font-weight:400;}
+.ai-dbg textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:11px;
+  padding:11px 13px;font:inherit;font-size:13.5px;line-height:1.7;background:var(--bg-elev);
+  color:var(--fg);resize:vertical;}
+.ai-dbg textarea:focus{outline:none;border-color:var(--accent);}
+.ai-dbg .cnt{font-size:11.5px;color:var(--muted);text-align:right;}
+.ai-dbg .cnt.over{color:#c0392b;font-weight:700;}
+.ai-dbg .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 16px;}
+.ai-dbg .bar button{font:inherit;font-weight:700;padding:10px 22px;border-radius:10px;border:0;
+  background:var(--fg);color:var(--bg);cursor:pointer;}
+.ai-dbg .bar button:disabled{opacity:.5;cursor:not-allowed;}
+.ai-dbg .left{font-size:13.5px;}
+.ai-dbg .left b{font-size:17px;color:var(--accent);}
+.ai-ans{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--bg-elev);
+  font-size:14px;line-height:1.85;white-space:pre-wrap;word-break:break-word;}
+.ai-redeem{display:none;margin-bottom:14px;padding:14px 16px;border:1px solid var(--line);
+  border-radius:12px;background:var(--bg-elev);}
+.ai-redeem.on{display:block;}
+.ai-redeem input{font:inherit;padding:9px 12px;border-radius:9px;border:1px solid var(--line);
+  background:var(--bg);color:var(--fg);width:220px;text-transform:uppercase;}
+</style>
+
+<div class="ai-wrap">
+  <div class="ai-tabs">
+    <button type="button" class="ai-tab on" data-pane="chat" onclick="switchPane('chat')">对话助手</button>
+    <button type="button" class="ai-tab" data-pane="debug" onclick="switchPane('debug')">代码调试</button>
+  </div>
+
+  <div class="ai-pane on" id="pane-chat">
+  <div class="ai-header">
+    <div>
+      <h1>AI 助手 · 小柒</h1>
+      <div class="sub">输入 ≤ {{ max_input_char }} 字 · 回复 ≤ 200 字 · 记忆 5 轮</div>
+    </div>
+    <div class="actions">
+      <div class="ai-modes" id="aiModes">
+        {% for k, m in chat_modes.items() %}
+        <button type="button" class="ai-mode" data-mode="{{ k }}" title="{{ m.desc }}">{{ m.label }}</button>
+        {% endfor %}
+      </div>
+      <button onclick="clearHistory()">🗑 清空对话</button>
+    </div>
+  </div>
+
+  <div class="ai-chat">
+    <div class="ai-messages" id="messages"></div>
+    <div class="ai-input-wrap">
+      <button type="button" id="imgBtn" title="上传图片" aria-label="上传图片">
+        <svg viewBox="0 0 16 16" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="1.8" y="3" width="12.4" height="10" rx="2"/><circle cx="5.6" cy="6.6" r="1.2" fill="currentColor" stroke="none"/><path d="M2.5 11.6l3.4-3.2 2.3 2.2 2-1.8 3.3 3"/></svg>
+      </button>
+      <input type="file" id="imgInput" accept="image/*" style="display:none;">
+      <div class="ai-img-chip" id="imgChip">
+        <img id="imgThumb" alt="">
+        <button type="button" id="imgClear" aria-label="移除图片">✕</button>
+      </div>
+      <textarea id="input" placeholder="说点什么吧…（Shift+Enter 换行，Enter 发送）" rows="1"></textarea>
+      <button id="sendBtn" onclick="send()">发送</button>
+    </div>
+  </div>
+  </div>
+
+  <div class="ai-pane" id="pane-debug">
+  <div class="ai-dbg">
+    <div class="ai-header">
+      <div>
+        <h1>AI 代码调试</h1>
+        <div class="sub">由 {{ debug_model_label }} 驱动 · 帮你定位问题，但不直接给答案</div>
+      </div>
+      <div class="actions">
+        <span class="left">剩余次数 <b id="dbgLeft">{{ debug_left }}</b> 次</span>
+        <button type="button" onclick="toggleRedeem()">🎁 兑换次数</button>
+      </div>
+    </div>
+
+    <div class="ai-redeem" id="redeemBox">
+      <div style="font-size:13px;margin-bottom:9px;">输入兑换码换取调试次数</div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;">
+        <input id="redeemCode" placeholder="兑换码" autocomplete="off" maxlength="64">
+        <button type="button" onclick="doRedeem()"
+          style="font:inherit;font-weight:700;padding:9px 18px;border-radius:9px;border:0;background:var(--fg);color:var(--bg);cursor:pointer;">兑换</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>题面 <span class="req">必填</span></label>
+      <textarea id="dbgProblem" rows="4" placeholder="把题目描述贴进来…"></textarea>
+    </div>
+    <div class="field">
+      <label>代码 <span class="opt">选填</span></label>
+      <textarea id="dbgCode" rows="10" placeholder="你写的代码。没有就留空，我会讲思路。"></textarea>
+    </div>
+    <div class="field">
+      <label>说明 <span class="req">必填</span></label>
+      <textarea id="dbgNote" rows="3" placeholder="说说你卡在哪：是 WA 了、超时了，还是完全没思路？"></textarea>
+    </div>
+    <div class="cnt" id="dbgCnt">0 / {{ debug_input_char }} 字</div>
+
+    <div class="bar">
+      <button id="dbgBtn" onclick="doDebug()">开始调试</button>
+      <span style="font-size:12.5px;color:var(--muted);">每次消耗 1 次 · 输出 ≤ {{ debug_output_char }} 字 · 英文按半个字算</span>
+    </div>
+
+    <div id="dbgAns"></div>
+  </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ cdn_url('js/mono_fp.js') }}"></script>
+<script>
+const ME_ID = {{ user.id }};
+const AI_KEY = 'mono_ai_chat_' + ME_ID;   // 本地记忆键（按用户隔离）
+let isStreaming = false;
+let chatLog = [];                          // 规范化对话记录 [{role, content}]
+
+const TYPING = '<span class="typing"><span></span><span></span><span></span></span>';
+const WELCOME = '<div style="font-size:14.5px;">👋 你好！我是 MONO 社区的 AI 助手 <b>小柒</b>。有什么可以帮你的？</div>';
+
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+
+function scrollBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function persist(){ try { localStorage.setItem(AI_KEY, JSON.stringify(chatLog)); } catch(e){} }
+function loadLocal(){ try { const v = localStorage.getItem(AI_KEY); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
+
+function renderBubble(role, text, isHtml){
+  const wrap = document.createElement('div');
+  wrap.className = 'ai-msg ' + role;
+  const bub = document.createElement('div');
+  bub.className = 'bubble md-content';
+  bub.innerHTML = isHtml ? text : renderMarkdown(text);
+  wrap.appendChild(bub);
+  messagesEl.appendChild(wrap);
+  if (!isHtml) enhanceMarkdown(bub);
+  scrollBottom();
+  return bub;
+}
+
+function addMessage(role, text, img){
+  chatLog.push({role: role, content: text});
+  persist();
+  var bub = renderBubble(role, text, false);
+  if (img && bub){
+    var im = document.createElement('img');
+    im.className = 'ai-msg-img';
+    im.src = img;
+    bub.insertBefore(im, bub.firstChild);
+  }
+  return bub;
+}
+
+const initialHistory = {{ history|tojson }};
+const local = loadLocal();
+const rawSeed = (local && local.length) ? local : (initialHistory || []);
+const seed = (Array.isArray(rawSeed) ? rawSeed : []).filter(
+  m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
+);
+chatLog = seed.slice();
+if (chatLog.length){
+  for (const m of chatLog) renderBubble(m.role, m.content, false);
+} else {
+  renderBubble('assistant', WELCOME, true);
+}
+
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    send();
+  }
+});
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = '46px';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+});
+
+async function clearHistory(){
+  if (!confirm(__('确认清空对话历史？'))) return;
+  await fetch('/api/ai/clear', {method:'POST'});
+  try { localStorage.removeItem(AI_KEY); } catch(e){}
+  chatLog = [];
+  messagesEl.innerHTML = '';
+  renderBubble('assistant', WELCOME, true);
+}
+
+/* ── 页签切换 ── */
+function switchPane(name){
+  document.querySelectorAll('.ai-tab').forEach(function(b){
+    b.classList.toggle('on', b.dataset.pane === name);
+  });
+  document.querySelectorAll('.ai-pane').forEach(function(p){
+    p.classList.toggle('on', p.id === 'pane-' + name);
+  });
+  try { localStorage.setItem('mono_ai_pane', name); } catch(e){}
+  if (name === 'debug') dbgCount();
+}
+
+/* ── 对话模式：默认 / 快速 / 深度思考 ── */
+var MODE_KEY = 'mono_ai_mode';
+function currentMode(){
+  try { return localStorage.getItem(MODE_KEY) || '{{ default_mode }}'; } catch(e){ return '{{ default_mode }}'; }
+}
+(function(){
+  var btns = document.querySelectorAll('.ai-mode');
+  if (!btns.length) return;
+  function paint(){
+    var m = currentMode();
+    btns.forEach(function(b){ b.classList.toggle('on', b.dataset.mode === m); });
+  }
+  btns.forEach(function(b){
+    b.addEventListener('click', function(){
+      try { localStorage.setItem(MODE_KEY, b.dataset.mode); } catch(e){}
+      paint();
+    });
+  });
+  paint();
+})();
+
+/* ── 代码调试 ── */
+var DBG_IN = {{ debug_input_char }};
+var DBG_OUT = {{ debug_output_char }};
+function effChars(s){
+  var n = 0;
+  for (var i = 0; i < s.length; i++) n += (s.charCodeAt(i) < 128) ? 0.5 : 1;
+  return n;
+}
+function dbgEls(){
+  return {
+    problem: document.getElementById('dbgProblem'),
+    code: document.getElementById('dbgCode'),
+    note: document.getElementById('dbgNote'),
+    cnt: document.getElementById('dbgCnt'),
+    btn: document.getElementById('dbgBtn'),
+    ans: document.getElementById('dbgAns')
+  };
+}
+function dbgCount(){
+  var e = dbgEls();
+  if (!e.cnt) return;
+  var total = effChars(e.problem.value) + effChars(e.code.value) + effChars(e.note.value);
+  var over = total > DBG_IN;
+  e.cnt.textContent = Math.round(total) + ' / ' + DBG_IN + ' 字' + (over ? '（超了）' : '');
+  e.cnt.classList.toggle('over', over);
+  e.btn.disabled = over;
+}
+['dbgProblem', 'dbgCode', 'dbgNote'].forEach(function(id){
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('input', dbgCount);
+});
+function toggleRedeem(){
+  var b = document.getElementById('redeemBox');
+  if (b) b.classList.toggle('on');
+}
+async function doRedeem(){
+  var el = document.getElementById('redeemCode');
+  var code = (el.value || '').trim();
+  if (!code) { toast(__('请输入兑换码')); return; }
+  try {
+    var r = await fetch('/api/ai/redeem', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code: code})
+    });
+    var j = await r.json();
+    if (!j.ok) { toast(j.msg || __('兑换失败')); return; }
+    document.getElementById('dbgLeft').textContent = j.left;
+    el.value = '';
+    toggleRedeem();
+    toast(j.msg || __('兑换成功'));
+  } catch (e) { toast(__('网络错误，请重试')); }
+}
+function toast(msg){
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;left:50%;top:74px;transform:translateX(-50%);z-index:19999;' +
+    'padding:10px 20px;border-radius:11px;font-size:13px;font-weight:700;' +
+    'background:rgba(42,38,32,.93);color:#FFF6E0';
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 2400);
+}
+async function doDebug(){
+  var e = dbgEls();
+  var problem = (e.problem.value || '').trim();
+  var code = (e.code.value || '').trim();
+  var note = (e.note.value || '').trim();
+  if (!problem) { toast(__('题面必填')); e.problem.focus(); return; }
+  if (!note) { toast(__('说明必填 —— 说说你卡在哪')); e.note.focus(); return; }
+  var total = effChars(problem) + effChars(code) + effChars(note);
+  if (total > DBG_IN) { toast(__('内容超长了，精简一下')); return; }
+
+  e.btn.disabled = true;
+  e.btn.textContent = '分析中…';
+  /* ⚠️ DeepSeek 是推理模型，要先把思考跑完才出正文 ✗
+     实测一道 NOIP 题要 36 秒 —— 只写「十几秒」用户会以为卡死了 ✗
+     所以给个实时秒数，让人知道它还活着 ✓ */
+  var _t0 = Date.now();
+  e.ans.innerHTML = '<div class="ai-ans" style="color:var(--muted);">'
+    + '正在分析… 已等 <b id="dbgSec">0</b> 秒<br>'
+    + '<span style="font-size:12px;">思考型模型通常要 20～60 秒，别关页面</span></div>';
+  var _tick = setInterval(function(){
+    var b = document.getElementById('dbgSec');
+    if (b) b.textContent = Math.round((Date.now() - _t0) / 1000);
+  }, 1000);
+  try {
+    var r = await monoFetch('/api/ai/debug', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({problem: problem, code: code, note: note})
+    });
+    var j = await r.json();
+    if (!j.ok) {
+      e.ans.innerHTML = '<div class="ai-ans" style="color:#c0392b;">⚠️ ' + escapeHtml(j.msg || '出错了') + '</div>';
+      return;
+    }
+    document.getElementById('dbgLeft').textContent = j.left;
+    e.ans.innerHTML = '<div class="ai-ans md-content">' + renderMarkdown(j.answer || '') + '</div>';
+    if (window.enhanceMarkdown) enhanceMarkdown(e.ans);
+      + '<div style="font-size:11.5px;color:var(--muted);margin-top:7px;text-align:right;">'
+      + j.chars + ' 字' + (j.cut ? '（已截断到上限）' : '') + ' · 剩余 ' + j.left + ' 次</div>';
+  } catch (err) {
+    e.ans.innerHTML = '<div class="ai-ans" style="color:#c0392b;">⚠️ 网络错误，请重试</div>';
+  } finally {
+    clearInterval(_tick);
+    e.btn.disabled = false;
+    e.btn.textContent = '开始调试';
+    dbgCount();
+  }
+}
+(function(){
+  try {
+    var p = localStorage.getItem('mono_ai_pane');
+    if (p === 'debug') switchPane('debug');
+  } catch(e){}
+  dbgCount();
+})();
+
+let pendingImage = '';
+(function(){
+  var btn = document.getElementById('imgBtn');
+  var inp = document.getElementById('imgInput');
+  var chip = document.getElementById('imgChip');
+  var thumb = document.getElementById('imgThumb');
+  var clr = document.getElementById('imgClear');
+  if (!btn || !inp) return;
+
+  btn.addEventListener('click', function(){ inp.click(); });
+  inp.addEventListener('change', async function(){
+    if (!inp.files.length) return;
+    var f = inp.files[0];
+    try {
+      if (window.MonoImage && window.MonoImage.compress){
+        f = await window.MonoImage.compress(f, { maxSide: 1280, quality: 0.8 });
+      }
+    } catch(e){}
+    var fr = new FileReader();
+    fr.onload = function(){
+      pendingImage = fr.result;
+      thumb.src = pendingImage;
+      chip.classList.add('on');
+    };
+    fr.readAsDataURL(f);
+    inp.value = '';
+  });
+  clr.addEventListener('click', function(){
+    pendingImage = ''; chip.classList.remove('on'); thumb.removeAttribute('src');
+  });
+})();
+
+async function send(){
+  if (isStreaming) return;
+  const text = inputEl.value.trim();
+  const sentImage = pendingImage;
+  if (!text && !sentImage) return;      // 允许「只发图不打字」
+
+  addMessage('user', text, sentImage);
+  pendingImage = '';
+  var _chip = document.getElementById('imgChip');
+  if (_chip) _chip.classList.remove('on');
+  var _th = document.getElementById('imgThumb');
+  if (_th) _th.removeAttribute('src');
+  inputEl.value = ''; inputEl.style.height = '46px';
+
+  const aiBub = renderBubble('assistant', TYPING, true);
+  chatLog.push({role:'assistant', content:''});   // 占位，流式填充
+  const aiIdx = chatLog.length - 1;
+  isStreaming = true; sendBtn.disabled = true;
+
+  try {
+    const resp = await fetch('/api/ai/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        message: text || '（请看图片）',
+        mode: currentMode(),
+        image: sentImage || ''
+      })
+    });
+    if (!resp.ok){
+      const j = await resp.json().catch(() => ({}));
+      aiBub.innerHTML = '<div class="ai-err">⚠️ ' + escapeHtml(j.msg || ('HTTP ' + resp.status)) + '</div>';
+      chatLog[aiIdx].content = aiBub.textContent; persist();
+      return;
+    }
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder('utf-8');
+    let buf = '';
+    let full = '';
+    let thinkBuf = '';
+    // 深度思考时 token 是密集流式到的。原来每个 token 都重渲染整篇
+    // Markdown + 强制滚底，PC 看不出来，手机上主线程被占满就表现成
+    // 「卡住不动，过一会全冒出来」。改成按帧节流。
+    let paintAt = 0;
+    const PAINT_MS = 80;
+    function paint(thinking){
+      const now = Date.now();
+      if (now - paintAt < PAINT_MS) return;
+      paintAt = now;
+      aiBub.innerHTML = thinkHTML(thinking) + renderMarkdown(full) + TYPING;
+      scrollBottom();
+    }
+    const thinkHTML = (open) => thinkBuf
+      ? '<details class="ai-think"' + (open ? ' open' : '') + '><summary>思考过程</summary>'
+        + '<div class="tk">' + escapeHtml(thinkBuf) + '</div></details>'
+      : '';
+    while (true){
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) !== -1){
+        const evt = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        if (!evt.startsWith('data:')) continue;
+        const payloadStr = evt.slice(5).trim();
+        if (!payloadStr || payloadStr === '[DONE]') continue;
+        try {
+          const obj = JSON.parse(payloadStr);
+          if (obj.type === 'thinking' && obj.content){
+            // 推理模型的思考过程：单独折叠展示，正文还没开始
+            thinkBuf += obj.content;
+            paint(true);
+          } else if (obj.type === 'delta' && obj.content){
+            full += obj.content;
+            chatLog[aiIdx].content = full;
+            if (Date.now() - paintAt >= PAINT_MS) persist();
+            paint(false);
+          } else if (obj.type === 'error'){
+            aiBub.innerHTML = '<div class="ai-err">⚠️ ' + escapeHtml(obj.msg || '出错了') + '</div>';
+            chatLog[aiIdx].content = aiBub.textContent; persist();
+          } else if (obj.type === 'done'){
+            chatLog[aiIdx].content = full; persist();
+            aiBub.innerHTML = thinkHTML(false) + renderMarkdown(full);
+            enhanceMarkdown(aiBub);   // 只在最终 done 时插入一次 head
+            scrollBottom();
+          }
+        } catch(e){}
+      }
+    }
+    if (!full) aiBub.innerHTML = '<span style="color:var(--muted);">（无回复）</span>';
+    chatLog[aiIdx].content = full; persist();
+  } catch(e){
+    aiBub.innerHTML = '<div class="ai-err">⚠️ 网络错误，请重试</div>';
+    chatLog[aiIdx].content = aiBub.textContent; persist();
+  } finally {
+    isStreaming = false; sendBtn.disabled = false;
+    persist(); scrollBottom();
+  }
+}
+</script>
+{% endblock %}

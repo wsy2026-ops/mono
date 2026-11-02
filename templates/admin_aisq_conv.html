@@ -1,0 +1,43 @@
+{% extends "_admin_base.html" %}
+{% block title %}对话详情 · 管理后台{% endblock %}
+{% block admin_icon %}💬{% endblock %}
+{% block admin_heading %}{{ conv.title or '（无标题）' }}{% endblock %}
+{% block admin_desc %}{{ conv.username or ('uid ' ~ conv.user_id) }} · {{ conv.model or '—' }} · {{ conv.time_str }} · 共 {{ msgs|length }} 条消息{% endblock %}
+
+{% block admin_content %}
+<style>
+  .cv-wrap{padding:14px;max-width:900px;}
+  .cv-back{display:inline-block;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:12px;}
+  .cv-back:hover{color:var(--fg);}
+  .cv-msg{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;
+    background:var(--card);}
+  .cv-msg.user{border-left:3px solid #5b8cff;}
+  .cv-msg.assistant{border-left:3px solid #9aa0a6;}
+  .cv-msg.system{border-left:3px solid #d9a441;}
+  .cv-meta{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:11.5px;color:var(--muted);}
+  .cv-role{font-weight:700;color:var(--fg);font-size:12px;}
+  .cv-body{font-size:13px;line-height:1.75;color:var(--fg);white-space:pre-wrap;word-break:break-word;
+    max-height:420px;overflow-y:auto;}
+  .cv-empty{padding:40px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+
+<div class="cv-wrap">
+  <a class="cv-back" href="/admin/aisq-user/{{ conv.user_id }}">← 返回该用户的对话列表</a>
+  {% if msgs %}
+    {% for m in msgs %}
+    <div class="cv-msg {{ m.role }}">
+      <div class="cv-meta">
+        <span class="cv-role">{{ m.role }}</span>
+        <span>{{ m.time_str }}</span>
+        {% if m.model %}<span>{{ m.model }}</span>{% endif %}
+        {% if m.cost %}<span>¥{{ '%.6f' % m.cost }}</span>{% endif %}
+        {% if m.images %}<span>含图片</span>{% endif %}
+      </div>
+      <div class="cv-body">{{ m.content }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="cv-empty">这个对话没有消息</div>
+  {% endif %}
+</div>
+{% endblock %}

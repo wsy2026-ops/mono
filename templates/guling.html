@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}古陵归客 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .gl-wrap{
+    max-width:960px;margin:0 auto;padding:14px 12px 40px;
+    display:flex;flex-direction:column;gap:10px;align-items:center;
+  }
+  .gl-top{
+    width:100%;display:flex;align-items:center;gap:12px;
+  }
+  .gl-top h1{font-size:17px;font-weight:800;margin:0;color:var(--fg,#1a1a1a);}
+  .gl-top .gl-back{font-size:12.5px;color:var(--fg-3);text-decoration:none;padding:4px 10px;border:1px solid var(--line,#e6e6e6);border-radius:8px;}
+  .gl-top .gl-back:hover{background:var(--soft,#f5f5f5);}
+  .gl-stage{
+    width:100%;max-width:640px;position:relative;
+    border-radius:14px;overflow:hidden;background:#08080a;
+    border:1px solid #222;
+  }
+  .gl-stage canvas{
+    display:block;width:100%;height:auto;
+    image-rendering:pixelated;image-rendering:crisp-edges;
+    aspect-ratio:4/3;
+  }
+  .gl-joy{
+    position:absolute;left:14px;bottom:14px;width:96px;height:96px;
+    border-radius:50%;background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.18);
+    touch-action:none;display:none;
+  }
+  .gl-joy-knob{
+    position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;
+    border-radius:50%;background:rgba(255,255,255,0.35);
+    pointer-events:none;
+  }
+  @media (pointer:coarse){
+    .gl-joy{display:block;}
+  }
+  .gl-hint{font-size:12px;color:var(--fg-3,#888);text-align:center;line-height:1.8;margin:0;}
+  .gl-tip{
+    width:100%;max-width:640px;border:1px dashed var(--line,#ccc);border-radius:10px;
+    padding:10px 14px;font-size:12.5px;color:var(--fg-3,#777);line-height:1.9;background:var(--soft,#fafafa);
+  }
+  .gl-tip b{color:var(--fg,#333);}
+</style>
+
+<div class="gl-wrap">
+  <div class="gl-top">
+    <h1>古陵归客</h1>
+    <a class="gl-back" href="{{ url_for('games_center') }}">← 游戏中心</a>
+  </div>
+  <div class="gl-stage">
+    <canvas id="gCanvas" width="320" height="240"></canvas>
+    <div class="gl-joy" id="gJoy"><div class="gl-joy-knob" id="gJoyKnob"></div></div>
+  </div>
+  <p class="gl-hint">WASD / 方向键移动 · 手机用左下摇杆</p>
+  <div class="gl-tip">
+    <b>九层妖楼 · 外围墓道（施工中）</b><br>
+    当前为渲染骨架版本：可以走进墓道环线，看看油灯照出来的石砖和火把。
+    文物搜集、怪物遭遇与撤离结算正在后续施工。
+  </div>
+</div>
+
+<script src="{{ cdn_url('js/guling.js') }}"></script>
+{% endblock %}

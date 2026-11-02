@@ -1,0 +1,62 @@
+{% extends "_admin_base.html" %}
+{% block title %}服务器状态 · 管理后台{% endblock %}
+{% block admin_icon %}🖥{% endblock %}
+{% block admin_heading %}服务器状态{% endblock %}
+{% block admin_desc %}香港主站本机 + 洛杉矶备用机 · 只有超管可见{% endblock %}
+
+{% block admin_content %}
+<style>
+  .sv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;padding:16px;}
+  .sv-card{border:1px solid var(--line);border-radius:13px;background:var(--card);padding:16px 18px;}
+  .sv-card h3{margin:0 0 12px;font-size:14.5px;display:flex;align-items:center;gap:8px;}
+  .sv-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .sv-dot.g{background:#12b76a;} .sv-dot.r{background:#f04438;}
+  .sv-row{display:flex;justify-content:space-between;padding:7px 0;
+    border-bottom:1px dashed var(--line);font-size:13px;}
+  .sv-row:last-child{border-bottom:none;}
+  .sv-row span{color:var(--muted);}
+  .sv-row b{font-variant-numeric:tabular-nums;color:var(--fg);}
+  .sv-note{padding:0 16px 16px;font-size:12px;color:var(--muted);line-height:1.8;}
+  .sv-bar{height:7px;border-radius:99px;background:var(--soft);overflow:hidden;margin-top:5px;}
+  .sv-bar i{display:block;height:100%;border-radius:99px;}
+  .sv-bar .w80{background:#12b76a;} .sv-bar .w90{background:#f79009;} .sv-bar .w95{background:#f04438;}
+</style>
+
+<div class="sv-grid">
+  <div class="sv-card">
+    <h3><span class="sv-dot g"></span>香港 · 主站（本机）</h3>
+    <div class="sv-row"><span>运行时长</span><b>{{ local.uptime }}</b></div>
+    <div class="sv-row"><span>负载（1/5/15 分钟）</span><b>{{ local.load }}</b></div>
+    <div class="sv-row" style="display:block">
+      <div style="display:flex;justify-content:space-between">
+        <span>内存</span><b>{{ local.mem_used_p }}% / {{ local.mem_total }}</b>
+      </div>
+      <div class="sv-bar"><i class="{{ 'w95' if local.mem_used_p >= 95 else ('w90' if local.mem_used_p >= 85 else 'w80') }}"
+           style="width: {{ local.mem_used_p }}%"></i></div>
+    </div>
+    <div class="sv-row" style="display:block">
+      <div style="display:flex;justify-content:space-between">
+        <span>磁盘（/）</span><b>{{ local.disk_used_p }}% / {{ local.disk_total }}</b>
+      </div>
+      <div class="sv-bar"><i class="{{ 'w95' if local.disk_used_p >= 95 else ('w90' if local.disk_used_p >= 85 else 'w80') }}"
+           style="width: {{ local.disk_used_p }}%"></i></div>
+    </div>
+  </div>
+
+  <div class="sv-card">
+    <h3>
+      {% if la.ok %}<span class="sv-dot g"></span>{% else %}<span class="sv-dot r"></span>{% endif %}
+      洛杉矶 · 备用机
+    </h3>
+    <div class="sv-row"><span>地址</span><b>{{ la.host }}</b></div>
+    <div class="sv-row"><span>SSH (22) 可达</span><b>{{ '✓ 通' if la.ok else '✗ 不通' }}</b></div>
+    <div class="sv-row"><span>握手延迟</span><b>{{ (la.ms ~ ' ms') if la.ms else '—' }}</b></div>
+    {% if la.err %}<div class="sv-row"><span>错误</span><b style="font-weight:400">{{ la.err }}</b></div>{% endif %}
+  </div>
+</div>
+
+<div class="sv-note">
+  探测方式：洛杉矶机走 TCP 连 22 端口测可达性（每次打开本页实时探测一次，不落库）。
+  本机数据来自 /proc，实时读取。此页只有超管可见，不暴露任何密钥或敏感配置。
+</div>
+{% endblock %}

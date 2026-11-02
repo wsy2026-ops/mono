@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}成就墙 - MONO 社区{% endblock %}
+{% set active = 'achievements' %}
+
+{% block content %}
+<style>
+  .aw-wrap{max-width:960px;margin:0 auto;}
+  .aw-hero{
+    border:1px solid var(--line);border-radius:16px;padding:30px 34px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);
+    display:flex;align-items:center;gap:26px;flex-wrap:wrap;
+  }
+  .aw-hero h1{font-size:26px;margin:0 0 8px;font-weight:700;letter-spacing:-0.3px;}
+  .aw-hero p{margin:0;color:var(--fg-2);font-size:13.5px;line-height:1.7;}
+  .aw-pct{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;color:#c9a227;}
+  .aw-bar{width:220px;height:8px;border-radius:99px;background:var(--soft);overflow:hidden;}
+  .aw-bar i{display:block;height:100%;background:linear-gradient(90deg,#e8c95c,#c9a227);}
+  .aw-sec{margin-top:34px;}
+  .aw-sec h2{font-size:18px;margin:0 0 14px;font-weight:700;}
+  .aw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
+  .aw-item{
+    border:1px solid var(--line);border-radius:12px;padding:14px 15px;background:var(--card);
+    display:flex;gap:12px;align-items:flex-start;position:relative;
+  }
+  .aw-item.got{border-color:rgba(201,162,39,.55);background:linear-gradient(180deg,rgba(201,162,39,.07),var(--card));}
+  .aw-item.locked .aw-icon{filter:grayscale(1);opacity:.45;}
+  .aw-icon{font-size:26px;line-height:1;flex:none;}
+  .aw-body{min-width:0;}
+  .aw-title{font-size:13.5px;font-weight:700;margin-bottom:3px;}
+  .aw-desc{font-size:11.5px;color:var(--muted);line-height:1.55;}
+  .aw-meta{margin-top:7px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .aw-coin{font-size:11px;color:#a9821a;font-weight:700;}
+  .aw-count{font-size:10.5px;color:var(--muted);}
+  .aw-flag{position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;
+    padding:2px 8px;border-radius:99px;background:rgba(201,162,39,.16);color:#8a6d12;}
+  .aw-login-tip{font-size:12.5px;color:var(--muted);}
+</style>
+
+<div class="aw-wrap">
+  <div class="aw-hero">
+    <div>
+      <h1>🏅 成就墙</h1>
+      <p>九款游戏 + 跨游戏挑战，全站共 {{ total }} 项成就，积分自动入账。</p>
+    </div>
+    {% if mine %}
+    <div style="margin-left:auto;text-align:right;">
+      <div class="aw-pct">{{ mine.pct }}%</div>
+      <div style="font-size:12px;color:var(--muted);margin:2px 0 8px;">
+        已解锁 {{ mine.got }} / {{ mine.total }} · 累计成就积分 {{ mine.coins }}</div>
+      <div class="aw-bar" style="margin-left:auto;"><i style="width:{{ mine.pct }}%"></i></div>
+    </div>
+    {% else %}
+    <div style="margin-left:auto;" class="aw-login-tip"><a href="{{ url_for('login') }}">登录</a> 后查看你的进度</div>
+    {% endif %}
+  </div>
+
+  {% for g in groups %}
+  <div class="aw-sec">
+    <h2>{{ g.name }} <span style="font-size:12px;color:var(--muted);font-weight:600;">{{ g.got }}/{{ g.total }}</span></h2>
+    <div class="aw-grid">
+      {% for it in g.list %}
+      <div class="aw-item {% if it.unlocked %}got{% else %}locked{% endif %}">
+        <div class="aw-icon">{{ it.icon }}</div>
+        <div class="aw-body">
+          <div class="aw-title">{{ it.title }}</div>
+          <div class="aw-desc">{{ it.desc }}</div>
+          <div class="aw-meta">
+            <span class="aw-coin">+{{ it.coins }} 积分</span>
+            <span class="aw-count">{{ it.unlocked_count }} 人已解锁</span>
+          </div>
+        </div>
+        {% if it.unlocked %}<span class="aw-flag">已解锁</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

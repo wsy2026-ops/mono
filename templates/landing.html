@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}MONO 社区 · 陆柒工作室{% endblock %}
+{% block content %}
+<style>
+  .land-wrap{max-width:960px;margin:0 auto;padding:8px 0 40px;}
+  .land-hero{padding:36px 28px;border-radius:16px;background:linear-gradient(135deg,#111 0%,#1e293b 100%);color:#fff;}
+  .land-badge{display:inline-block;font-size:12px;letter-spacing:.08em;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.14);margin-bottom:14px;}
+  .land-hero h1{margin:0 0 10px;font-size:28px;line-height:1.35;font-weight:700;}
+  .land-hero p{margin:0 0 20px;font-size:15px;line-height:1.7;color:rgba(255,255,255,.86);}
+  .land-hero p b{color:#fff;}
+  .land-cta{display:flex;gap:10px;flex-wrap:wrap;}
+  .land-btn{display:inline-block;padding:10px 20px;border-radius:10px;font-size:14px;text-decoration:none;border:1px solid rgba(255,255,255,.35);color:#fff;}
+  .land-btn.primary{background:#fff;color:#111;border-color:#fff;font-weight:600;}
+  .land-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:18px 0;}
+  .land-card{display:block;padding:18px;border:1px solid var(--line,#e6e8eb);border-radius:12px;text-decoration:none;color:inherit;background:var(--card,#fff);transition:border-color .15s;}
+  .land-card:hover{border-color:#111;}
+  .land-card h3{margin:0 0 6px;font-size:16px;}
+  .land-card p{margin:0;font-size:13px;line-height:1.6;color:#6b7280;}
+  .land-sec{margin:26px 0;}
+  .land-sec-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;}
+  .land-sec-h h2{margin:0;font-size:17px;}
+  .land-sec-h a{font-size:13px;text-decoration:none;color:#6b7280;}
+  .land-list{border:1px solid var(--line,#e6e8eb);border-radius:12px;overflow:hidden;background:var(--card,#fff);}
+  .land-row{display:flex;align-items:center;gap:12px;padding:11px 14px;text-decoration:none;color:inherit;border-bottom:1px solid var(--line,#f1f2f4);font-size:14px;}
+  .land-row:last-child{border-bottom:0;}
+  .land-row:hover{background:#fafafa;}
+  .land-id{width:52px;flex:none;color:#9ca3af;font-size:13px;}
+  .land-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .land-tag{flex:none;font-size:12px;color:#6b7280;border:1px solid var(--line,#e6e8eb);border-radius:999px;padding:2px 9px;}
+  .land-about{margin-top:28px;padding-top:18px;border-top:1px solid var(--line,#e6e8eb);font-size:13px;line-height:1.8;color:#6b7280;}
+  .land-about a{color:#111;}
+  .land-empty{padding:16px 14px;font-size:13px;color:#9ca3af;}
+  @media (max-width:600px){
+    .land-hero{padding:26px 18px;}
+    .land-hero h1{font-size:22px;}
+    .land-tag{display:none;}
+  }
+</style>
+
+<div class="land-wrap">
+  <section class="land-hero">
+    <div class="land-badge">陆柒工作室 · LIUQI STUDIO</div>
+    <h1>几个初中生自己写、自己维护的社区</h1>
+    <p>论坛、在线判题、棋类对弈、小游戏、音乐台和 AI 广场，都是我们一块块写出来的。<br>
+       放学后来逛逛，想说话就注册一个。</p>
+    <div class="land-cta">
+      <a class="land-btn primary" href="{{ url_for('register') }}">注册一个</a>
+      <a class="land-btn" href="{{ url_for('forum') }}">逛论坛 →</a>
+    </div>
+  </section>
+
+  <section class="land-grid">
+    <a class="land-card" href="{{ url_for('forum') }}">
+      <h3>📝 论坛</h3>
+      <p>综合闲聊、技术讨论、游戏、资源、官方公告五个版块。</p>
+    </a>
+    <a class="land-card" href="{{ url_for('games_center') }}">
+      <h3>🎮 游戏大厅</h3>
+      <p>2048、扫雷、数独、华容道、汉诺塔……还有排行榜。</p>
+    </a>
+    <a class="land-card" href="{{ url_for('oj_home') }}">
+      <h3>🧩 MONO OJ</h3>
+      <p>在线判题，支持 C++98 到 C++20，四种赛制。</p>
+    </a>
+  </section>
+
+  {% if oj_problems %}
+  <section class="land-sec">
+    <div class="land-sec-h">
+      <h2>题目</h2>
+      <a href="{{ url_for('oj_home') }}">全部题目 »</a>
+    </div>
+    <div class="land-list">
+      {% for p in oj_problems %}
+      <a class="land-row" href="{{ url_for('oj_problem', pid=p.id) }}">
+        <span class="land-id">#{{ p.id }}</span>
+        <span class="land-title">{{ p.title }}</span>
+        <span class="land-tag">{{ p.difficulty or '未评定' }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if essence_posts %}
+  <section class="land-sec">
+    <div class="land-sec-h">
+      <h2>✍️ 编辑精选</h2>
+      <a href="{{ url_for('forum') }}">全部 »</a>
+    </div>
+    <div class="land-list">
+      {% for p in essence_posts %}
+      <a class="land-row" href="{{ url_for('view_post', post_id=p.id) }}">
+        <span class="land-title">{{ p.title }}</span>
+        <span class="land-tag">{{ p.username }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if hot_posts %}
+  <section class="land-sec">
+    <div class="land-sec-h">
+      <h2>最新帖子</h2>
+      <a href="{{ url_for('forum') }}">进论坛 »</a>
+    </div>
+    <div class="land-list">
+      {% for p in hot_posts %}
+      <a class="land-row" href="{{ url_for('view_post', post_id=p.id) }}">
+        <span class="land-title">{{ p.title }}</span>
+        <span class="land-tag">{{ p.username }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="land-about">
+    陆柒工作室是 2026 年 1 月成立的四个初中生小组：白天上课写作业，晚上和周末敲代码。
+    服务器、域名、备份、限流，全是自己弄的。<a href="{{ url_for('about') }}">关于我们 →</a>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>中国象棋大师 · 棋子样式与特效预览</title>
+<style>
+:root{
+  --wood-1:#E0C49B; --wood-2:#C9A87A; --wood-3:#B08F60;
+  --paper:#F5F0E6; --paper-2:#EFE7D8;
+  --red:#8B1A1A; --red-lt:#C0392B; --red-dk:#5E0F0F;
+  --green:#1B3A2F; --green-lt:#2E6151; --green-dk:#0B1E18;
+  --gold:#C9A227; --gold-lt:#E4C55A; --gold-dk:#8C6E15;
+  --ink:#2A2620; --ink-2:#6B6357; --line:rgba(120,100,70,.22);
+  --hp-full:#4A8B5C; --hp-mid:#C9A227; --hp-low:#A52222;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(201,162,39,.10), transparent 45%),
+    radial-gradient(circle at 88% 92%, rgba(139,26,26,.08), transparent 45%),
+    linear-gradient(170deg, var(--paper) 0%, var(--paper-2) 100%);
+  background-attachment:fixed;
+  min-height:100vh;
+  padding:0 0 70px;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+/* ── 页头 ── */
+.hero{
+  text-align:center;padding:54px 20px 40px;
+  border-bottom:1px solid var(--line);margin-bottom:46px;
+  position:relative;
+}
+.hero::after{
+  content:"";position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);
+  width:150px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+}
+.hero h1{
+  margin:0 0 12px;font-size:38px;font-weight:800;letter-spacing:.06em;
+  font-family:"Songti SC","STSong","SimSun",serif;
+  background:linear-gradient(180deg,var(--red) 0%,var(--red-dk) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.hero .sub{color:var(--ink-2);font-size:14.5px;letter-spacing:.02em;line-height:1.9}
+.hero .tag{
+  display:inline-block;margin-top:16px;padding:5px 16px;border-radius:99px;
+  font-size:12px;letter-spacing:.1em;color:var(--gold-dk);
+  border:1px solid rgba(201,162,39,.5);background:rgba(201,162,39,.08);
+}
+
+/* ── 区块 ── */
+section{margin-bottom:56px}
+.sec-h{
+  display:flex;align-items:baseline;gap:12px;margin:0 0 6px;
+  padding-bottom:12px;border-bottom:2px solid var(--line);
+}
+.sec-h .no{
+  font-size:12px;font-weight:700;color:var(--gold-dk);letter-spacing:.1em;
+  border:1px solid rgba(201,162,39,.5);border-radius:6px;padding:2px 8px;
+  background:rgba(201,162,39,.08);
+}
+.sec-h h2{
+  margin:0;font-size:21px;font-weight:800;letter-spacing:.04em;
+  font-family:"Songti SC","STSong","SimSun",serif;
+}
+.sec-desc{color:var(--ink-2);font-size:13.5px;line-height:1.85;margin:12px 0 24px}
+
+/* ── 棋子本体 ── */
+.pc{
+  --sz:62px;
+  width:var(--sz);height:var(--sz);border-radius:50%;
+  display:grid;place-items:center;position:relative;flex-shrink:0;
+  font-family:"Songti SC","STSong","SimSun","Noto Serif SC",serif;
+  font-weight:700;font-size:calc(var(--sz)*.46);
+  color:#FFF8E7;
+  text-shadow:0 1px 2px rgba(0,0,0,.55),0 0 1px rgba(0,0,0,.9);
+  user-select:none;cursor:pointer;
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease;
+}
+.pc::before{
+  content:"";position:absolute;inset:6%;border-radius:50%;
+  border:1px solid rgba(255,248,231,.16);pointer-events:none;
+}
+.pc.red{
+  background:radial-gradient(circle at 34% 26%,#D0483F 0%,#A52222 44%,#6E0F0F 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(201,162,39,.92),
+    inset 0 0 0 3.5px rgba(0,0,0,.2),
+    inset 0 3px 9px rgba(255,255,255,.3),
+    inset 0 -6px 12px rgba(0,0,0,.42),
+    0 4px 12px rgba(70,20,20,.38);
+}
+.pc.black{
+  background:radial-gradient(circle at 34% 26%,#3A6B57 0%,#1E4536 44%,#0A1C16 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(201,162,39,.92),
+    inset 0 0 0 3.5px rgba(0,0,0,.2),
+    inset 0 3px 9px rgba(255,255,255,.26),
+    inset 0 -6px 12px rgba(0,0,0,.45),
+    0 4px 12px rgba(10,30,24,.42);
+}
+.pc .glyph{position:relative;z-index:2;line-height:1}
+
+/* 裂纹层：深色裂缝 + 浅色崩口双层描边，受损时逐条「长」出来 */
+.pc .cracks{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:3;
+}
+.pc .cracks path{
+  fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:220;stroke-dashoffset:220;opacity:0;
+  transition:stroke-dashoffset .46s cubic-bezier(.32,.94,.4,1), opacity .24s ease;
+}
+.pc .cracks path.dk{stroke:rgba(6,3,2,.74)}
+.pc .cracks path.lt{
+  stroke:rgba(255,247,228,.34);stroke-width:1;
+  transform:translate(.85px,-.85px);
+}
+.pc .cracks polygon.chip{
+  fill:rgba(6,3,2,.46);stroke:none;
+  opacity:0;transform-origin:50% 50%;transform:scale(.4);
+  transition:opacity .3s ease, transform .34s cubic-bezier(.34,1.5,.64,1);
+}
+/* 按受损等级逐层显现 */
+.pc[data-dmg="1"] .cracks path[data-t="1"],
+.pc[data-dmg="2"] .cracks path[data-t="1"],
+.pc[data-dmg="2"] .cracks path[data-t="2"],
+.pc[data-dmg="3"] .cracks path[data-t="1"],
+.pc[data-dmg="3"] .cracks path[data-t="2"],
+.pc[data-dmg="3"] .cracks path[data-t="3"],
+.pc[data-dmg="4"] .cracks path{
+  stroke-dashoffset:0;opacity:1;
+}
+.pc[data-dmg="2"] .cracks polygon.chip[data-t="1"],
+.pc[data-dmg="3"] .cracks polygon.chip,
+.pc[data-dmg="4"] .cracks polygon.chip{
+  opacity:1;transform:scale(1);
+}
+/* 濒死时整块玉牌压暗一点 */
+.pc[data-dmg="4"]{filter:saturate(.72) brightness(.9)}
+/* 刚受击时新裂纹快速长出的提示 */
+.pc.cracking .cracks path{transition-duration:.24s}
+
+/* 选中 */
+.pc.sel{transform:translateY(-4px) scale(1.07)}
+.pc.sel::after{
+  content:"";position:absolute;inset:-7px;border-radius:50%;
+  border:2.5px solid var(--gold);
+  animation:selPulse 1.5s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes selPulse{
+  0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 0 0 rgba(201,162,39,.5)}
+  50%{opacity:.6;transform:scale(1.05);box-shadow:0 0 0 8px rgba(201,162,39,0)}
+}
+.pc.hoverable:hover{transform:translateY(-3px) scale(1.05)}
+
+/* 受击闪白 + 震屏 */
+.pc.hit{animation:hitFlash .34s ease}
+@keyframes hitFlash{
+  0%{filter:brightness(1)}
+  18%{filter:brightness(2.6) saturate(.3)}
+  100%{filter:brightness(1)}
+}
+.shake{animation:shake .32s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{
+  10%,90%{transform:translate(-2px,0)}
+  20%,80%{transform:translate(4px,0)}
+  30%,50%,70%{transform:translate(-6px,0)}
+  40%,60%{transform:translate(6px,0)}
+}
+
+/* 血条 */
+.hpwrap{width:56px;margin-top:7px}
+.hpbar{
+  height:6px;border-radius:99px;overflow:hidden;position:relative;
+  background:rgba(40,30,20,.22);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.28);
+}
+.hpbar > i{
+  display:block;height:100%;border-radius:99px;
+  transition:width .42s cubic-bezier(.4,0,.2,1), background .3s ease;
+  position:relative;
+}
+.hpbar > i::after{
+  content:"";position:absolute;inset:0;border-radius:99px;
+  background:linear-gradient(180deg,rgba(255,255,255,.42),transparent 60%);
+}
+.hpbar.hp-full > i{background:linear-gradient(90deg,#3E7A4E,var(--hp-full))}
+.hpbar.hp-mid  > i{background:linear-gradient(90deg,#A8861D,var(--hp-mid))}
+.hpbar.hp-low  > i{background:linear-gradient(90deg,#7E1A1A,var(--hp-low))}
+/* 掉血残影 */
+.hpghost{
+  position:absolute;top:0;left:0;height:100%;border-radius:99px;
+  background:rgba(255,120,120,.55);pointer-events:none;
+}
+.hptext{font-size:10.5px;color:var(--ink-2);text-align:center;margin-top:3px;font-variant-numeric:tabular-nums}
+
+/* ── 总览网格 ── */
+.roster{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:16px;
+}
+.rcard{
+  background:rgba(255,255,255,.72);border:1px solid var(--line);
+  border-radius:16px;padding:20px 12px 16px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+  position:relative;overflow:hidden;
+}
+.rcard::before{
+  content:"";position:absolute;inset:0;opacity:0;transition:opacity .25s;
+  background:radial-gradient(circle at 50% 0%,rgba(201,162,39,.16),transparent 65%);
+}
+.rcard:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(90,70,40,.16);border-color:rgba(201,162,39,.55)}
+.rcard:hover::before{opacity:1}
+.rcard .rn{font-size:13px;font-weight:700;margin-top:13px;letter-spacing:.06em;position:relative}
+.rcard .rs{font-size:11.5px;color:var(--ink-2);margin-top:4px;position:relative}
+.rcard .hpwrap{position:relative}
+
+/* ── 解剖卡 ── */
+.anat{
+  display:grid;grid-template-columns:250px 1fr;gap:34px;align-items:start;
+  background:rgba(255,255,255,.72);border:1px solid var(--line);
+  border-radius:18px;padding:30px;
+}
+@media(max-width:760px){.anat{grid-template-columns:1fr;gap:24px}}
+.anat-vis{display:flex;flex-direction:column;align-items:center;gap:14px}
+.anat-vis .pc{--sz:132px;font-size:60px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{
+  border:1px solid var(--line);border-radius:12px;padding:13px 15px;
+  background:rgba(255,255,255,.6);
+}
+.stat .k{font-size:11px;color:var(--ink-2);letter-spacing:.06em;margin-bottom:5px}
+.stat .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.stat.red .v{color:var(--red)}
+.stat.green .v{color:var(--green-lt)}
+.stat.gold .v{color:var(--gold-dk)}
+.feat{
+  margin-top:16px;border-radius:12px;padding:14px 16px;
+  background:linear-gradient(135deg,rgba(201,162,39,.13),rgba(201,162,39,.05));
+  border:1px solid rgba(201,162,39,.4);
+}
+.feat .ft{font-size:13px;font-weight:800;color:var(--gold-dk);letter-spacing:.06em;margin-bottom:6px}
+.feat .fd{font-size:13px;line-height:1.8;color:var(--ink)}
+
+/* 攻击范围小棋盘 */
+.mini{
+  margin-top:18px;display:inline-grid;gap:2px;padding:10px;
+  border-radius:12px;border:1px solid var(--line);
+  background:linear-gradient(160deg,var(--wood-1),var(--wood-2));
+  box-shadow:inset 0 2px 8px rgba(120,90,50,.25);
+}
+.mini .cell{
+  width:20px;height:20px;border-radius:3px;
+  background:rgba(255,255,255,.12);
+  display:grid;place-items:center;font-size:10px;
+}
+.mini .cell.rng{background:repeating-linear-gradient(45deg,rgba(201,162,39,.85) 0 3px,rgba(201,162,39,.5) 3px 6px)}
+.mini .cell.mv{background:rgba(110,170,130,.62)}
+.mini .cell.me{background:rgba(139,26,26,.85);border-radius:50%}
+.mini .cell.foe{background:rgba(27,58,47,.85);border-radius:50%}
+
+/* ── 血量演示 ── */
+.hprow{display:flex;gap:26px;flex-wrap:wrap;justify-content:center;padding:10px 0}
+.hpcell{text-align:center}
+.hpcell .lab{font-size:12px;color:var(--ink-2);margin-top:11px;letter-spacing:.04em}
+
+/* ── 特效舞台 ── */
+.stage-box{
+  background:rgba(255,255,255,.72);border:1px solid var(--line);
+  border-radius:18px;padding:24px;position:relative;overflow:hidden;
+}
+.btns{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:22px}
+.btn{
+  padding:9px 17px;border-radius:10px;border:1px solid rgba(201,162,39,.5);
+  background:linear-gradient(180deg,rgba(201,162,39,.16),rgba(201,162,39,.07));
+  color:var(--gold-dk);font-size:13px;font-weight:700;cursor:pointer;
+  font-family:inherit;letter-spacing:.03em;
+  transition:transform .14s ease,box-shadow .14s ease,background .14s ease;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(201,162,39,.28);
+  background:linear-gradient(180deg,rgba(201,162,39,.26),rgba(201,162,39,.12))}
+.btn:active{transform:translateY(0)}
+.stage{
+  position:relative;height:290px;border-radius:14px;
+  background:
+    repeating-linear-gradient(90deg,rgba(140,110,70,.05) 0 1px,transparent 1px 34px),
+    linear-gradient(165deg,var(--wood-1),var(--wood-2) 60%,var(--wood-3));
+  box-shadow:inset 0 3px 14px rgba(110,80,45,.3);
+  display:flex;align-items:center;justify-content:center;gap:130px;
+  overflow:hidden;
+}
+@media(max-width:640px){.stage{gap:70px;height:250px}}
+.stage .slot{position:relative;display:flex;flex-direction:column;align-items:center}
+.stage .fx{position:absolute;inset:0;pointer-events:none;z-index:20}
+
+/* 伤害数字 */
+.dmgnum{
+  position:absolute;font-size:26px;font-weight:900;pointer-events:none;z-index:30;
+  font-family:"Songti SC","STSong",serif;
+  color:#FFE9A8;
+  text-shadow:0 0 8px rgba(255,120,60,.9),0 2px 4px rgba(0,0,0,.7),0 0 2px #000;
+  animation:dmgFloat 1.05s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes dmgFloat{
+  0%{opacity:0;transform:translate(-50%,0) scale(.5)}
+  22%{opacity:1;transform:translate(-50%,-16px) scale(1.22)}
+  45%{transform:translate(-50%,-26px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-66px) scale(.92)}
+}
+
+/* 碎片 */
+.frag{
+  position:absolute;width:100%;height:100%;border-radius:50%;
+  pointer-events:none;z-index:25;
+}
+
+/* 命中爆点 */
+@keyframes burstPop{
+  0%{transform:scale(.18);opacity:1}
+  52%{transform:scale(1.02);opacity:.95}
+  100%{transform:scale(1.55);opacity:0}
+}
+@keyframes ringOut{
+  0%{transform:scale(.28);opacity:1}
+  100%{transform:scale(1.95);opacity:0}
+}
+@keyframes spikeOut{
+  0%{transform:translate(0,0) scale(1.5);opacity:1}
+  100%{transform:translate(var(--tx),var(--ty)) scale(.28);opacity:0}
+}
+
+/* 移动拖尾 */
+.trail{
+  position:absolute;border-radius:50%;pointer-events:none;z-index:12;
+  animation:trailFade .72s ease-out forwards;
+}
+@keyframes trailFade{
+  0%{opacity:.55;transform:scale(1)}
+  100%{opacity:0;transform:scale(.35)}
+}
+
+/* 回血 */
+.healnum{
+  position:absolute;font-size:24px;font-weight:900;pointer-events:none;z-index:30;
+  color:#9BE7A8;text-shadow:0 0 8px rgba(80,220,120,.9),0 2px 4px rgba(0,0,0,.6);
+  animation:healFloat 1.15s ease-out forwards;
+}
+@keyframes healFloat{
+  0%{opacity:0;transform:translate(-50%,0) scale(.6)}
+  25%{opacity:1;transform:translate(-50%,-14px) scale(1.1)}
+  100%{opacity:0;transform:translate(-50%,-58px) scale(.95)}
+}
+.pc.healing{animation:healGlow 1s ease}
+@keyframes healGlow{
+  0%,100%{filter:none}
+  40%{filter:brightness(1.35) drop-shadow(0 0 12px rgba(120,255,160,.85))}
+}
+
+/* 棋子碎裂 → 重生的幽灵 */
+.pc.ghost{opacity:.22;filter:grayscale(.7)}
+
+/* ── 棋盘预览 ── */
+.boardwrap{display:flex;justify-content:center}
+.board{
+  --cw:46px;--ch:44px;
+  display:grid;grid-template-columns:repeat(9,var(--cw));
+  grid-template-rows:repeat(10,var(--ch));
+  padding:16px 18px;border-radius:16px;position:relative;
+  background:
+    repeating-linear-gradient(88deg,rgba(150,115,70,.055) 0 1px,transparent 1px 23px),
+    linear-gradient(168deg,#E3C9A2,#CFAE81 55%,#BB9765);
+  box-shadow:inset 0 0 0 2px rgba(120,90,50,.35),0 14px 34px rgba(90,70,40,.22);
+  overflow:hidden;
+}
+.bcell{
+  display:grid;place-items:center;position:relative;
+}
+.bcell::before{
+  content:"";position:absolute;left:0;right:0;top:50%;height:1px;
+  background:rgba(110,82,48,.42);
+}
+.bcell::after{
+  content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;
+  background:rgba(110,82,48,.42);
+}
+.bcell.hl-mv::before,.bcell.hl-mv::after{opacity:.3}
+/* 范围高亮：填满整格，而不是小圆点 —— 木纹底上必须够醒目 */
+.bcell .hl{
+  position:absolute;inset:3px;border-radius:7px;z-index:1;
+  animation:hlIn .26s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes hlIn{from{transform:scale(.55);opacity:0}to{transform:scale(1);opacity:1}}
+/* 可移动：玉绿实心 */
+.bcell .hl.mv{
+  background:rgba(78,168,112,.5);
+  box-shadow:inset 0 0 0 2px rgba(58,140,92,.9), 0 0 12px rgba(95,190,130,.55);
+}
+/* 攻击范围：鎏金斜纹 */
+.bcell .hl.rng{
+  background:repeating-linear-gradient(45deg,
+    rgba(240,214,110,.95) 0 4px, rgba(196,158,36,.62) 4px 8px);
+  box-shadow:inset 0 0 0 2px rgba(201,162,39,.95), 0 0 12px rgba(228,197,90,.5);
+}
+/* 既能走又能打 */
+.bcell .hl.both{
+  background:
+    repeating-linear-gradient(45deg,
+      rgba(240,214,110,.92) 0 4px, rgba(196,158,36,.55) 4px 8px),
+    rgba(78,168,112,.42);
+  box-shadow:inset 0 0 0 2px rgba(201,162,39,.95), 0 0 14px rgba(228,197,90,.6);
+}
+/* 范围内有敌人：加一圈朱红脉冲 */
+.bcell .hl .foemark{
+  position:absolute;inset:-3px;border-radius:9px;
+  border:2.5px solid rgba(200,60,50,.95);
+  animation:foePulse 1.25s ease-in-out infinite;
+}
+@keyframes foePulse{
+  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(200,60,50,.55)}
+  50%{opacity:.65;box-shadow:0 0 0 7px rgba(200,60,50,0)}
+}
+.bcell .pc{--sz:38px;font-size:17px;z-index:3}
+.river{
+  position:absolute;left:0;right:0;height:calc(var(--ch)*1);
+  top:calc(16px + var(--ch)*4.5);pointer-events:none;z-index:2;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 34px;
+}
+.river span{
+  font-family:"Songti SC","STSong","SimSun",serif;
+  font-size:19px;letter-spacing:.55em;color:rgba(60,90,70,.5);
+  text-shadow:0 1px 0 rgba(255,255,255,.3);
+}
+/* 九宫：用两个 45° 线性渐变画出对角线，不用旋转，任何宽高比都准 */
+.palace{
+  position:absolute;width:calc(var(--cw)*2);height:calc(var(--ch)*2);
+  pointer-events:none;z-index:1;
+  border:1px solid rgba(110,82,48,.38);
+  background:
+    linear-gradient(to bottom right,
+      transparent calc(50% - .6px), rgba(110,82,48,.38) calc(50% - .6px),
+      rgba(110,82,48,.38) calc(50% + .6px), transparent calc(50% + .6px)),
+    linear-gradient(to bottom left,
+      transparent calc(50% - .6px), rgba(110,82,48,.38) calc(50% - .6px),
+      rgba(110,82,48,.38) calc(50% + .6px), transparent calc(50% + .6px));
+}
+.boardtip{
+  margin-top:18px;text-align:center;font-size:13px;color:var(--ink);
+  min-height:22px;letter-spacing:.02em;
+}
+.boardtip b{color:var(--red)}
+
+/* ── 配色板 ── */
+.palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:12px}
+.sw{
+  border-radius:12px;overflow:hidden;border:1px solid var(--line);
+  background:rgba(255,255,255,.72);
+}
+.sw .chip{height:64px}
+.sw .meta{padding:9px 11px}
+.sw .nm{font-size:12px;font-weight:700;letter-spacing:.03em}
+.sw .hx{font-size:11px;color:var(--ink-2);font-variant-numeric:tabular-nums;margin-top:2px}
+
+footer{
+  text-align:center;color:var(--ink-2);font-size:12px;
+  padding-top:30px;border-top:1px solid var(--line);line-height:2;
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>中国象棋大师</h1>
+  <div class="sub">棋子样式与特效预览 · 国风棋枰</div>
+  <div class="tag">DESIGN PREVIEW · 2026-09-29</div>
+</div>
+
+<div class="wrap">
+
+<!-- 01 棋子总览 -->
+<section>
+  <div class="sec-h"><span class="no">01</span><h2>棋子总览</h2></div>
+  <p class="sec-desc">七种棋子，红黑双方各一套。玉牌造型，朱红与墨绿两种玉色，外圈鎏金。鼠标悬停可看抬起效果。</p>
+  <div class="roster" id="roster"></div>
+</section>
+
+<!-- 02 棋子解剖 -->
+<section>
+  <div class="sec-h"><span class="no">02</span><h2>棋子解剖与数值</h2></div>
+  <p class="sec-desc">以「车」为例。下方小棋盘用<strong>鎏金斜纹</strong>标攻击范围、<strong>玉绿圆点</strong>标可移动格 —— 两套高亮用不同纹理区分，不靠颜色，色盲也分得清。</p>
+  <div class="anat">
+    <div class="anat-vis">
+      <div class="pc red hoverable" data-piece="车">
+        <span class="glyph">车</span>
+      </div>
+      <div class="hpwrap">
+        <div class="hpbar hp-full"><i style="width:100%"></i></div>
+        <div class="hptext">150 / 150</div>
+      </div>
+    </div>
+    <div>
+      <div class="stats">
+        <div class="stat red"><div class="k">生命 HP</div><div class="v">150</div></div>
+        <div class="stat red"><div class="k">攻击 ATK</div><div class="v">60</div></div>
+        <div class="stat green"><div class="k">移动方式</div><div class="v" style="font-size:15px">直线任意格</div></div>
+        <div class="stat gold"><div class="k">攻击范围</div><div class="v" style="font-size:15px">直线 3 格内</div></div>
+      </div>
+      <div class="feat">
+        <div class="ft">特性 · 破甲</div>
+        <div class="fd">攻击时无视目标 20% 的减伤效果。车跑得远但只能打 3 格内，必须贴上去换血 —— 这是它和「炮」最大的区别。</div>
+      </div>
+      <div class="mini" id="miniChe"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 血量与破损 -->
+<section>
+  <div class="sec-h"><span class="no">03</span><h2>血量与破损</h2></div>
+  <p class="sec-desc">血条颜色随血量从玉绿 → 鎏金 → 朱红过渡；玉牌上的裂纹数量随受损程度增加。掉血时左侧会留一条浅色残影，让你看清这一下掉了多少。</p>
+  <div class="hprow" id="hpRow"></div>
+</section>
+
+<!-- 04 特效演示 -->
+<section>
+  <div class="sec-h"><span class="no">04</span><h2>特效演示</h2></div>
+  <p class="sec-desc">点下面的按钮逐个看。这些动效会用在真实对局里。</p>
+  <div class="stage-box">
+    <div class="btns">
+      <button class="btn" onclick="fxSelect()">选中高亮</button>
+      <button class="btn" onclick="fxAttack()">攻击（弧线 + 震屏 + 伤害数字）</button>
+      <button class="btn" onclick="fxKill()">击杀（玉牌碎裂飞散）</button>
+      <button class="btn" onclick="fxMove()">移动（拖尾）</button>
+      <button class="btn" onclick="fxHeal()">回血</button>
+      <button class="btn" onclick="fxReset()">重置</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="slot" id="slotA"></div>
+      <div class="slot" id="slotB"></div>
+      <div class="fx" id="fxLayer"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 棋盘预览 -->
+<section>
+  <div class="sec-h"><span class="no">05</span><h2>棋盘预览</h2></div>
+  <p class="sec-desc">木纹棋盘 + 楚河汉界 + 九宫斜线。<strong>点任意棋子</strong>就能看到它自己的行动范围 —— 七种棋子的走法完全不同，所以是逐个实现的，不是一套套用。</p>
+  <div class="boardwrap">
+    <div class="board" id="board"></div>
+  </div>
+  <div class="boardtip" id="boardTip">点一枚棋子，看看它能走到哪、能打到哪</div>
+</section>
+
+<!-- 06 配色板 -->
+<section>
+  <div class="sec-h"><span class="no">06</span><h2>配色板</h2></div>
+  <p class="sec-desc">四个色相撑起整张画面，明确避开纯黑白灰。</p>
+  <div class="palette" id="palette"></div>
+</section>
+
+<footer>
+  中国象棋大师 · 棋子样式预览 · 生成于 2026-09-29<br>
+  数值以设计文档为准（帅令减伤 50% · 将帅 HP 300）
+</footer>
+
+</div>
+
+<script>
+/* ───────── 棋子数据 ───────── */
+const PIECES = [
+  {k:'king',    zh:'帅',  hp:300, atk:30, mv:'九宫内 1 格',  rng:'九宫内 1 格', feat:'帅令', fd:'周围 1 格内友军受到的伤害减少 50%。'},
+  {k:'advisor', zh:'仕',  hp:120, atk:25, mv:'九宫内斜 1 格', rng:'斜 1 格',      feat:'舍身', fd:'紧邻帅/将时，替其承受 30% 伤害。'},
+  {k:'elephant',zh:'相',  hp:140, atk:25, mv:'田字',         rng:'田字',        feat:'厚甲', fd:'受到的远程伤害（车/炮）额外减少 25%。'},
+  {k:'horse',   zh:'马',  hp:110, atk:55, mv:'日字',         rng:'日字（可越子）',feat:'冲锋', fd:'本回合先移动再攻击时，伤害 +20%。'},
+  {k:'chariot', zh:'车',  hp:150, atk:60, mv:'直线任意格',    rng:'直线 3 格内',  feat:'破甲', fd:'攻击时无视目标 20% 的减伤效果。'},
+  {k:'cannon',  zh:'炮',  hp:100, atk:70, mv:'直线任意格',    rng:'隔 1 子直线',  feat:'轰击', fd:'对目标身后 1 格造成 40% 溅射伤害。'},
+  {k:'pawn',    zh:'兵',  hp:80,  atk:35, mv:'前 1 格 / 过河前三', rng:'同移动',   feat:'锐气', fd:'过河后攻击力 +50%。'},
+];
+const BLACK_MAP = {帅:'将',仕:'士',相:'象',兵:'卒'};
+
+/* ── 程序化裂纹生成 ──
+   每条裂纹从撞击点向外爬、逐段变细并随机偏折，还有概率分叉。
+   约束在玉牌圆内，避免爬出棋子轮廓。 */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function _clampC(x, y){
+  const dx = x - 50, dy = y - 50, d = Math.hypot(dx, dy);
+  if(d <= 46) return [x, y];
+  return [50 + dx/d*46, 50 + dy/d*46];
+}
+function _crackPath(rnd, x0, y0, ang, segs, step0){
+  let x = x0, y = y0, a = ang, step = step0;
+  let d = 'M' + x.toFixed(1) + ' ' + y.toFixed(1);
+  for(let i=0;i<segs;i++){
+    a += (rnd() - .5) * 0.95;
+    let nx = x + Math.cos(a)*step, ny = y + Math.sin(a)*step;
+    const cl = _clampC(nx, ny); nx = cl[0]; ny = cl[1];
+    d += ' L' + nx.toFixed(1) + ' ' + ny.toFixed(1);
+    x = nx; y = ny; step *= 0.76;
+  }
+  return d;
+}
+function genCracks(seed){
+  const rnd = mulberry32(seed);
+  // [撞击点x, y, 出现档位] —— 档位越低越早出现
+  const impacts = [[33,29,1],[69,57,2],[41,75,3],[67,23,4],[26,55,4]];
+  const out = [];
+  impacts.forEach(imp => {
+    const ix = imp[0], iy = imp[1], tier = imp[2];
+    const mains = tier >= 4 ? 2 : 3;
+    for(let i=0;i<mains;i++){
+      const ang = rnd() * Math.PI * 2;
+      out.push({d: _crackPath(rnd, ix, iy, ang, 3 + Math.floor(rnd()*3), 7 + rnd()*7), t: tier});
+      if(rnd() > 0.42){
+        const ba = ang + (rnd() > .5 ? 1 : -1) * (0.55 + rnd()*0.6);
+        out.push({d: _crackPath(rnd, ix, iy, ba, 2 + Math.floor(rnd()*2), 5 + rnd()*4), t: tier});
+      }
+    }
+  });
+  return out;
+}
+function genChips(seed){
+  const rnd = mulberry32(seed + 977);
+  const out = [];
+  for(let i=0;i<5;i++){
+    const cx = 24 + rnd()*52, cy = 24 + rnd()*52, s = 2.2 + rnd()*2.4;
+    const a0 = rnd() * Math.PI * 2, pts = [];
+    for(let k=0;k<3;k++){
+      const a = a0 + k * 2.09;
+      pts.push((cx + Math.cos(a)*s).toFixed(1) + ',' + (cy + Math.sin(a)*s).toFixed(1));
+    }
+    out.push({pts: pts.join(' '), t: i < 2 ? 1 : i < 4 ? 2 : 3});
+  }
+  return out;
+}
+function crackSVG(seed){
+  let s = '<svg class="cracks" viewBox="0 0 100 100">';
+  genCracks(seed).forEach(c => {
+    s += `<path class="dk" data-t="${c.t}" d="${c.d}"/>`;
+    s += `<path class="lt" data-t="${c.t}" d="${c.d}"/>`;
+  });
+  genChips(seed).forEach(c => {
+    s += `<polygon class="chip" data-t="${c.t}" points="${c.pts}"/>`;
+  });
+  return s + '</svg>';
+}
+
+function pcHTML(zh, side, hpPct, opts){
+  opts = opts || {};
+  const dmg = hpPct <= 15 ? 4 : hpPct <= 40 ? 3 : hpPct <= 70 ? 2 : hpPct < 100 ? 1 : 0;
+  const cls = ['pc', side];
+  if(opts.sel) cls.push('sel');
+  if(opts.hover) cls.push('hoverable');
+  const seed = (zh.charCodeAt(0) || 65) * 131 + (side === 'red' ? 7 : 29);
+  return `<div class="${cls.join(' ')}" data-dmg="${dmg}" ${opts.attrs||''}>
+    ${crackSVG(seed)}
+    <span class="glyph">${zh}</span>
+  </div>`;
+}
+function hpBarHTML(pct){
+  const cls = pct>60?'hp-full':pct>30?'hp-mid':'hp-low';
+  return `<div class="hpwrap">
+    <div class="hpbar ${cls}"><i style="width:${Math.max(0,pct)}%"></i></div>
+    <div class="hptext">${Math.round(pct)}%</div>
+  </div>`;
+}
+
+/* ───────── 01 总览 ───────── */
+(function(){
+  const box = document.getElementById('roster');
+  let html = '';
+  PIECES.forEach(p => {
+    html += `<div class="rcard">
+      ${pcHTML(p.zh, 'red', 100, {hover:true})}
+      ${hpBarHTML(100)}
+      <div class="rn">${p.zh} · ${p.feat}</div>
+      <div class="rs">HP ${p.hp} · ATK ${p.atk}</div>
+    </div>`;
+  });
+  PIECES.forEach(p => {
+    const bz = BLACK_MAP[p.zh] || p.zh;
+    html += `<div class="rcard">
+      ${pcHTML(bz, 'black', 100, {hover:true})}
+      ${hpBarHTML(100)}
+      <div class="rn">${bz} · ${p.feat}</div>
+      <div class="rs">HP ${p.hp} · ATK ${p.atk}</div>
+    </div>`;
+  });
+  box.innerHTML = html;
+})();
+
+/* ───────── 02 车的小棋盘 ───────── */
+(function(){
+  const box = document.getElementById('miniChe');
+  const N = 9;
+  // 中心 (4,4) 放车；攻击范围 = 直线 3 格内（上下左右）；移动 = 直线任意格（这里展示 4 格）
+  let html = '';
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const dr = Math.abs(r-4), dc = Math.abs(c-4);
+    let cls = 'cell';
+    const straight = (dr===0 || dc===0) && (dr+dc>0);
+    if(straight && (dr+dc)<=3) cls += ' rng';
+    else if(straight && (dr+dc)<=4) cls += ' mv';
+    if(r===4&&c===4) cls += ' me';
+    if(r===2&&c===4) cls += ' foe';
+    html += `<div class="${cls}">${(r===4&&c===4)?'车':(r===2&&c===4)?'卒':''}</div>`;
+  }
+  box.innerHTML = html;
+  box.style.gridTemplateColumns = `repeat(${N},20px)`;
+})();
+
+/* ───────── 03 血量演示 ───────── */
+(function(){
+  const box = document.getElementById('hpRow');
+  const cases = [
+    {pct:100, lab:'满血 · 完好'},
+    {pct:70,  lab:'轻伤 · 细纹'},
+    {pct:45,  lab:'中伤 · 裂纹'},
+    {pct:20,  lab:'重伤 · 裂痕遍布'},
+    {pct:5,   lab:'濒死'},
+  ];
+  box.innerHTML = cases.map(c => `<div class="hpcell">
+    ${pcHTML('马','red',c.pct,{hover:true})}
+    ${hpBarHTML(c.pct)}
+    <div class="lab">${c.lab}</div>
+  </div>`).join('');
+})();
+
+/* ───────── 04 特效舞台 ───────── */
+const stage = document.getElementById('stage');
+const slotA = document.getElementById('slotA');
+const slotB = document.getElementById('slotB');
+const fxLayer = document.getElementById('fxLayer');
+
+function renderStage(hpA, hpB){
+  slotA.innerHTML = pcHTML('车','red', hpA===undefined?100:hpA, {sel:true}) + hpBarHTML(hpA===undefined?100:hpA);
+  slotB.innerHTML = pcHTML('卒','black', hpB===undefined?100:hpB, {}) + hpBarHTML(hpB===undefined?100:hpB);
+}
+renderStage();
+let hpB = 100, dead = false;
+
+function clearFx(){ fxLayer.innerHTML = ''; }
+
+function fxSelect(){
+  clearFx();
+  const a = slotA.querySelector('.pc');
+  a.classList.remove('sel'); void a.offsetWidth; a.classList.add('sel');
+}
+
+/* ── 刀光几何：采样贝塞尔，沿法线偏移出「中间粗、两端尖」的填充形状 ── */
+function _bez(t, p0, p1, p2){
+  const u = 1 - t;
+  return {x: u*u*p0.x + 2*u*t*p1.x + t*t*p2.x,
+          y: u*u*p0.y + 2*u*t*p1.y + t*t*p2.y};
+}
+function _bezTan(t, p0, p1, p2){
+  const u = 1 - t;
+  return {x: 2*u*(p1.x-p0.x) + 2*t*(p2.x-p1.x),
+          y: 2*u*(p1.y-p0.y) + 2*t*(p2.y-p1.y)};
+}
+function _slashPath(p0, p1, p2, maxW){
+  const N = 46, L = [], R = [];
+  for(let i=0;i<=N;i++){
+    const t = i / N;
+    const pt = _bez(t, p0, p1, p2), tg = _bezTan(t, p0, p1, p2);
+    const len = Math.hypot(tg.x, tg.y) || 1;
+    const nx = -tg.y/len, ny = tg.x/len;
+    const w = Math.pow(Math.sin(Math.PI*t), 0.62) * maxW + 0.45;
+    L.push([pt.x + nx*w, pt.y + ny*w]);
+    R.push([pt.x - nx*w, pt.y - ny*w]);
+  }
+  const f = a => a.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L');
+  return 'M' + f(L) + ' L' + f(R.reverse()) + ' Z';
+}
+
+function fxAttack(){
+  if(dead) fxReset();
+  clearFx();
+  const ra = slotA.getBoundingClientRect();
+  const rb = slotB.getBoundingClientRect();
+  const sr = stage.getBoundingClientRect();
+  const x1 = ra.left - sr.left + ra.width/2;
+  const y1 = ra.top  - sr.top  + ra.height/2;
+  const x2 = rb.left - sr.left + rb.width/2;
+  const y2 = rb.top  - sr.top  + rb.height/2;
+
+  const A = slotA.querySelector('.pc');
+  const B = slotB.querySelector('.pc');
+
+  // ① 起手：攻击方先微微下沉蓄力
+  A.style.transition = 'transform .09s ease-out';
+  A.style.transform = 'translate(4px,3px) scale(.94)';
+
+  setTimeout(()=>{
+    A.style.transition = 'transform .16s cubic-bezier(.34,1.6,.64,1)';
+    A.style.transform = 'translate(-3px,-4px) scale(1.06)';
+    setTimeout(()=>{ A.style.transform = ''; }, 180);
+
+    // ② 刀光
+    const P0 = {x:x1, y:y1}, P2 = {x:x2, y:y2};
+    const P1 = {x:(x1+x2)/2, y:(y1+y2)/2 - 66};
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', sr.width);
+    svg.setAttribute('height', sr.height);
+    svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:22';
+
+    const x0 = Math.min(x1,x2) - 40, wSweep = Math.abs(x2-x1) + 80;
+    const y0 = Math.min(y1,y2) - 110, hSweep = Math.abs(y2-y1) + 220;
+    defsInject(svg, `
+      <linearGradient id="slashGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%"   stop-color="#FFF6D8" stop-opacity=".06"/>
+        <stop offset="16%"  stop-color="#E4C55A" stop-opacity=".92"/>
+        <stop offset="50%"  stop-color="#FFF3C4" stop-opacity="1"/>
+        <stop offset="84%"  stop-color="#C9A227" stop-opacity=".92"/>
+        <stop offset="100%" stop-color="#FFF6D8" stop-opacity=".06"/>
+      </linearGradient>
+      <filter id="slashBlur" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="5.5"/>
+      </filter>
+      <clipPath id="slashSweep">
+        <rect x="${x0}" y="${y0}" width="0" height="${hSweep}"/>
+      </clipPath>`);
+
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('clip-path', 'url(#slashSweep)');
+    g.style.filter = 'drop-shadow(0 0 10px rgba(228,197,90,.75))';
+
+    const mk = (d, fill, op, filt) => {
+      const p = document.createElementNS(ns, 'path');
+      p.setAttribute('d', d); p.setAttribute('fill', fill);
+      if(op != null) p.setAttribute('opacity', op);
+      if(filt) p.setAttribute('filter', filt);
+      return p;
+    };
+    const glowD = _slashPath(P0, P1, P2, 19);
+    const mainD = _slashPath(P0, P1, P2, 9.5);
+    const coreD = _slashPath(P0, P1, P2, 2.8);
+    g.appendChild(mk(glowD, '#E4C55A', .45, 'url(#slashBlur)'));
+    g.appendChild(mk(mainD, 'url(#slashGrad)'));
+    g.appendChild(mk(coreD, '#FFFFFF', .95));
+    svg.appendChild(g);
+    fxLayer.appendChild(svg);
+
+    // ③ 沿弧线扫出 + 飞溅火星
+    const rect = svg.querySelector('#slashSweep rect');
+    const t0 = performance.now();
+    const DUR = 190;
+    let lastSpark = 0;
+    (function sweep(now){
+      const p = Math.min(1, (now - t0) / DUR);
+      const e = 1 - Math.pow(1 - p, 3);
+      rect.setAttribute('width', (wSweep * e).toFixed(1));
+
+      if(p - lastSpark > 0.13){
+        lastSpark = p;
+        const pt = _bez(p, P0, P1, P2), tg = _bezTan(p, P0, P1, P2);
+        const len = Math.hypot(tg.x, tg.y) || 1;
+        const nx = -tg.y/len, ny = tg.x/len;
+        for(let k=0;k<3;k++){
+          const side = k % 2 ? 1 : -1;
+          const sp = document.createElement('div');
+          const sz = 2 + Math.random()*3;
+          const ang = Math.atan2(ny*side, nx*side) + (Math.random()-.5)*1.1;
+          const dist = 14 + Math.random()*26;
+          sp.style.cssText = `position:absolute;border-radius:50%;pointer-events:none;z-index:26;
+            left:${pt.x}px;top:${pt.y}px;width:${sz}px;height:${sz}px;
+            background:radial-gradient(circle,#FFF6D8,#E4C55A 55%,rgba(201,162,39,0) 100%);
+            transition:transform .5s cubic-bezier(.2,.8,.3,1),opacity .5s ease-out;`;
+          fxLayer.appendChild(sp);
+          requestAnimationFrame(()=>{
+            sp.style.transform = `translate(${Math.cos(ang)*dist}px,${Math.sin(ang)*dist}px) scale(.2)`;
+            sp.style.opacity = '0';
+          });
+          setTimeout(()=>sp.remove(), 560);
+        }
+      }
+      if(p < 1) requestAnimationFrame(sweep);
+      else setTimeout(()=>{
+        g.style.transition = 'opacity .3s ease';
+        g.style.opacity = '0';
+        setTimeout(()=>svg.remove(), 320);
+      }, 90);
+    })(t0);
+
+    // ④ 命中爆点
+    setTimeout(()=>{
+      const burst = document.createElement('div');
+      burst.style.cssText = `position:absolute;left:${x2}px;top:${y2}px;width:0;height:0;z-index:24;pointer-events:none;`;
+      burst.innerHTML = `
+        <div style="position:absolute;left:-56px;top:-56px;width:112px;height:112px;border-radius:50%;
+          background:radial-gradient(circle,rgba(255,243,196,.95) 0%,rgba(228,197,90,.55) 32%,rgba(201,162,39,0) 70%);
+          animation:burstPop .42s cubic-bezier(.15,.8,.3,1) forwards;"></div>
+        <div style="position:absolute;left:-34px;top:-34px;width:68px;height:68px;border-radius:50%;
+          border:2.5px solid rgba(255,243,196,.9);animation:ringOut .5s cubic-bezier(.15,.8,.3,1) forwards;"></div>`;
+      for(let i=0;i<7;i++){
+        const a = (i/7)*Math.PI*2 + Math.random()*0.4;
+        const d = 26 + Math.random()*24;
+        burst.innerHTML += `<div style="position:absolute;left:-2px;top:-2px;width:4px;height:4px;border-radius:50%;
+          background:#FFF6D8;box-shadow:0 0 6px rgba(255,230,140,.95);
+          animation:spikeOut .46s cubic-bezier(.15,.85,.3,1) forwards;
+          --tx:${(Math.cos(a)*d).toFixed(1)}px;--ty:${(Math.sin(a)*d).toFixed(1)}px;"></div>`;
+      }
+      fxLayer.appendChild(burst);
+      setTimeout(()=>burst.remove(), 620);
+
+      // ⑤ 受击反馈
+      B.classList.add('hit');
+      B.classList.add('cracking');
+      stage.classList.add('shake');
+      setTimeout(()=>{ stage.classList.remove('shake'); B.classList.remove('hit'); }, 340);
+      setTimeout(()=>B.classList.remove('cracking'), 500);
+
+      const dmg = 62;
+      hpB = Math.max(0, hpB - dmg);
+      const n = document.createElement('div');
+      n.className = 'dmgnum'; n.textContent = '-' + dmg;
+      n.style.left = x2 + 'px'; n.style.top = (y2 - 22) + 'px';
+      fxLayer.appendChild(n);
+      setTimeout(()=>n.remove(), 1100);
+
+      updateHpB(hpB, dmg);
+      setTimeout(()=>{ if(hpB <= 0 && !dead){ dead = true; fxKill(); } }, 430);
+    }, 250);
+  }, 95);
+}
+
+function defsInject(svg, html){
+  const ns = 'http://www.w3.org/2000/svg';
+  const defs = document.createElementNS(ns, 'defs');
+  defs.innerHTML = html;
+  svg.appendChild(defs);
+}
+
+function updateHpB(pct, lostPct){
+  const wrap = slotB.querySelector('.hpwrap');
+  const bar = wrap.querySelector('.hpbar');
+  const fill = bar.querySelector('i');
+  const oldPct = parseFloat(fill.style.width) || 100;
+  const cls = pct>60?'hp-full':pct>30?'hp-mid':'hp-low';
+  bar.className = 'hpbar ' + cls;
+  // 残影
+  const ghost = document.createElement('div');
+  ghost.className = 'hpghost';
+  ghost.style.width = oldPct + '%';
+  ghost.style.left = '0';
+  bar.appendChild(ghost);
+  requestAnimationFrame(()=>{
+    fill.style.width = pct + '%';
+    ghost.style.transition = 'width .6s ease .15s, opacity .6s ease .15s';
+    ghost.style.width = pct + '%';
+    ghost.style.opacity = '0';
+  });
+  wrap.querySelector('.hptext').textContent = Math.round(pct) + '%';
+  setTimeout(()=>ghost.remove(), 900);
+}
+
+function fxKill(){
+  clearFx();
+  const b = slotB.querySelector('.pc');
+  const r = b.getBoundingClientRect();
+  const sr = stage.getBoundingClientRect();
+  const cx = r.left - sr.left + r.width/2;
+  const cy = r.top  - sr.top  + r.height/2;
+  const bg = getComputedStyle(b).backgroundImage;
+  const size = r.width;
+
+  // 8 块扇形碎片
+  for(let i=0;i<8;i++){
+    const a0 = i*45, a1 = (i+1)*45;
+    const pts = ['50% 50%'];
+    for(let a=a0;a<=a1;a+=9){
+      const rad = a*Math.PI/180;
+      pts.push(`${50+50*Math.cos(rad)}% ${50+50*Math.sin(rad)}%`);
+    }
+    const f = document.createElement('div');
+    f.className = 'frag';
+    f.style.width = size+'px'; f.style.height = size+'px';
+    f.style.left = (cx - size/2)+'px'; f.style.top = (cy - size/2)+'px';
+    f.style.background = bg;
+    f.style.clipPath = `polygon(${pts.join(',')})`;
+    f.style.boxShadow = 'inset 0 0 0 2px rgba(201,162,39,.9)';
+    const ang = (a0+a1)/2 * Math.PI/180;
+    const dist = 70 + Math.random()*55;
+    const tx = Math.cos(ang)*dist, ty = Math.sin(ang)*dist - 26;
+    f.style.transition = 'transform .62s cubic-bezier(.2,.7,.35,1), opacity .62s ease-out';
+    fxLayer.appendChild(f);
+    requestAnimationFrame(()=>{
+      f.style.transform = `translate(${tx}px,${ty}px) rotate(${(Math.random()*2-1)*180}deg) scale(.72)`;
+      f.style.opacity = '0';
+    });
+    setTimeout(()=>f.remove(), 700);
+  }
+
+  b.classList.add('ghost');
+  // 复活提示
+  setTimeout(()=>{
+    const t = document.createElement('div');
+    t.className = 'dmgnum';
+    t.style.cssText = 'font-size:19px;color:#FFD9D9;left:'+cx+'px;top:'+(cy-30)+'px;';
+    t.textContent = '棋子阵亡';
+    fxLayer.appendChild(t);
+  }, 180);
+}
+
+function fxMove(){
+  clearFx();
+  const a = slotA.querySelector('.pc');
+  const r = a.getBoundingClientRect();
+  const sr = stage.getBoundingClientRect();
+  const cx = r.left - sr.left + r.width/2;
+  const cy = r.top  - sr.top  + r.height/2;
+  const dx = 92, dy = -30;
+
+  // 拖尾
+  for(let i=1;i<=7;i++){
+    const t = document.createElement('div');
+    t.className = 'trail';
+    const sz = r.width * (1 - i*0.08);
+    t.style.width = sz+'px'; t.style.height = sz+'px';
+    t.style.left = (cx + dx*(i/8) - sz/2)+'px';
+    t.style.top  = (cy + dy*(i/8) - sz/2)+'px';
+    t.style.background = 'radial-gradient(circle at 40% 35%, rgba(208,72,63,.85), rgba(110,15,15,.5))';
+    t.style.animationDelay = (i*0.028)+'s';
+    fxLayer.appendChild(t);
+    setTimeout(()=>t.remove(), 900);
+  }
+  a.style.transition = 'transform .46s cubic-bezier(.34,1.4,.64,1)';
+  a.style.transform = `translate(${dx}px,${dy}px)`;
+  setTimeout(()=>{
+    a.style.transform = '';
+  }, 950);
+}
+
+function fxHeal(){
+  clearFx();
+  const b = slotB.querySelector('.pc');
+  if(dead){ b.classList.remove('ghost'); dead = false; hpB = 0; }
+  const r = b.getBoundingClientRect();
+  const sr = stage.getBoundingClientRect();
+  const cx = r.left - sr.left + r.width/2;
+  const cy = r.top  - sr.top  + r.height/2;
+  const add = 28;
+  hpB = Math.min(100, hpB + add);
+  b.classList.add('healing');
+  const n = document.createElement('div');
+  n.className = 'healnum'; n.textContent = '+' + add;
+  n.style.left = cx+'px'; n.style.top = (cy-20)+'px';
+  fxLayer.appendChild(n);
+  updateHpB(hpB, 0);
+  setTimeout(()=>b.classList.remove('healing'), 1000);
+}
+
+function fxReset(){
+  clearFx(); dead = false; hpB = 100;
+  renderStage(100,100);
+  const a = slotA.querySelector('.pc');
+  a.style.transition = ''; a.style.transform = '';
+}
+
+/* ───────── 05 棋盘 ───────── */
+const BOARD = [
+  [null,{z:'马',s:'black'},null,{z:'象',s:'black'},null,null,null,null,null],
+  [null,null,null,null,null,null,null,null,null],
+  [null,null,{z:'炮',s:'black'},null,null,null,{z:'卒',s:'black'},null,null],
+  [{z:'卒',s:'black'},null,null,null,null,null,null,null,{z:'卒',s:'black'}],
+  [null,null,null,null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null,null],
+  [{z:'兵',s:'red'},null,null,null,null,null,null,null,{z:'兵',s:'red'}],
+  [null,null,{z:'炮',s:'red'},null,null,null,{z:'兵',s:'red'},null,null],
+  [null,null,null,null,null,null,null,null,null],
+  [null,{z:'马',s:'red'},null,{z:'相',s:'red'},null,null,null,null,null],
+];
+/* ───────── 各棋子的移动 / 攻击范围 ─────────
+   七种棋子走法完全不同，必须逐个实现，不能共用一套。
+   行号 0 在最上（黑方底线），9 在最下（红方底线）；河界在 4/5 行之间。 */
+function rangeFor(piece, side, r, c, boardEl){
+  const red = side === 'red';
+  const key = (a, b) => a + ',' + b;
+  const ok = (a, b) => a >= 0 && a <= 9 && b >= 0 && b <= 8;
+  const inPalace = (a, b) => b >= 3 && b <= 5 && (red ? a >= 7 : a <= 2);
+  const pieceAt = (a, b) => {
+    const cell = boardEl.querySelector(`.bcell[data-r="${a}"][data-c="${b}"]`);
+    return cell ? cell.querySelector('.pc') : null;
+  };
+  const mv = new Set(), rng = new Set();
+  const addMv  = (a, b) => { if(ok(a, b)) mv.add(key(a, b)); };
+  const addRng = (a, b) => { if(ok(a, b)) rng.add(key(a, b)); };
+  const fwd = red ? -1 : 1;
+  const DIR4 = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  if(piece === '帅' || piece === '将'){
+    // 九宫内横竖斜各 1 格
+    [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
+      .forEach(([dr,dc]) => { const a=r+dr, b=c+dc; if(inPalace(a,b)) addMv(a,b); });
+
+  } else if(piece === '仕' || piece === '士'){
+    // 九宫内斜 1 格
+    [[-1,-1],[-1,1],[1,-1],[1,1]]
+      .forEach(([dr,dc]) => { const a=r+dr, b=c+dc; if(inPalace(a,b)) addMv(a,b); });
+
+  } else if(piece === '相' || piece === '象'){
+    // 田字，且不能过河
+    [[-2,-2],[-2,2],[2,-2],[2,2]].forEach(([dr,dc]) => {
+      const a = r+dr, b = c+dc;
+      if(red ? a >= 5 : a <= 4) addMv(a, b);
+    });
+
+  } else if(piece === '马'){
+    // 日字（本作不蹩马腿）
+    [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]
+      .forEach(([dr,dc]) => addMv(r+dr, c+dc));
+
+  } else if(piece === '车'){
+    // 移动：直线任意格，遇子停；攻击：直线 3 格内
+    DIR4.forEach(([dr,dc]) => {
+      for(let k=1;k<10;k++){
+        const a = r+dr*k, b = c+dc*k;
+        if(!ok(a,b)) break;
+        if(k <= 3) addRng(a, b);
+        if(pieceAt(a,b)) break;
+        addMv(a, b);
+      }
+    });
+
+  } else if(piece === '炮'){
+    // 移动：直线遇子停；攻击：必须隔一个子，打炮架后的第一个子
+    DIR4.forEach(([dr,dc]) => {
+      let screen = false;
+      for(let k=1;k<10;k++){
+        const a = r+dr*k, b = c+dc*k;
+        if(!ok(a,b)) break;
+        const occ = !!pieceAt(a,b);
+        if(!screen){
+          if(occ) screen = true;
+          else addMv(a, b);
+        } else if(occ){
+          addRng(a, b); break;
+        }
+      }
+    });
+
+  } else if(piece === '兵' || piece === '卒'){
+    // 未过河：只能正前 1 格；过河后：前 / 左 / 右
+    addMv(r+fwd, c);
+    if(red ? r <= 4 : r >= 5){ addMv(r, c-1); addMv(r, c+1); }
+  }
+
+  // 除车、炮外，攻击范围 = 移动范围
+  if(piece !== '车' && piece !== '炮') mv.forEach(k => rng.add(k));
+
+  // 己方棋子占住的格既不能走也不能打
+  [mv, rng].forEach(set => {
+    Array.from(set).forEach(k => {
+      const ab = k.split(',');
+      const p = pieceAt(parseInt(ab[0],10), parseInt(ab[1],10));
+      if(p && p.classList.contains(side)) set.delete(k);
+    });
+  });
+  return {mv, rng};
+}
+
+(function(){
+  const board = document.getElementById('board');
+  let html = '';
+  BOARD.forEach((row,r)=>{
+    row.forEach((cell,c)=>{
+      let cls = 'bcell';
+      html += `<div class="${cls}" data-r="${r}" data-c="${c}">`;
+      if(cell){
+        const bseed = (cell.z.charCodeAt(0) || 65) * 131 + (cell.s === 'red' ? 7 : 29);
+        html += `<div class="pc ${cell.s}" data-dmg="0" data-r="${r}" data-c="${c}" style="cursor:pointer">
+          ${crackSVG(bseed)}
+          <span class="glyph">${cell.z}</span>
+        </div>`;
+      }
+      html += '</div>';
+    });
+  });
+  // 九宫（棋盘 padding 是 16px 18px，所以格子起点在 18,16）
+  html += `<div class="palace" style="left:calc(18px + var(--cw)*3);top:calc(16px + var(--ch)*7)"></div>`;
+  html += `<div class="palace" style="left:calc(18px + var(--cw)*3);top:16px"></div>`;
+  // 河界
+  html += `<div class="river"><span>楚 河</span><span>汉 界</span></div>`;
+  board.innerHTML = html;
+
+  board.addEventListener('click', (e)=>{
+    const p = e.target.closest('.pc');
+    if(!p) return;
+    board.querySelectorAll('.hl').forEach(d => d.remove());
+    board.querySelectorAll('.pc').forEach(x => x.classList.remove('sel'));
+    p.classList.add('sel');
+
+    const r = parseInt(p.dataset.r, 10), c = parseInt(p.dataset.c, 10);
+    const side = p.classList.contains('red') ? 'red' : 'black';
+    const piece = p.querySelector('.glyph').textContent.trim();
+    const res = rangeFor(piece, side, r, c, board);
+    const mv = res.mv, rng = res.rng;
+
+    const all = new Set();
+    mv.forEach(k => all.add(k));
+    rng.forEach(k => all.add(k));
+
+    all.forEach(k => {
+      const ab = k.split(',');
+      const a = parseInt(ab[0], 10), b = parseInt(ab[1], 10);
+      const cell = board.querySelector(`.bcell[data-r="${a}"][data-c="${b}"]`);
+      if(!cell) return;
+      const inMv = mv.has(k), inRng = rng.has(k);
+      const foe = cell.querySelector('.pc');
+      const d = document.createElement('div');
+      d.className = 'hl ' + (inMv && inRng ? 'both' : inMv ? 'mv' : 'rng');
+      if(foe && inRng) d.innerHTML = '<span class="foemark"></span>';
+      cell.appendChild(d);
+    });
+
+    // 底部提示
+    const tip = document.getElementById('boardTip');
+    if(tip){
+      const names = {mv:'玉绿=可移动', rng:'鎏金斜纹=可攻击', both:'双色=可走也可打'};
+      const parts = [];
+      if(mv.size) parts.push('可移动 ' + mv.size + ' 格');
+      if(rng.size) parts.push('可攻击 ' + rng.size + ' 格');
+      tip.innerHTML = `<b>${piece}</b> · ` + (parts.join(' · ') || '当前没有可行动的位置') +
+        `<span style="opacity:.7">　（玉绿实心=可走，鎏金斜纹=可打，朱红圈=该格有敌人）</span>`;
+    }
+  });
+})();
+
+/* ───────── 06 配色板 ───────── */
+(function(){
+  const cols = [
+    ['朱红','#8B1A1A','红方主色'],
+    ['朱红·亮','#C0392B','高光'],
+    ['墨绿','#1B3A2F','黑方主色'],
+    ['墨绿·亮','#2E6151','高光'],
+    ['鎏金','#C9A227','选中 / 高亮'],
+    ['鎏金·亮','#E4C55A','光晕'],
+    ['木色·浅','#E0C49B','棋盘'],
+    ['木色·深','#B08F60','棋盘暗部'],
+    ['宣纸','#F5F0E6','页面底色'],
+    ['玉绿','#4A8B5C','满血'],
+    ['赭金','#C9A227','半血'],
+    ['赤红','#A52222','残血'],
+  ];
+  document.getElementById('palette').innerHTML = cols.map(([nm,hx,use])=>`
+    <div class="sw">
+      <div class="chip" style="background:${hx}"></div>
+      <div class="meta"><div class="nm">${nm}</div><div class="hx">${hx} · ${use}</div></div>
+    </div>`).join('');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} 排行榜 - MONO 社区{% endblock %}
+{% set active = 'ranking' %}
+
+{% block content %}
+<style>
+  .gr-wrap{max-width:680px;margin:0 auto;}
+  .gr-hero{
+    border:1px solid var(--line);border-radius:16px;padding:24px 30px;
+    background:linear-gradient(160deg,#fafafa 0%,#ffffff 60%);margin-bottom:22px;
+  }
+  .gr-hero h1{font-size:22px;margin:0 0 4px;font-weight:700;}
+  .gr-hero p{margin:0;font-size:12.5px;color:var(--fg-2);}
+  .gr-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);}
+  .gr-row{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .gr-row:last-child{border-bottom:0;}
+  .gr-row.me{background:rgba(201,162,39,.08);}
+  .gr-no{width:34px;flex:none;font-weight:800;font-variant-numeric:tabular-nums;font-size:15px;color:var(--muted);}
+  .gr-no.top1{color:#d4a017;}.gr-no.top2{color:#9aa0a6;}.gr-no.top3{color:#b08d57;}
+  .gr-name{font-weight:600;}
+  .gr-v{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums;}
+  .gr-empty{padding:30px;text-align:center;color:var(--muted);font-size:13px;}
+  .gr-rank-me{display:flex;justify:space-between;align-items:center;margin:0 0 14px;
+    border:1px dashed rgba(201,162,39,.5);border-radius:12px;padding:10px 16px;font-size:12.5px;color:var(--fg-2);}
+  .gr-rank-me b{color:#c9a227;font-variant-numeric:tabular-nums;}
+</style>
+
+<div class="gr-wrap">
+  <div class="gr-hero">
+    <h1>{% if kind == 'time' %}⏱️{% else %}🎮{% endif %} {{ name }} 排行榜</h1>
+    <p>{% if kind == 'time' %}按用时从少到多排序{% else %}按最高分从高到低排序{% endif %} · <a href="{{ url_for('ranking_page') }}">返回总榜</a></p>
+  </div>
+
+  {% if my_rank %}
+  <div class="gr-rank-me">
+    <span>我的排名</span><b>第 {{ my_rank }} 名</b>
+  </div>
+  {% endif %}
+
+  <div class="gr-card">
+    {% for r in rows %}
+    <div class="gr-row {% if me and r.username == me.username %}me{% endif %}">
+      <div class="gr-no {% if loop.index <= 3 %}top{{ loop.index }}{% endif %}">
+        {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}</div>
+      <div class="gr-name">{{ r.username }}</div>
+      <div class="gr-v">{{ r.v }}</div>
+    </div>
+    {% else %}
+    <div class="gr-empty">这个游戏还没有人上榜</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

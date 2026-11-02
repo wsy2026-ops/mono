@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}国际象棋大厅 - MONO 社区{% endblock %}
+{% set active = 'games' %}
+{% block content %}
+<style>
+  .cs-sec{margin-bottom:22px;}
+  .cs-sec h3{font-size:16px;font-weight:800;margin:0 0 10px;}
+  .cs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .cs-room{border:1px solid var(--line,#e6e6e6);border-radius:14px;padding:14px 16px;background:#fff;transition:all .2s;display:flex;flex-direction:column;gap:6px;}
+  .cs-room:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.08);}
+  .cs-room .nm{font-size:15px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .cs-tag{padding:1px 8px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;}
+  .cs-tag.pvp{background:#eef2ff;color:#4f46e5;}
+  .cs-tag.ai{background:#111;color:#fff;}
+  .cs-tag.pub{background:#d1fae5;color:#10b981;}
+  .cs-tag.w{background:#fef3c7;color:#d97706;}
+  .cs-room .meta{font-size:12px;color:#888;display:flex;gap:10px;flex-wrap:wrap;}
+  .cs-room .act{display:flex;gap:6px;margin-top:6px;}
+  .cs-room .act a,.cs-room .act button{flex:1;padding:7px 0;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;border:1px solid #111;background:#111;color:#fff;}
+  .cs-room .act button.del{background:#fff;color:#dc2626;border-color:#f3c0c0;}
+  .cs-create{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .cs-create label{font-size:12px;color:#888;display:block;margin-bottom:4px;}
+  .cs-create input,.cs-create select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box;background:#fff;}
+  .cs-create .col{min-width:170px;flex:1;}
+  .cs-empty{text-align:center;color:#999;padding:24px 10px;font-size:13px;}
+  .cs-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+  .cs-head h2{margin:0;font-size:22px;font-weight:800;}
+  .cs-head .btn{padding:8px 14px;border-radius:9px;border:1px solid #111;background:#111;color:#fff;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;}
+  .cs-note{background:#fdf9ec;border:1px dashed #e3d7a8;border-radius:10px;padding:10px 14px;font-size:12.5px;color:#7a6a33;margin-bottom:18px;line-height:1.8;}
+  .cs-note a{color:#4f46e5;font-weight:600;}
+</style>
+
+<div class="cs-head">
+  <div>
+    <h2>♞ 国际象棋</h2>
+    <p style="margin:4px 0 0;color:#888;font-size:13px;">标准 8×8 · 白先黑后</p>
+  </div>
+</div>
+
+
+{% set mm_game = 'chess' %}
+{% set mm_room = '/game/chess/' %}
+{% set mm_has_ai = true %}
+{% include "_mm_panel.html" %}
+{% include "_board_lb.html" %}
+
+
+<script src="{{ cdn_url('js/socket.io.min.js') }}"></script>
+<script>
+async function joinR(rid){
+  const r = await fetch('/api/chess/' + rid + '/join', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.href = '/game/chess/' + rid;
+  else alert(j.msg || __('加入失败'));
+}
+async function randomJoin(){
+  const r = await fetch('/api/chess/random-join', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.href = '/game/chess/' + j.rid;
+  else alert(j.msg || __('暂无可加入房间'));
+}
+async function delR(rid){
+  if (!confirm(__('确定删除该房间？'))) return;
+  const r = await fetch('/api/chess/' + rid + '/delete', {method:'POST'});
+  const j = await r.json();
+  if (j.ok) location.reload(); else alert(j.msg || __('删除失败'));
+}
+(function(){
+  if (typeof io === 'undefined') return;
+  try{
+    const sio = window.__monoSio();
+    window.__monoSioReady(() => sio.emit('join_chess_lobby'));
+    sio.on('cs_lobby_update', () => location.reload());
+  }catch(e){}
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,243 @@
+/* MONO 特效系统
+   全部特效由 body 上的 class 控制，可在设置里单独关闭。
+   fx-off        → 全部关闭
+   fx-no-click   → 关闭点击/悬停类
+   fx-no-page    → 关闭页面切换
+   fx-no-ko      → 关闭象棋绝杀
+*/
+
+:root{
+  --fx-ease: cubic-bezier(.22,.61,.36,1);
+  --fx-pop: cubic-bezier(.34,1.56,.64,1);
+}
+
+/* ---------- 页面切换：淡入上移 ---------- */
+@keyframes fxPageIn{
+  from{opacity:0;transform:translateY(10px);}
+  to{opacity:1;transform:translateY(0);}
+}
+body:not(.fx-no-page) .fx-page{
+  animation:fxPageIn .38s var(--fx-ease) both;
+}
+
+/* ---------- 卡片：悬停抬升 ---------- */
+body:not(.fx-no-click) .card,
+body:not(.fx-no-click) .fx-lift{
+  transition:box-shadow .18s var(--fx-ease);
+}
+body:not(.fx-no-click) .card:hover,
+body:not(.fx-no-click) .fx-lift:hover{
+  box-shadow:0 6px 20px var(--shadow);
+}
+
+/* ---------- 按钮：按下回弹 ---------- */
+body:not(.fx-no-click) .btn,
+body:not(.fx-no-click) button.btn,
+body:not(.fx-no-click) .fx-press{
+  transition:transform .08s var(--fx-ease), filter .12s;
+}
+body:not(.fx-no-click) .btn:active,
+body:not(.fx-no-click) .fx-press:active{
+  transform:scale(.985);
+}
+
+/* ---------- 点击涟漪 ---------- */
+.fx-ripple{
+  position:absolute;border-radius:50%;
+  pointer-events:none !important;
+  background:currentColor;opacity:.22;
+  transform:scale(0);
+  animation:fxRipple .55s var(--fx-ease) forwards;
+}
+@keyframes fxRipple{
+  to{transform:scale(2.6);opacity:0;}
+}
+.fx-ripple-host{position:relative;overflow:hidden;}
+
+/* ---------- 悬停微光扫过 ---------- */
+.fx-sheen{position:relative;overflow:hidden;}
+.fx-sheen::after{
+  content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.22),transparent);
+  pointer-events:none !important;opacity:0;
+}
+body:not(.fx-no-click) .fx-sheen:hover::after{
+  animation:fxSheen .7s var(--fx-ease);
+}
+@keyframes fxSheen{
+  0%{left:-60%;opacity:1;}
+  100%{left:110%;opacity:1;}
+}
+
+/* ---------- 加载：旋转 + 脉冲 ---------- */
+.fx-spin{
+  width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--line);border-top-color:var(--fg);
+  animation:fxSpin .7s linear infinite;display:inline-block;
+}
+@keyframes fxSpin{to{transform:rotate(360deg);}}
+
+.fx-pulse{animation:fxPulse 1.6s var(--fx-ease) infinite;}
+@keyframes fxPulse{
+  0%,100%{opacity:1;}
+  50%{opacity:.45;}
+}
+
+/* ---------- 骨架屏 ---------- */
+.fx-skeleton{
+  background:linear-gradient(90deg,var(--soft) 25%,var(--bg-elev) 50%,var(--soft) 75%);
+  background-size:200% 100%;
+  animation:fxSkel 1.3s linear infinite;
+  border-radius:6px;color:transparent;
+}
+@keyframes fxSkel{
+  to{background-position:-200% 0;}
+}
+
+/* ---------- 数字滚动 ---------- */
+@keyframes fxCount{
+  from{opacity:0;transform:translateY(6px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.fx-count{animation:fxCount .4s var(--fx-ease) both;}
+
+/* ---------- 提示条滑入 ---------- */
+@keyframes fxToastIn{
+  from{opacity:0;transform:translateY(12px) scale(.96);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+.fx-toast{animation:fxToastIn .3s var(--fx-pop) both;}
+
+/* =====================================================
+   象棋绝杀
+   ===================================================== */
+
+/* 棋盘定格：变暗 + 轻微去色 */
+body:not(.fx-no-ko) .xq-ko .xq-board-wrap{
+  filter:brightness(.55) saturate(.5) blur(.6px);
+  transition:filter .5s var(--fx-ease);
+}
+.xq-board-wrap{transition:filter .5s var(--fx-ease);}
+
+/* 屏幕震动 */
+@keyframes fxShake{
+  0%,100%{transform:translate(0,0);}
+  12%{transform:translate(-4px,2px);}
+  25%{transform:translate(4px,-2px);}
+  37%{transform:translate(-3px,-2px);}
+  50%{transform:translate(3px,2px);}
+  62%{transform:translate(-2px,1px);}
+  75%{transform:translate(2px,-1px);}
+  87%{transform:translate(-1px,1px);}
+}
+body:not(.fx-no-ko) .xq-ko-shake{animation:fxShake .6s var(--fx-ease);}
+
+/* 金色冲击波：从将/帅位置扩散 */
+.fx-ko-ring{
+  position:absolute;border-radius:50%;pointer-events:none;z-index:60;
+  border:3px solid #f5c26b;
+  box-shadow:0 0 22px rgba(245,194,107,.75), inset 0 0 18px rgba(245,194,107,.45);
+  transform:scale(.1);opacity:1;
+  animation:fxKoRing 1.05s var(--fx-ease) forwards;
+}
+@keyframes fxKoRing{
+  0%{transform:scale(.1);opacity:1;border-width:5px;}
+  70%{opacity:.85;}
+  100%{transform:scale(9);opacity:0;border-width:1px;}
+}
+
+/* 第二圈（延迟，做出层次） */
+.fx-ko-ring.d2{animation-delay:.16s;border-color:#fff3d4;}
+
+/* 粒子 */
+.fx-ko-particle{
+  position:absolute;width:7px;height:7px;border-radius:50%;
+  pointer-events:none;z-index:61;
+  background:#f5c26b;
+  box-shadow:0 0 8px rgba(245,194,107,.9);
+}
+@keyframes fxKoP{
+  0%{transform:translate(0,0) scale(1);opacity:1;}
+  100%{transform:translate(var(--dx),var(--dy)) scale(.15);opacity:0;}
+}
+
+/* 中央大字 */
+.fx-ko-word{
+  position:fixed;left:50%;top:50%;z-index:80;
+  transform:translate(-50%,-50%) scale(.4);
+  font-size:clamp(52px,15vw,110px);font-weight:900;letter-spacing:.14em;
+  max-width:94vw;text-align:center;
+  color:#f5c26b;pointer-events:none;white-space:nowrap;
+  text-shadow:0 0 26px rgba(245,194,107,.85), 0 4px 22px rgba(0,0,0,.55);
+  opacity:0;
+  animation:fxKoWord 1.7s var(--fx-pop) forwards;
+}
+.fx-ko-word[data-n="3"]{font-size:clamp(44px,12.5vw,92px);letter-spacing:.1em;}
+.fx-ko-word[data-n="4"]{font-size:clamp(38px,11vw,80px);letter-spacing:.08em;}
+.fx-ko-word[data-n="5"]{font-size:clamp(32px,9vw,68px);letter-spacing:.06em;}
+
+@keyframes fxKoWord{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-5deg);}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1.12) rotate(1.5deg);}
+  30%{transform:translate(-50%,-50%) scale(1) rotate(0deg);}
+  78%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.06);}
+}
+
+/* 全屏金光闪一下 */
+.fx-ko-flash{
+  position:fixed;inset:0;z-index:70;pointer-events:none;
+  background:radial-gradient(circle at 50% 50%, rgba(245,194,107,.42), transparent 62%);
+  animation:fxKoFlash .7s var(--fx-ease) forwards;
+}
+@keyframes fxKoFlash{
+  0%{opacity:0;}
+  16%{opacity:1;}
+  100%{opacity:0;}
+}
+
+/* 暗角 */
+.fx-ko-vignette{
+  position:fixed;inset:0;z-index:55;pointer-events:none;
+  background:radial-gradient(circle at 50% 50%, transparent 34%, rgba(0,0,0,.62) 100%);
+  animation:fxKoVig 2.1s var(--fx-ease) forwards;
+}
+@keyframes fxKoVig{
+  0%{opacity:0;}
+  22%{opacity:1;}
+  80%{opacity:1;}
+  100%{opacity:0;}
+}
+
+/* 被将死那一方：将/帅格高亮 */
+.fx-ko-target{
+  animation:fxKoTarget 1.5s var(--fx-ease) 2;
+}
+@keyframes fxKoTarget{
+  0%,100%{box-shadow:none;}
+  50%{box-shadow:0 0 0 3px #f5c26b, 0 0 22px rgba(245,194,107,.9);}
+}
+
+/* 将军（非绝杀）时的轻提示 */
+body:not(.fx-no-ko) .fx-check-flash{
+  animation:fxCheckFlash .5s var(--fx-ease) 2;
+}
+@keyframes fxCheckFlash{
+  0%,100%{box-shadow:none;}
+  50%{box-shadow:inset 0 0 0 3px rgba(220,38,38,.6);}
+}
+
+/* ---------- 无障碍：系统开启「减少动态效果」时全部关掉 ---------- */
+@media (prefers-reduced-motion: reduce){
+  .fx-page,
+  body:not(.fx-no-page) .fx-page,
+  .fx-ko-word,.fx-ko-ring,.fx-ko-particle,
+  .fx-ko-flash,.fx-ko-vignette,.fx-spin,.fx-pulse,.fx-skeleton,
+  .fx-count,.fx-toast,.fx-check-flash,.fx-ko-target{
+    animation:none !important;
+  }
+  .fx-ko-word{opacity:1;transform:translate(-50%,-50%);}
+  .fx-ko-ring,.fx-ko-particle,.fx-ko-flash,.fx-ko-vignette{display:none !important;}
+  body:not(.fx-no-click) .card:hover,
+  body:not(.fx-no-click) .fx-lift:hover{transform:none;}
+}

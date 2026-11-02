@@ -1,0 +1,38 @@
+{
+  "name": "MONO 社区",
+  "short_name": "MONO",
+  "description": "局域网社区平台 · 群聊 / 论坛 / 动态 / 游戏 / AI 助手",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "lang": "zh-CN",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icon-192-v1.6.6.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-512-v1.6.6.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-512-v1.6.6.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

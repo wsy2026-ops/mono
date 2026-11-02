@@ -1,0 +1,157 @@
+{% extends "_admin_base.html" %}
+{% block title %}AI 用量明细 · 管理后台{% endblock %}
+{% block admin_icon %}🤖{% endblock %}
+{% block admin_heading %}AI 用量明细{% endblock %}
+{% block admin_desc %}对话助手 + 代码调试的每一次调用 · 谁、什么时候、问了什么、成没成功、花了多少 token{% endblock %}
+
+{% block admin_content %}
+<style>
+  .ai-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:12px 14px;border-bottom:1px solid var(--line);background:var(--soft);}
+  .ai-bar input,.ai-bar select{width:auto;min-width:96px;padding:6px 9px;font-size:13px;}
+  .ai-bar .sp{flex:1;}
+  .ai-cards{display:flex;gap:10px;flex-wrap:wrap;padding:14px;}
+  .ai-card{flex:1;min-width:118px;border:1px solid var(--line);border-radius:11px;
+    padding:11px 13px;background:var(--card);}
+  .ai-card b{display:block;font-size:21px;line-height:1.25;color:var(--fg);}
+  .ai-card span{font-size:11.5px;color:var(--muted);}
+  .ai-card .bad{color:#b42318;}
+  .ai-card .good{color:#067647;}
+  .ai-wrap{padding:0 14px 16px;overflow-x:auto;}
+  .ai-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+  .ai-tbl th,.ai-tbl td{padding:8px 9px;border-bottom:1px solid var(--line);
+    text-align:left;vertical-align:top;white-space:nowrap;}
+  .ai-tbl th{font-size:12px;color:var(--muted);font-weight:600;background:var(--soft);}
+  .ai-tbl tr:hover td{background:var(--soft);}
+  .ai-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .ai-tbl .q{max-width:330px;white-space:normal;word-break:break-word;line-height:1.5;}
+  .ai-tbl .q details summary{cursor:pointer;color:var(--fg-2);}
+  .ai-tbl .q details pre{white-space:pre-wrap;word-break:break-word;
+    margin:6px 0 0;padding:8px 10px;background:var(--soft);border-radius:8px;
+    font-size:12px;max-height:230px;overflow:auto;}
+  .ai-pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11.5px;
+    border:1px solid var(--line);}
+  .ai-pill.ok{color:#067647;border-color:#a6f4c5;background:#ecfdf3;}
+  .ai-pill.bad{color:#b42318;border-color:#fecdca;background:#fef3f2;}
+  .ai-pill.m{color:var(--fg-2);}
+  .ai-sub{padding:0 14px;}
+  .ai-sub h4{margin:16px 0 8px;font-size:13.5px;color:var(--fg-2);}
+  .ai-pager{display:flex;gap:6px;align-items:center;justify-content:center;padding:14px;}
+  .ai-pager a,.ai-pager span{padding:5px 11px;border:1px solid var(--line);
+    border-radius:8px;font-size:13px;text-decoration:none;color:var(--fg-2);}
+  .ai-pager a:hover{background:var(--soft);}
+  .ai-pager .cur{background:var(--fg);color:var(--bg);border-color:var(--fg);}
+  .ai-empty{padding:26px 14px;text-align:center;color:var(--muted);font-size:13.5px;}
+</style>
+
+<form class="ai-bar" method="get">
+  <span class="muted" style="font-size:12.5px;">筛选</span>
+  <input type="text" name="u" value="{{ f_user }}" placeholder="用户名 / uid">
+  <select name="m">
+    <option value="" {% if not f_module %}selected{% endif %}>全部模块</option>
+    <option value="chat" {% if f_module=='chat' %}selected{% endif %}>对话助手</option>
+    <option value="debug" {% if f_module=='debug' %}selected{% endif %}>代码调试</option>
+  </select>
+  <select name="ok">
+    <option value="" {% if f_ok=='' %}selected{% endif %}>全部结果</option>
+    <option value="1" {% if f_ok=='1' %}selected{% endif %}>仅成功</option>
+    <option value="0" {% if f_ok=='0' %}selected{% endif %}>仅失败</option>
+  </select>
+  <button class="btn xs" type="submit">查询</button>
+  <a class="btn xs ghost" href="{{ url_for('admin_ai_logs') }}">重置</a>
+  <span class="sp"></span>
+  <span class="muted" style="font-size:12.5px;">共 <b>{{ total }}</b> 条</span>
+</form>
+
+<div class="ai-cards">
+  <div class="ai-card"><b>{{ agg.n }}</b><span>调用次数</span></div>
+  <div class="ai-card"><b class="good">{{ agg.ok_n }}</b><span>成功</span></div>
+  <div class="ai-card"><b class="bad">{{ agg.n - agg.ok_n }}</b><span>失败</span></div>
+  <div class="ai-card"><b>{{ '{:,}'.format(agg.tok) }}</b><span>消耗 Token</span></div>
+  <div class="ai-card"><b>{{ '%.0f'|format(agg.avg_ms) }}<span style="font-size:13px;"> ms</span></b><span>平均耗时</span></div>
+</div>
+
+{% if by_module or top_users %}
+<div class="ai-sub">
+  {% if by_module %}
+  <h4>按模块</h4>
+  <table class="ai-tbl">
+    <tr><th>模块</th><th class="num">次数</th><th class="num">Token</th></tr>
+    {% for m in by_module %}
+    <tr>
+      <td>{% if m.module == 'chat' %}对话助手{% elif m.module == 'debug' %}代码调试{% else %}（早期记录，未标模块）{% endif %}</td>
+      <td class="num">{{ m.n }}</td>
+      <td class="num">{{ '{:,}'.format(m.tok) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if top_users %}
+  <h4>用得最多的人</h4>
+  <table class="ai-tbl">
+    <tr><th>用户</th><th class="num">次数</th><th class="num">Token</th><th class="num">失败</th></tr>
+    {% for t in top_users %}
+    <tr>
+      <td>{{ t.username or ('#' ~ t.user_id) }}</td>
+      <td class="num">{{ t.n }}</td>
+      <td class="num">{{ '{:,}'.format(t.tok) }}</td>
+      <td class="num">{% if t.fail_n %}<span class="ai-pill bad">{{ t.fail_n }}</span>{% else %}0{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="ai-wrap">
+  {% if not rows %}
+  <div class="ai-empty">没有符合条件的记录</div>
+  {% else %}
+  <table class="ai-tbl" style="margin-top:14px;">
+    <tr>
+      <th>时间</th><th>用户</th><th>模块</th><th>模式</th><th>模型</th>
+      <th class="num">输入</th><th class="num">输出</th><th class="num">耗时</th>
+      <th>结果</th><th>内容</th>
+    </tr>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.created_at|fmttime }}</td>
+      <td>{{ r.username or ('#' ~ r.user_id) }}</td>
+      <td><span class="ai-pill m">{% if r.module=='chat' %}对话{% elif r.module=='debug' %}调试{% else %}—{% endif %}</span></td>
+      <td>{{ r.mode or '—' }}</td>
+      <td>{{ r.model or '—' }}</td>
+      <td class="num">{{ r.prompt_tokens or 0 }}</td>
+      <td class="num">{{ r.completion_tokens or 0 }}</td>
+      <td class="num">{% if r.latency_ms %}{{ r.latency_ms }} ms{% else %}—{% endif %}</td>
+      <td>
+        {% if r.success %}<span class="ai-pill ok">成功</span>
+        {% else %}<span class="ai-pill bad">失败</span>{% endif %}
+      </td>
+      <td class="q">
+        <details>
+          <summary>{{ (r.question or '（无输入）')[:52] }}{% if r.question and r.question|length > 52 %}…{% endif %}</summary>
+          {% if r.question %}<pre>问：{{ r.question }}</pre>{% endif %}
+          {% if r.answer %}<pre>答：{{ r.answer }}</pre>{% endif %}
+          {% if r.error %}<pre style="color:#b42318;">错：{{ r.error }}</pre>{% endif %}
+          {% if r.ip %}<pre>IP：{{ r.ip }}</pre>{% endif %}
+        </details>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+
+{% if pages > 1 %}
+<div class="ai-pager">
+  {% if page > 1 %}
+  <a href="{{ url_for('admin_ai_logs') }}?u={{ f_user }}&m={{ f_module }}&ok={{ f_ok }}&p={{ page-1 }}">← 上一页</a>
+  {% endif %}
+  <span class="cur">{{ page }} / {{ pages }}</span>
+  {% if page < pages %}
+  <a href="{{ url_for('admin_ai_logs') }}?u={{ f_user }}&m={{ f_module }}&ok={{ f_ok }}&p={{ page+1 }}">下一页 →</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

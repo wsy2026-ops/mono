@@ -1,0 +1,132 @@
+{% extends "_admin_base.html" %}
+{% block admin_icon %}✏️{% endblock %}
+{% block admin_heading %}站点文案{% endblock %}
+{% block admin_desc %}「关于我们」和「更新日志」页头的文字。改完点最下面的保存；留空或点「恢复默认」会回到代码里的原始文案。{% endblock %}
+
+{% block admin_content %}
+<style>
+  .pg-sec{margin-bottom:22px;}
+  .pg-sec:last-of-type{margin-bottom:0;}
+  .pg-sec-title{
+    font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.05em;
+    margin:0 0 10px;padding-bottom:7px;border-bottom:1px dashed var(--line);
+  }
+  .pg-row{margin-bottom:14px;}
+  .pg-row:last-child{margin-bottom:0;}
+  .pg-lab{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    font-size:12.5px;font-weight:600;margin-bottom:5px;
+  }
+  .pg-lab .pg-key{
+    font-size:10.5px;font-weight:400;color:var(--muted);
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+  }
+  .pg-in,.pg-ta{
+    width:100%;box-sizing:border-box;padding:9px 11px;
+    border:1px solid var(--line);border-radius:9px;
+    background:var(--bg-sunken);color:var(--fg);font-size:13px;
+    font-family:inherit;line-height:1.7;
+  }
+  .pg-ta{min-height:78px;resize:vertical;}
+  .pg-in:focus,.pg-ta:focus{outline:none;border-color:#9a9aa2;background:var(--card);}
+  .pg-row.changed .pg-in,.pg-row.changed .pg-ta{border-color:#c9a227;background:#fffdf3;}
+  .pg-save{
+    position:sticky;bottom:12px;z-index:5;margin-top:18px;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:13px 16px;border-radius:12px;
+    background:var(--card);border:1px solid var(--line);
+    box-shadow:0 6px 20px rgba(0,0,0,.07);
+  }
+  .pg-save .pg-tip{font-size:12px;color:var(--muted);margin-left:auto;}
+</style>
+
+<form method="post" id="pgForm">
+  <div class="adm-card">
+    <div class="adm-card-head">
+      <h3>关于我们</h3>
+      <span class="adm-hint">公开页面 · {{ url_for('about') }}</span>
+      <div class="adm-right">
+        <a class="btn ghost xs" href="{{ url_for('about') }}" target="_blank" rel="noopener">预览</a>
+      </div>
+    </div>
+    <div class="adm-card-body">
+      {% for sec, items in about_groups %}
+      <div class="pg-sec">
+        <div class="pg-sec-title">{{ sec }}</div>
+        {% for b in items %}
+        <div class="pg-row {{ 'changed' if about_over.get(b.key) else '' }}">
+          <div class="pg-lab">
+            <span>{{ b.label }}</span>
+            <span class="pg-key">{{ b.key }}</span>
+            {% if about_over.get(b.key) %}
+            <button type="button" class="btn ghost xs"
+                    onclick="pgReset('about','{{ b.key }}','{{ b.label }}')">恢复默认</button>
+            {% endif %}
+          </div>
+          {% if b.multi %}
+          <textarea class="pg-ta" name="{{ b.key }}">{{ about_eff[b.key] }}</textarea>
+          {% else %}
+          <input class="pg-in" type="text" name="{{ b.key }}" value="{{ about_eff[b.key] }}">
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="adm-card">
+    <div class="adm-card-head">
+      <h3>更新日志 · 页头</h3>
+      <span class="adm-hint">条目在「更新日志」标签页里管理</span>
+      <div class="adm-right">
+        <a class="btn ghost xs" href="{{ url_for('changelog_page') }}" target="_blank" rel="noopener">预览</a>
+      </div>
+    </div>
+    <div class="adm-card-body">
+      {% for sec, items in changelog_groups %}
+      <div class="pg-sec">
+        <div class="pg-sec-title">{{ sec }}</div>
+        {% for b in items %}
+        <div class="pg-row {{ 'changed' if changelog_over.get(b.key) else '' }}">
+          <div class="pg-lab">
+            <span>{{ b.label }}</span>
+            <span class="pg-key">{{ b.key }}</span>
+            {% if changelog_over.get(b.key) %}
+            <button type="button" class="btn ghost xs"
+                    onclick="pgReset('changelog','{{ b.key }}','{{ b.label }}')">恢复默认</button>
+            {% endif %}
+          </div>
+          {% if b.multi %}
+          <textarea class="pg-ta" name="{{ b.key }}">{{ changelog_eff[b.key] }}</textarea>
+          {% else %}
+          <input class="pg-in" type="text" name="{{ b.key }}" value="{{ changelog_eff[b.key] }}">
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="pg-save">
+    <button type="submit" class="btn">保存全部改动</button>
+    <a class="btn ghost" href="{{ url_for('admin_pages') }}">放弃改动</a>
+    <span class="pg-tip">黄色边框 = 这处已经被你改过（不是代码里的默认值）</span>
+  </div>
+</form>
+
+<form method="post" action="{{ url_for('admin_pages_reset') }}" id="pgResetForm" style="display:none;">
+  <input type="hidden" name="page" id="pgResetPage">
+  <input type="hidden" name="key" id="pgResetKey">
+</form>
+
+<script>
+function pgReset(page, key, label){
+  if (!confirm(__('把「') + label + __('」恢复成代码里的默认文案？'))) return;
+  document.getElementById('pgResetPage').value = page;
+  document.getElementById('pgResetKey').value = key;
+  document.getElementById('pgResetForm').submit();
+}
+</script>
+{% endblock %}

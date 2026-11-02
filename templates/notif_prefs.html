@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}通知偏好 - MONO 社区{% endblock %}
+{% set active = 'notifications' %}
+
+{% block content %}
+<style>
+  .np-wrap{max-width:560px;margin:0 auto;}
+  .np-row{display:flex;align-items:center;gap:14px;border:1px solid var(--line);
+    border-radius:12px;padding:14px 18px;background:var(--card);margin-bottom:10px;}
+  .np-row .nm{font-weight:700;font-size:14px;}
+  .np-row .ds{font-size:12px;color:var(--muted);margin-top:2px;}
+  .np-row .sw{margin-left:auto;flex:none;}
+  .np-lock{font-size:11.5px;color:var(--muted);border:1px dashed var(--line);
+    border-radius:99px;padding:3px 10px;}
+</style>
+
+<div class="np-wrap">
+  <h2>通知偏好</h2>
+  <p class="sub">关掉不想要的分类，世界清静了。系统类通知（封禁/官方公告等）强制送达，不可关闭。</p>
+  <form method="post">
+    {% for c in cats %}
+    <div class="np-row">
+      <div>
+        <div class="nm">{{ c.name }}</div>
+        <div class="ds">
+          {% if c.key == 'interact' %}评论回复、点赞、私信、主题更新
+          {% elif c.key == 'social' %}好友申请
+          {% elif c.key == 'honor' %}成就解锁、徽章、升级
+          {% elif c.key == 'points' %}积分变动、管理员操作
+          {% else %}系统通知{% endif %}
+        </div>
+      </div>
+      {% if c.closable %}
+      <label class="sw" style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;">
+        <input type="checkbox" name="off" value="{{ c.key }}" {{ 'checked' if c.off }}>
+        关闭这类
+      </label>
+      {% else %}
+      <span class="sw np-lock">强制送达 🔒</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div style="margin-top:16px;text-align:right;">
+      <button type="submit" class="btn">保存偏好</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

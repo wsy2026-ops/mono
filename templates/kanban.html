@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}数据看板 - MONO 社区{% endblock %}
+{% set active = 'kanban' %}
+{% block content %}
+<style>
+  .kb-wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px;}
+  .kb-head{
+    border:1px solid var(--line);border-radius:14px;padding:16px 20px;background:var(--bg-elev);
+    display:flex;align-items:center;gap:12px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,.04);
+  }
+  .kb-head h1{margin:0;font-size:18px;font-weight:800;}
+  .kb-head .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .kb-head .actions{margin-left:auto;display:flex;gap:8px;}
+  .kb-head .actions button{padding:7px 14px;border-radius:9px;border:1px solid var(--line);background:var(--bg-elev);cursor:pointer;font-size:12.5px;font-weight:600;}
+  .kb-head .actions button:hover{border-color:var(--muted);}
+  .kb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;}
+  .kb-stat{
+    border:1px solid var(--line);border-radius:12px;background:var(--bg-elev);padding:16px;
+    box-shadow:0 2px 8px rgba(0,0,0,.04);
+  }
+  .kb-stat .label{font-size:12px;color:var(--muted);font-weight:600;}
+  .kb-stat .value{font-size:26px;font-weight:800;margin-top:6px;line-height:1.2;}
+  .kb-stat .delta{font-size:11.5px;margin-top:4px;font-weight:600;}
+  .kb-stat .delta.up{color:#10b981;}
+  .kb-stat .delta.flat{color:var(--muted);}
+  .kb-chart-row{display:grid;grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);gap:16px;margin-bottom:16px;}
+  .kb-card{border:1px solid var(--line);border-radius:12px;background:var(--bg-elev);padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+  .kb-card h3{margin:0 0 12px;font-size:14.5px;font-weight:800;}
+  .kb-card h3 .kb-more{float:right;font-size:12px;font-weight:400;color:var(--muted);text-decoration:none;}
+  .kb-card h3 .kb-more:hover{color:var(--fg);text-decoration:underline;}
+  .kb-card.full{grid-column:1/-1;}
+  .kb-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .kb-table th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;}
+  .kb-table td{padding:6px 8px;border-bottom:1px solid #f5f5f5;}
+  .kb-table tr:last-child td{border-bottom:none;}
+  .kb-table .num{text-align:right;font-weight:700;}
+  .kb-empty{text-align:center;color:var(--muted);padding:50px 10px;font-size:13px;}
+  @media (max-width:800px){ .kb-chart-row{grid-template-columns:minmax(0, 1fr);} }
+</style>
+
+<div class="kb-wrap">
+  <div class="kb-head">
+    <div style="font-size:26px;">📊</div>
+    <div>
+      <h1>数据看板</h1>
+      <div class="sub">全站数据统计 · 近 14 天趋势 · 实时刷新</div>
+    </div>
+    <div class="actions">
+      <button onclick="location.reload()">🔄 刷新</button>
+    </div>
+  </div>
+
+  <div class="kb-grid" id="cards"><div class="kb-empty">加载中…</div></div>
+
+  <div class="kb-chart-row">
+    <div class="kb-card"><h3>📈 用户 / 消息 / 帖子趋势（近14天）</h3><canvas id="chTrend" height="150"></canvas></div>
+    <div class="kb-card"><h3>🔍 AI 调用趋势（近14天）</h3><canvas id="chAi" height="150"></canvas></div>
+  </div>
+  <div class="kb-chart-row">
+    <div class="kb-card"><h3>🗂 论坛板块帖子分布</h3><canvas id="chSec" height="150"></canvas></div>
+    <div class="kb-card"><h3>🎮 各游戏参与人数</h3><canvas id="chGame" height="150"></canvas></div>
+  </div>
+
+  <div class="kb-chart-row">
+    <div class="kb-card full"><h3>🔥 热门帖子 TOP 10</h3><table class="kb-table" id="topPosts"></table></div>
+  </div>
+  <div class="kb-chart-row">
+    <div class="kb-card full"><h3>⚙️ AI 模型用量
+      <a href="{{ url_for('admin_ai_logs') }}" class="kb-more">查看明细 →</a>
+    </h3><table class="kb-table" id="aiDist"></table></div>
+  </div>
+  <div class="kb-chart-row">
+    <div class="kb-card full"><h3>💬 聊天房间</h3><table class="kb-table" id="rooms"></table></div>
+  </div>
+</div>
+
+<script src="{{ cdn_url("js/chart.umd.min.js") }}"></script>
+<script>
+const GAME_NAMES = {24:'24点', sudoku:'数独', klotski:'华容道', color_blind:'色盲派对', jump:'跳一跳'};
+
+async function load(){
+  const r = await fetch('/api/kanban/stats');
+  const d = await r.json();
+  if (!d.ok){ document.getElementById('cards').innerHTML = '<div class="kb-empty">加载失败</div>'; return; }
+  renderCards(d.cards);
+  renderTrend(d.trend);
+  renderSections(d.sections, d.sec_posts);
+  renderGames(d.game_stats);
+  renderTopPosts(d.top_posts);
+  renderAiDist(d.ai_model_dist);
+  renderRooms(d.rooms);
+}
+
+function renderCards(c){
+  const grid = document.getElementById('cards');
+  const defs = [
+    ['👥 用户总数', c.users, c.today_users, '今日新增'],
+    ['💬 消息总数', c.messages, c.today_messages, '今日消息'],
+    ['📝 帖子总数', c.posts, c.today_posts, '今日发帖'],
+    ['💭 评论总数', c.comments, null, ''],
+    ['📢 动态总数', c.dynamics, null, ''],
+    ['👥 群组数', c.groups, null, ''],
+    ['🎪 活动数', c.activities, null, ''],
+    ['⚙️ AI 调用', c.ai_calls, null, ''],
+    ['⚡ AI Token', c.ai_tokens.toLocaleString(), null, ''],
+    ['🚨 举报数', c.reports, null, ''],
+    ['⚖️ 处罚数', c.punishments, null, ''],
+    ['● 7日活跃', c.online_7d, null, ''],
+  ];
+  grid.innerHTML = defs.map(([label, value, delta, deltaLabel]) => `
+    <div class="kb-stat">
+      <div class="label">${label}</div>
+      <div class="value">${value}</div>
+      ${delta !== null ? `<div class="delta up">↑ ${delta} ${deltaLabel}</div>` : ''}
+    </div>`).join('');
+}
+
+function renderTrend(t){
+  new Chart(document.getElementById('chTrend'), {
+    type: 'line',
+    data: { labels: t.labels, datasets: [
+      { label: '用户', data: t.users, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.1)', fill: true, tension: .3 },
+      { label: '消息', data: t.messages, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', fill: true, tension: .3 },
+      { label: '帖子', data: t.posts, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.1)', fill: true, tension: .3 },
+      { label: '动态', data: t.dynamics, borderColor: '#8b5cf6', tension: .3 },
+    ]},
+    options: { responsive: true, plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+  new Chart(document.getElementById('chAi'), {
+    type: 'bar',
+    data: { labels: t.labels, datasets: [{ label: 'AI 调用', data: t.ai, backgroundColor: 'rgba(124,58,237,.55)', borderRadius: 4 }]},
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+function renderSections(sections, secPosts){
+  const el = document.getElementById('chSec');
+  const names = (sections || []).map(s => s.name || ('板块' + s.id));
+  const data = (sections || []).map(s => secPosts[s.id] || 0);
+  if (!names.length){ el.parentNode.innerHTML = '<div class="kb-empty">暂无板块</div>'; return; }
+  new Chart(el, {
+    type: 'bar',
+    data: { labels: names, datasets: [{ label: '帖子数', data, backgroundColor: 'rgba(37,99,235,.55)', borderRadius: 4 }]},
+    options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+function renderGames(gs){
+  const names = Object.keys(gs).map(k => GAME_NAMES[k] || k);
+  const vals = Object.values(gs);
+  new Chart(document.getElementById('chGame'), {
+    type: 'pie',
+    data: { labels: names, datasets: [{ data: vals, backgroundColor: ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'] }]},
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+  });
+}
+
+function renderTopPosts(posts){
+  const el = document.getElementById('topPosts');
+  if (!posts || !posts.length){ el.innerHTML = '<tr><td style="color:var(--muted);">暂无帖子</td></tr>'; return; }
+  el.innerHTML = '<tr><th>标题</th><th class="num">浏览</th><th class="num">赞</th><th class="num">评论</th></tr>' +
+    posts.map(p => `<tr><td><a href="/post/${p.id}" style="color:inherit;">${(p.title || '').slice(0,30)}</a></td>` +
+      `<td class="num">${p.view_count}</td><td class="num">${p.likes}</td><td class="num">${p.comment_count}</td></tr>`).join('');
+}
+
+function renderAiDist(dist){
+  const el = document.getElementById('aiDist');
+  if (!dist || !dist.length){ el.innerHTML = '<tr><td style="color:var(--muted);">暂无 AI 调用记录</td></tr>'; return; }
+  el.innerHTML = '<tr><th>模型</th><th class="num">调用次数</th><th class="num">消耗 Token</th></tr>' +
+    dist.map(x => `<tr><td>${x.model}</td><td class="num">${x.c}</td><td class="num">${(x.tokens || 0).toLocaleString()}</td></tr>`).join('');
+}
+
+function renderRooms(rooms){
+  const el = document.getElementById('rooms');
+  if (!rooms || !rooms.length){ el.innerHTML = '<tr><td style="color:var(--muted);">暂无房间</td></tr>'; return; }
+  el.innerHTML = '<tr><th>ID</th><th>名称</th><th>创建时间</th></tr>' +
+    rooms.map(r => `<tr><td>${r.id}</td><td>${r.name}</td><td>${new Date(r.created_at*1000).toLocaleString()}</td></tr>`).join('');
+}
+
+load();
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="225" fill="#0a0a0a"/>
+  <g stroke="#ffffff" stroke-width="13" fill="none" stroke-linecap="square">
+    <path d="M96 150v62M96 150h62"/>
+    <path d="M96 500v62M96 562h62"/>
+  </g>
+  <text x="512" y="300" font-family="Arial Black,Arial,sans-serif" font-size="232"
+        font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="central"
+        letter-spacing="2">MONO</text>
+  <rect x="800" y="196" width="58" height="58" fill="#22d3ee"/>
+  <g stroke="#ffffff" stroke-width="5">
+    <path d="M362 710L437 674M437 674L512 666M512 666L587 674M512 666L662 710M512 666L512 752M362 710L512 752M662 710L512 752"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="362" cy="710" r="13"/><circle cx="437" cy="674" r="13"/>
+    <circle cx="512" cy="666" r="20"/><circle cx="587" cy="674" r="13"/>
+    <circle cx="662" cy="710" r="13"/><circle cx="512" cy="752" r="13"/>
+  </g>
+</svg>

@@ -1,0 +1,65 @@
+{% extends "_admin_base.html" %}
+{% block title %}更新公告 · 管理后台{% endblock %}
+{% block admin_icon %}📢{% endblock %}
+{% block admin_heading %}更新公告{% endblock %}
+{% block admin_desc %}用户进入网站时弹窗展示。每人每天至少显示一次：关掉后当天不再弹，次日重新弹。{% endblock %}
+
+{% block admin_content %}
+<style>
+  .un-form{padding:16px 18px;max-width:760px;}
+  .un-row{margin-bottom:16px;}
+  .un-lb{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;}
+  .un-inp,.un-ta{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;font-size:13.5px;background:var(--bg);color:var(--fg);outline:none;
+    font-family:inherit;}
+  .un-inp:focus,.un-ta:focus{border-color:rgba(91,140,255,.5);}
+  .un-ta{min-height:260px;line-height:1.7;resize:vertical;font-family:ui-monospace,Consolas,monospace;}
+  .un-switch{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--fg);}
+  .un-switch input{width:18px;height:18px;cursor:pointer;}
+  .un-btn{padding:10px 22px;border-radius:10px;border:none;background:var(--fg);color:var(--bg);
+    font-size:13.5px;font-weight:700;cursor:pointer;}
+  .un-btn:hover{opacity:.86;}
+  .un-tip{font-size:12px;color:var(--muted);line-height:1.7;margin-top:10px;
+    padding:10px 12px;border:1px dashed var(--line);border-radius:10px;}
+  .un-state{font-size:12.5px;color:var(--muted);margin-bottom:14px;}
+</style>
+
+<form method="post" class="un-form">
+  <div class="un-state">
+    当前状态：
+    {% if cur.enabled and cur.content %}
+      <b>已开启</b> · 第 {{ cur.ver or 1 }} 版
+    {% elif cur.content %}
+      <b>已关闭</b>（内容还在，用户看不到）
+    {% else %}
+      <b>还没配置</b>
+    {% endif %}
+  </div>
+
+  <div class="un-row">
+    <label class="un-switch">
+      <input type="checkbox" name="enabled" {{ 'checked' if cur.enabled else '' }}>
+      <span>启用弹窗公告</span>
+    </label>
+  </div>
+
+  <div class="un-row">
+    <label class="un-lb">标题</label>
+    <input class="un-inp" name="title" maxlength="80"
+           value="{{ cur.title or '' }}" placeholder="例如：v8.2 更新说明">
+  </div>
+
+  <div class="un-row">
+    <label class="un-lb">内容（支持 HTML，比如 &lt;p&gt; &lt;ul&gt; &lt;strong&gt;）</label>
+    <textarea class="un-ta" name="content" placeholder="<p>本次更新：</p><ul><li>新增 2048 小游戏</li><li>修复若干问题</li></ul>">{{ cur.content or '' }}</textarea>
+  </div>
+
+  <button type="submit" class="un-btn">保存</button>
+
+  <div class="un-tip">
+    · <b>每人每天至少弹一次</b>：登录用户由服务端记日期，换设备、清缓存也照样弹；游客用本地存储兜底。<br>
+    · 改了标题或内容会自动升版本号，游客那边会重新弹一次。<br>
+    · 关闭按钮在弹窗右上角，也可以点遮罩或按 Esc 关闭。
+  </div>
+</form>
+{% endblock %}
