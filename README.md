@@ -15,9 +15,9 @@ Flask + SQLite 单进程，**能跑在一台 2 核 2G 的小服务器上** —�
 > 大多是踩过坑之后补的，比如「这里必须用 copytruncate，否则日志轮转会杀掉进程」。
 > 觉得啰嗦可以删，但删之前建议先看看它在防什么。
 
-![游戏中心](docs/screenshots/games.png)
+![游戏中心](assets/screenshots/games.png)
 
-![登录页](docs/screenshots/login.png)
+![登录页](assets/screenshots/login.png)
 
 > 截图来自一个**全新初始化的空库**，不是线上站点，所以看不到任何真实用户数据。
 > 想看真实效果可以直接开 <https://monocraft.top>（服务器只有 2 核 2G，人多的时候会慢）。
@@ -172,7 +172,6 @@ templates/          142 个 Jinja2 模板
 static/             前端资源
 infra/              systemd / nginx / logrotate / 部署校验脚本
 scripts/            运维脚本（含引擎下载）
-docs/               设计文档（棋类 UI 规范、PWA 方案等）
 ```
 
 **关于 `app.py` 很大**：项目是从单文件长起来的，2026-10 做过一轮拆包
