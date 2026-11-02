@@ -1,5 +1,7 @@
 # MONO 社区
 
+[![CI](https://github.com/wsy2026-ops/mono/actions/workflows/ci.yml/badge.svg)](https://github.com/wsy2026-ops/mono/actions/workflows/ci.yml)
+
 一个自己写的社区网站：论坛、群聊、六款棋盘对战、在线判题（OJ）、积分商城、AI 广场、音乐台。
 
 Flask + SQLite 单进程，**能跑在一台 2 核 2G 的小服务器上** —— 没上 Redis 集群，没上消息队列，
@@ -10,6 +12,12 @@ Flask + SQLite 单进程，**能跑在一台 2 核 2G 的小服务器上** —�
 > 这是一个**真实在跑**的站点，不是教学 demo。所以里面有不少「为什么这么写」的注释 ——
 > 大多是踩过坑之后补的，比如「这里必须用 copytruncate，否则日志轮转会杀掉进程」。
 > 觉得啰嗦可以删，但删之前建议先看看它在防什么。
+
+![游戏中心](docs/screenshots/games.png)
+
+![登录页](docs/screenshots/login.png)
+
+> 截图来自一个**全新初始化的空库**，不是线上站点，所以看不到任何真实用户数据。
 
 ---
 
@@ -67,12 +75,16 @@ Flask + SQLite 单进程，**能跑在一台 2 核 2G 的小服务器上** —�
 ```bash
 git clone <this-repo> mono && cd mono
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-render.txt              # Python 3.11+ 用这份（见下）
 
 python scripts/init_db.py --admin admin 你的密码    # 建表（145 张）+ 建第一个超管
 python start_server.py                              # 本地跑，默认 http://127.0.0.1:5000
 python start_server.py --check-only                 # 只做环境自检，不启动
 ```
+
+> **两份依赖清单的区别**：`requirements.txt` 是给一台老机器（Python 3.7 / 32 位 Windows）锁的；
+> `requirements-render.txt` 给 Python 3.11+，额外锁死了 flask 2.2.5 的传递依赖
+> （不锁的话新版 werkzeug 会把 flask 2.2 带崩）。**新环境用后者。**
 
 表结构在 `schema.sql`（从线上库导出的完整结构，已改成幂等）。
 数据库默认在项目根的 `data.db`（**已在 .gitignore 里，不会进仓库**）。
@@ -167,9 +179,19 @@ docs/               设计文档（棋类 UI 规范、PWA 方案等）
 - **没有数据库自动迁移**：加表/加列靠 `CREATE TABLE IF NOT EXISTS` + `_add_column()`，
   不引 Alembic。小项目、改动少，够用。
 - **SocketIO 用长轮询**，不是 WebSocket：为了在只开放 80/443 的环境里也能跑。
-- **没有单元测试**。有 `infra/verify.sh`（部署后 7 项校验）和一批手工冒烟脚本，
-  但没到 CI 级别。这是目前最该补的一块。
+- **没有单元测试**。有 `tests/smoke.py`（空库建表 → 渲染 13 个页面 → 检查内联 JS 语法）
+  和 `infra/verify.sh`（部署后 7 项校验），CI 跑前者。但没到逐函数覆盖的程度。
 - **中文注释占多数**。作者中文母语，写的时候没打算给谁看；开源后保留原样。
+
+---
+
+## 测试
+
+```bash
+python tests/smoke.py      # 建库 → 渲染 13 个页面 → 检查内联 JS 语法
+```
+
+CI（`.github/workflows/ci.yml`）跑的就是这条，外加 Python 语法检查和「有没有把密钥/数据库误提交」的扫描。
 
 ---
 

@@ -1,4 +1,6 @@
 # MONO 社区 · 依赖清单（锁定版本组合，适配 Python 3.7 / 32 位 Windows）
+# ⚠️ Python 3.11+ 请改用 requirements-render.txt —— 这份的 flask 2.2.5
+#    在 3.11 上会被新版 werkzeug 带崩（ImportError: url_quote）。
 # 安装：pip install -r requirements.txt
 # 注意：不要单独升级 flask-socketio 到 5.5.0+（与 python-socketio 5.9+ 不兼容）
 flask==2.2.5

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: 冒烟测试（建库 + 渲染 + JS 语法）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # 用 requirements-render.txt：requirements.txt 是给 Python 3.7 / 32 位
+      # Windows 那台老机器锁的，里面的 flask 2.2.5 在 3.11 上会被新版 werkzeug 带崩。
+      - name: 安装依赖
+        run: pip install -r requirements-render.txt
+
+      - name: Python 语法检查
+        run: python -m compileall -q . && echo "OK"
+
+      - name: 冒烟测试
+        run: python tests/smoke.py
+
+      - name: 检查有没有把密钥/数据库误提交
+        run: |
+          set -e
+          bad=$(git ls-files | grep -Ei '\.db$|secret_key|\.env$|\.apk$|_keys|passcode' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::这些文件不该进仓库："
+            echo "$bad"
+            exit 1
+          fi
+          echo "干净"
