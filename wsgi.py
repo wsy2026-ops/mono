@@ -1,6 +1,6 @@
 """MONO 社区 · 云端启动入口（Render / Linux 服务器用）。
 
-学校/本机仍用 一键启动.cmd → start_server.py（带诊断自修复，别动）；
+本地开发用 start_server.py（带诊断自修复，别动）；
 本入口做四件事：
     1. 读出数据目录（MONO_DATA_DIR，未设则与代码同目录）
     2. 本地没有数据库时，先从 Neon（外部 PostgreSQL）拉回快照

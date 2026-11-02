@@ -185,7 +185,7 @@ def do_restore(zpath):
             cnt += 1
         z.close()
         print("[OK] 恢复完成：共写入 %d 个文件" % cnt)
-        print("[提示] 现在双击「一键启动.cmd」即可。新代码启动时会自动把")
+        print("[提示] 现在运行 python start_server.py 即可。新代码启动时会自动把")
         print("       旧数据库升级到最新结构，不需要任何手动操作。")
         return True
     except Exception as e:
