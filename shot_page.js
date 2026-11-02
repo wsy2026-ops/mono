@@ -9,13 +9,17 @@
  */
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 
+// 想指定浏览器就设 CHROME_PATH；否则按常见位置找
 const CHROME_CANDIDATES = [
-  'C:/Users/weiha/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe',
-  'C:/Users/weiha/AppData/Local/ms-playwright/chromium-1228/chrome-win64/chrome.exe',
+  process.env.CHROME_PATH || '',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
-];
+].filter(Boolean);
 const CHROME = CHROME_CANDIDATES.find(p => fs.existsSync(p));
 if (!CHROME) { console.error('找不到可用的 Chromium/Chrome'); process.exit(1); }
 
@@ -33,7 +37,7 @@ const COOKIE = (process.env.SHOT_COOKIE || '').trim();
 if (!COOKIE) { console.error('缺 SHOT_COOKIE（用 shot_page.py 跑）'); process.exit(1); }
 
 fs.mkdirSync(OUT, { recursive: true });
-const PROFILE = 'C:/Users/weiha/AppData/Local/Temp/_shot_profile';
+const PROFILE = os.tmpdir() + '/_shot_profile';
 fs.rmSync(PROFILE, { recursive: true, force: true });
 
 const chrome = spawn(CHROME, [

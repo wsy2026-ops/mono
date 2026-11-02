@@ -209,7 +209,7 @@ problems/3/
 改完传到服务器：
 
 ```bash
-cd E:/9.2/文件夹/test6
+cd /opt/mono/app
 tar czf oj.tgz oj
 scp oj.tgz mono-vps:/tmp/
 ssh mono-vps "cd /opt/mono && tar xzf /tmp/oj.tgz && rm -f /tmp/oj.tgz && systemctl restart mono-oj"

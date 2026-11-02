@@ -35,9 +35,9 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
 NODE_CANDIDATES = [
-    r'C:\Users\weiha\.workbuddy-ai\binaries\node\versions\22.22.2-2\node.exe',
-    r'D:\Program Files\nodejs\node.exe',
+    os.environ.get('NODE_BIN') or '',
     'node',
+    'node.exe',
 ]
 
 

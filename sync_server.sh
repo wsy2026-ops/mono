@@ -45,7 +45,6 @@ fi
 # ---- 3) 打包代码（排除引擎/数据/密钥） ----
 echo "[3/5] 打包代码..."
 TAR_FILE="$(mktemp -u)/../mono_sync_$$.tar"
-TAR_FILE="C:/Users/weiha/AppData/Local/Temp/mono_sync_$$.tar"
 git archive -o "$TAR_FILE" HEAD -- . \
     ':(exclude)egaroucid' ':(exclude)gnugo' ':(exclude)katago' \
     ':(exclude)pikafish' ':(exclude)rapfi' ':(exclude)stockfish' \
