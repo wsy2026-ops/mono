@@ -46,7 +46,7 @@ def _send_smtp(to_addr, subject, body):
 def _from_header():
     """Resend 发件人。
 
-    环境变量里只存**纯地址**（noreply@monocraft.top）—— systemd 的 Environment=
+    环境变量里只存**纯地址**（noreply@example.com）—— systemd 的 Environment=
     会把空格后的内容当成下一个 assignment 吃掉（2026-10-24 实测踩坑），
     所以显示名在这里拼。环境变量自带 '<' 的完整格式则原样使用。
     """

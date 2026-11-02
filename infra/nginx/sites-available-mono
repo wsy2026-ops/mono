@@ -51,12 +51,12 @@ map $http_x_forwarded_proto$request_uri $mono_needs_https {
 # ---------------- 旧域名：搬家页 ----------------
 # mono-craft.cc.cd 被运营商按 SNI 做了 DPI 拦截，移动数据下 HTTPS 全端口断、
 # 开 VPN 才通（2026-10-06 tcpdump 定案，伪造 RST 的 TTL 是 242，真实包是 45）。
-# 换域名 mono-craft.de5.net 是唯一根治。这个块负责给还能访问到的用户一个落点。
+# 换域名 old.example.com 是唯一根治。这个块负责给还能访问到的用户一个落点。
 #
 # ⚠️ 这里返回 200 而不是 301：DPI 是按明文 SNI 匹配的，
 #   跳转目标写死在响应体里由 JS 跳转，用户不被 SNI 拦的路径也能看到新地址。
-#   用 301 的话浏览器会自己再请求 de5.net，多数情况下没问题，
-#   但旧域名客户端池里仍有打不开 de5.net 的，留个手动可点的入口更稳。
+#   用 301 的话浏览器会自己再请求 old.example.com，多数情况下没问题，
+#   但旧域名客户端池里仍有打不开 old.example.com 的，留个手动可点的入口更稳。
 server {
     listen 80;
     listen [::]:80;
@@ -91,7 +91,7 @@ server {
 #   `_` 会匹配任何没被别的块精确列出的名字 —— cc.cd 摘掉后请求落到 default_server，
 #   也就是主站。搬家页只在 80 生效就是这个漏了 `_` 导致的。
 #
-# ⚠️ 证书是 mono-de5-full（只含 de5.net），所以浏览器会先弹
+# ⚠️ 证书是 example.com-full（只含 old.example.com），所以浏览器会先弹
 #   「证书域名不匹配」警告，点「高级 → 继续」就能看到搬家页。
 #   换不到干净的 cc.cd 证书：它是被 DPI 按 SNI 拦的域名，
 #   且 LE 签 cc.cd 也得先过 http-01（会被自己的 DPI 拦）。
@@ -101,8 +101,8 @@ server {
     listen [::]:443 ssl;
     server_name mono-craft.cc.cd www.mono-craft.cc.cd;
 
-    ssl_certificate     /etc/letsencrypt/live/mono-de5-full/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/mono-de5-full/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/example.com-full/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com-full/privkey.pem;
     ssl_protocols       TLSv1.2;
     ssl_prefer_server_ciphers on;
     ssl_ciphers         HIGH:!aNULL:!MD5:!kDHE;
@@ -121,7 +121,7 @@ server {
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
-    server_name _ monocraft.top www.monocraft.top;
+    server_name _ example.com www.example.com;
 
     # ACME 验证必须留在 80 上走 HTTP（certbot renew 用），不能跳 HTTPS
     location ^~ /.well-known/acme-challenge/ {
@@ -161,10 +161,10 @@ server {
     # ⚠️ 服务器是 nginx 1.18，http2 必须写在 listen 里（新版才支持 "http2 on;"）
     listen 443 ssl http2 default_server;
     listen [::]:443 ssl http2 default_server;
-    server_name _ monocraft.top www.monocraft.top;
+    server_name _ example.com www.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/mono-de5-full/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/mono-de5-full/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/example.com-full/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com-full/privkey.pem;
     # ⚠️ 灰云直连后 TLS 由源站终结，客户端五花八门（老 Android WebView、
     #    旧 Edge、部分国产浏览器内核）。OpenSSL 3.0.2 默认开 TLS 1.3，
     #    而 TLS 1.3 的 key_share 协商跟这些客户端不兼容，日志里一堆
@@ -205,10 +205,10 @@ server {
 server {
     listen 8444 ssl http2;
     listen [::]:8444 ssl http2;
-    server_name _ monocraft.top www.monocraft.top;
+    server_name _ example.com www.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/mono-de5-full/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/mono-de5-full/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/example.com-full/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com-full/privkey.pem;
     ssl_protocols       TLSv1.2;
     ssl_prefer_server_ciphers on;
     ssl_ciphers         HIGH:!aNULL:!MD5:!kDHE;
@@ -235,14 +235,14 @@ server {
     include /etc/nginx/snippets/mono-locations.conf;
 }
 
-# ---------------- 旧域名 mono-craft.de5.net：搬家页 ----------------
-# 2026-10-24 主域名迁往 monocraft.top。de5.net 全部降级为搬家页：
+# ---------------- 旧域名 old.example.com：搬家页 ----------------
+# 2026-10-24 主域名迁往 example.com。old.example.com 全部降级为搬家页：
 # 返回 200 + JS 跳转（不用 301——给老书签用户一个人工可点的落点，
 # 也让搜索引擎平滑转移权重）。cc.cd 同款处理（它还被 DPI 拦着）。
 server {
     listen 80;
     listen [::]:80;
-    server_name mono-craft.de5.net www.mono-craft.de5.net;
+    server_name old.example.com www.old.example.com;
     root /var/www/mono-moved;
     add_header X-Robots-Tag "noindex" always;
     location / {
@@ -254,10 +254,10 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name mono-craft.de5.net www.mono-craft.de5.net;
+    server_name old.example.com www.old.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/mono-de5-full/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/mono-de5-full/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/example.com-full/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com-full/privkey.pem;
     ssl_protocols       TLSv1.2;
     ssl_prefer_server_ciphers on;
     ssl_ciphers         HIGH:!aNULL:!MD5:!kDHE;

@@ -30,12 +30,10 @@ API_USER = "https://api.github.com/user"
 # 推导值会漂移导致 GitHub 拒授（实测：VPN 下点击被拒、直连输 URL 成功）。
 # 换域名时改这里，或用环境变量 GITHUB_OAUTH_REDIRECT 覆盖。
 # 回调地址兜底值（动态推导优先，见 _redirect_uri）。
-# 2026-10-23 换域名 monocraft.top： authorize_url 改走 _redirect_uri(request)
+# 2026-10-23 换域名 example.com： authorize_url 改走 _redirect_uri(request)
 # 按请求 Host 动态生成，从此换域名只用在 GitHub OAuth App 加回调 URL，
 # 不用再改代码。这个常量只剩「环境变量显式覆盖」一个用途。
-FIXED_REDIRECT_URI = os.environ.get(
-    "GITHUB_OAUTH_REDIRECT",
-    "https://monocraft.top/login/github/callback")
+FIXED_REDIRECT_URI = (os.environ.get("GITHUB_OAUTH_REDIRECT") or "").strip()
 
 _NAME_RE = re.compile(r"[^0-9A-Za-z_\-\u4e00-\u9fa5]")
 

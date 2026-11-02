@@ -1,6 +1,6 @@
 # 象棋大师 UI 规范
 
-> 线上 https://mono-craft.de5.net/game/xqmaster
+> 线上 https://example.com/game/xqmaster
 > 本文是界面设计与实现的唯一依据，改样式前先读这里。
 
 ## 一、整体布局

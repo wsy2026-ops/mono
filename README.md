@@ -4,6 +4,8 @@
 
 一个自己写的社区网站：论坛、群聊、六款棋盘对战、在线判题（OJ）、积分商城、AI 广场、音乐台。
 
+**原站点（线上）：<https://monocraft.top>** —— 这个仓库就是它的代码，跑的是同一套逻辑。
+
 Flask + SQLite 单进程，**能跑在一台 2 核 2G 的小服务器上** —— 没上 Redis 集群，没上消息队列，
 所有功能都在一个进程里，部署就是 `scp` + `systemctl restart`。
 
@@ -18,6 +20,7 @@ Flask + SQLite 单进程，**能跑在一台 2 核 2G 的小服务器上** —�
 ![登录页](docs/screenshots/login.png)
 
 > 截图来自一个**全新初始化的空库**，不是线上站点，所以看不到任何真实用户数据。
+> 想看真实效果可以直接开 <https://monocraft.top>（服务器只有 2 核 2G，人多的时候会慢）。
 
 ---
 
@@ -111,6 +114,10 @@ python start_server.py --check-only                 # 只做环境自检，不�
 | `MONO_RESEND_KEY` / `MONO_RESEND_FROM` | Resend 发信（注册验证码、日报、告警） | 用邮件时 |
 | `MONO_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM` | SMTP 兜底通道 | 否 |
 | `GITHUB_OAUTH_CLIENT_ID` / `_SECRET` | GitHub 第三方登录 | 否 |
+| `GITHUB_OAUTH_REDIRECT` | GitHub 回调地址（不设则按请求 Host 推导） | 否 |
+| `MONO_SITE_URL` | 站点对外地址，看门狗和健康检查用，默认 `http://127.0.0.1:8080` | 否 |
+| `MONO_SUPPORT_URL` | AI 客服后端地址（另一台机器上的 llama-server），不设则客服功能关闭 | 否 |
+| `MONO_LA_HOST` | 后台「备用机探针」要探测的主机名，不设则跳过 | 否 |
 | `MONO_REPORT_TO` | 日报收件人 | 否（不设就不发） |
 | `MONO_ALERT_EMAIL` | 告警收件人 | 否（不设就不发） |
 | `MONO_TG_TOKEN` / `MONO_TG_CHAT` | Telegram 告警 | 否 |

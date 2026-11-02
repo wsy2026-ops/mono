@@ -12,9 +12,8 @@ VPS_ALIAS="mono-vps"          # ~/.ssh/config 中的主机别名
 APP_DIR="/opt/mono/app"
 # 健康检查走域名（经 Cloudflare）。
 # ⚠️ 不要改回 IP：源站已限制为只接受 Cloudflare 流量，直连 IP 会被防火墙挡掉。
-# 2026-11-01：主域名换成 monocraft.top（旧域名 mono-craft.de5.net 只留跳转页，
-# 拿它做健康检查等于「旧域名还活着」而不是「新站正常」）。
-SITE_URL="https://monocraft.top"
+# 健康检查打的是对外域名。换域名时改 MONO_SITE_URL，别改回 IP。
+SITE_URL="${MONO_SITE_URL:-http://127.0.0.1:8080}"
 
 echo "=============================================="
 echo "  MONO 一键更新  $(date '+%Y-%m-%d %H:%M:%S')"

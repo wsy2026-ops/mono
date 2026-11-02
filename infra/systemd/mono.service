@@ -22,7 +22,7 @@ Environment=MONO_ACCEL_MUSIC=1
 Environment=MONO_PROXY_DEPTH=1
 Environment=MONO_SECRET_KEY=<见 /etc/mono/secrets.env 或服务器上的真值>
 Environment=MONO_RESEND_KEY=<见 /etc/mono/secrets.env 或服务器上的真值>
-Environment=MONO_RESEND_FROM=noreply@monocraft.top
+Environment=MONO_RESEND_FROM=noreply@example.com
 Environment=MONO_PG_SHADOW=1
 Environment=MONO_PG_READ=1
 Environment=MONO_NEON_DSN=<见 /etc/mono/secrets.env 或服务器上的真值>

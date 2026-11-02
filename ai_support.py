@@ -11,11 +11,12 @@
 内存、embedding 索引维护）对这个规模是过度设计。真需要时再加。
 """
 import json
+import os
 import re
 
 import requests
 
-LA_CHAT = "http://64.83.18.51:8082"
+LA_CHAT = (os.environ.get("MONO_SUPPORT_URL") or "").strip()
 
 MAX_HISTORY = 2          # 最多带 2 轮历史（用户 2026-10-25 定；前端全量保留
                          # 会话记录，每次请求只带最近 2 轮进 prompt，省 token）

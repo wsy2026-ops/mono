@@ -2512,9 +2512,13 @@ def admin_server_status():
         "disk_used_p": round((d_total - d_free) * 100.0 / d_total, 1) if d_total else 0,
     }
 
-    # ── 洛杉矶备用机：TCP 探测 ──
+    # ── 备用机：TCP 探测（地址从环境变量取，没配就跳过）──
     import socket as _socket
-    la_info = {"host": "64.83.18.51", "ok": False, "ms": None, "err": ""}
+    la_host = (os.environ.get("MONO_LA_HOST") or "").strip()
+    la_info = {"host": la_host, "ok": False, "ms": None, "err": ""}
+    if not la_host:
+        la_info["err"] = "未配置 MONO_LA_HOST"
+        return render_template("admin_server.html", local=local, la=la_info)
     t0 = time.time()
     try:
         sk = _socket.create_connection((la_info["host"], 22), timeout=4)

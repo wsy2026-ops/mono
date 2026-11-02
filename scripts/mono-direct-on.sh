@@ -1,7 +1,7 @@
 #!/bin/bash
 # MONO · Cloudflare 灰云（直连）切换脚本
 # ============================================================
-# 前置：DNS 已在 Cloudflare 后台切成灰云（A 记录指向 64.90.12.106）
+# 前置：DNS 已在 Cloudflare 后台切成灰云（A 记录指向你的服务器 IP）
 #
 # 干三件事：
 #   1. 放行 ufw 的 443（全网，之前只放行 CF 网段）
@@ -15,8 +15,8 @@ set -e
 
 CERT_DIR=/etc/nginx/ssl
 LE_DIR=/etc/letsencrypt   # certbot 默认安装位置，不是 /etc/nginx/ssl
-DOMAIN=mono-craft.de5.net
-SERVER_IP=64.90.12.106
+DOMAIN="${MONO_DOMAIN:?请设置 MONO_DOMAIN}"
+SERVER_IP="${MONO_SERVER_IP:?请设置 MONO_SERVER_IP}"
 
 rollback() {
     echo "[回滚] 恢复 Cloudflare Origin CA 证书"

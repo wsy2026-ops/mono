@@ -4,8 +4,8 @@
 echo "═══════════════════════════════════════════"
 echo " MONO 直连状态检查  $(date '+%Y-%m-%d %H:%M:%S')"
 echo "═══════════════════════════════════════════"
-DOMAIN=mono-craft.de5.net
-IP=64.90.12.106
+DOMAIN="${MONO_DOMAIN:?请设置 MONO_DOMAIN}"
+IP="${MONO_SERVER_IP:?请设置 MONO_SERVER_IP}"
 
 echo
 echo "【1】DNS 解析"

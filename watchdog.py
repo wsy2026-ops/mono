@@ -88,7 +88,7 @@ try:
 except Exception:
     _mailer = None
 ALERT_COOLDOWN = 1800
-SITE = "https://monocraft.top"
+SITE = (os.environ.get("MONO_SITE_URL") or "http://127.0.0.1:8080").rstrip("/")
 HEALTHZ = SITE + "/healthz"
 
 DISK_MAX = 85
@@ -139,7 +139,7 @@ def send_mail(subject, body):
 
     ⚠️ **故意绕开 mailer.deliver()** —— 它的优先级是 SMTP 优先，
     而线上配的 smtp.163.com 连不上（用户实测），会导致永远发不出去。
-    Resend 配好且可用（noreply@monocraft.top 已验证），直接走它。
+    Resend 配好且可用（noreply@example.com 已验证），直接走它。
 
     发不出去返回 False，不抛异常 —— 告警失败不能把 watchdog 自己搞崩。
     """
