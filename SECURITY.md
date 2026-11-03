@@ -2,10 +2,9 @@
 
 ## 报告漏洞
 
-**请不要开公开 issue。** 用下面任一方式私下说：
+**请不要开公开 issue。** 用下面的方式私下说：
 
 - GitHub 的 [Private vulnerability reporting](../../security/advisories/new)（推荐）
-- 邮件：`<填你的邮箱>`
 
 尽量写清楚：影响哪个页面/接口、复现步骤、你期望的行为。有 PoC 更好。
 
